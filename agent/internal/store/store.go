@@ -71,7 +71,14 @@ func Open(path string) (*Store, error) {
 		_ = dir
 	}
 
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)",
+	// busy_timeout matters when more than one process holds the DB
+	// open concurrently — e.g. the long-lived daemon and a transient
+	// Native Messaging host instance both bumping aggregate_stats. WAL
+	// keeps reads non-blocking but writers still serialise; without
+	// busy_timeout SQLite returns SQLITE_BUSY immediately and the
+	// caller has to retry. We retry for up to 5s inside the driver so
+	// callers (and ultimately the stats counters) don't have to.
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)",
 		url.QueryEscape(path))
 
 	db, err := sql.Open("sqlite", dsn)

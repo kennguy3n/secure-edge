@@ -128,6 +128,30 @@ func TestStatsAddAndReset(t *testing.T) {
 	}
 }
 
+func TestOpen_PragmasApplied(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	// busy_timeout matters when the daemon and the Native Messaging
+	// host both write to aggregate_stats. The DSN sets it to 5000 ms;
+	// drift here would re-introduce silent counter loss.
+	var busy int
+	if err := s.DB().QueryRowContext(ctx, `PRAGMA busy_timeout`).Scan(&busy); err != nil {
+		t.Fatalf("read busy_timeout: %v", err)
+	}
+	if busy != 5000 {
+		t.Errorf("busy_timeout = %d ms, want 5000 ms", busy)
+	}
+
+	var mode string
+	if err := s.DB().QueryRowContext(ctx, `PRAGMA journal_mode`).Scan(&mode); err != nil {
+		t.Fatalf("read journal_mode: %v", err)
+	}
+	if mode != "wal" {
+		t.Errorf("journal_mode = %q, want %q", mode, "wal")
+	}
+}
+
 func TestMigrationsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "twice.db")
 	s, err := Open(path)

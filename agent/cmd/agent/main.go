@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -229,6 +230,16 @@ func run(configPath string) error {
 			if rulesDir == "" {
 				rulesDir = defaultRulesDir(cfg.RulePaths)
 			}
+			// The updater writes downloads as rulesDir/<basename>; the
+			// reload callback below reads cfg.DLPPatternsPath /
+			// cfg.RulePaths verbatim. If any of those paths point
+			// outside rulesDir we'd download new bytes that the live
+			// pipeline never reads — a silent staleness bug. Fail loud
+			// at startup instead of letting POST /api/rules/update lie.
+			if err := validateRulesAlignment(rulesDir, cfg.RulePaths,
+				cfg.DLPPatternsPath, cfg.DLPExclusionsPath); err != nil {
+				return fmt.Errorf("rule_update_url is set but %w", err)
+			}
 			updater, err := rules.New(rules.Options{
 				ManifestURL:  cfg.RuleUpdateURL,
 				PollInterval: cfg.RuleUpdateInterval,
@@ -277,6 +288,56 @@ func run(configPath string) error {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 	fmt.Fprintln(os.Stderr, "agent: shutting down")
+	return nil
+}
+
+// validateRulesAlignment checks that every rule file the live agent
+// reads at runtime resolves to a sibling of rulesDir. The updater
+// writes downloaded bytes to rulesDir/<basename>, then calls the
+// reload callback which re-reads cfg.DLPPatternsPath /
+// cfg.DLPExclusionsPath / cfg.RulePaths verbatim. Misaligned paths
+// therefore land in a directory the pipeline never reads, so
+// POST /api/rules/update would happily return {updated: true} while
+// every scan keeps using the on-disk file from the original install.
+//
+// Comparison is against the absolute-cleaned form of rulesDir so
+// "./rules" and "/etc/secure-edge/rules/" with a trailing slash both
+// behave the same way as canonical paths.
+func validateRulesAlignment(rulesDir string, rulePaths []string, dlpPatternsPath, dlpExclusionsPath string) error {
+	absDir, err := filepath.Abs(rulesDir)
+	if err != nil {
+		return fmt.Errorf("resolve rules_dir %q: %w", rulesDir, err)
+	}
+	absDir = filepath.Clean(absDir)
+	check := func(field, p string) error {
+		if p == "" {
+			return nil
+		}
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return fmt.Errorf("resolve %s %q: %w", field, p, err)
+		}
+		if filepath.Dir(filepath.Clean(abs)) != absDir {
+			return fmt.Errorf("%s = %q is not directly inside rules_dir = %q; "+
+				"the rule updater writes downloaded files into rules_dir but the "+
+				"live pipeline keeps reading the original path, so updates would "+
+				"silently never take effect. Move the file into rules_dir, or set "+
+				"rules_dir to the file's parent directory",
+				field, p, rulesDir)
+		}
+		return nil
+	}
+	for _, p := range rulePaths {
+		if err := check("rule_paths entry", p); err != nil {
+			return err
+		}
+	}
+	if err := check("dlp_patterns", dlpPatternsPath); err != nil {
+		return err
+	}
+	if err := check("dlp_exclusions", dlpExclusionsPath); err != nil {
+		return err
+	}
 	return nil
 }
 

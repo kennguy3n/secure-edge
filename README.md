@@ -86,21 +86,6 @@ MIT — see [LICENSE](./LICENSE).
 | MITM Proxy (opt-in) | `github.com/elazarl/goproxy` | Tier 2 non-browser traffic |
 | Installer | `goreleaser` + `nfpm` (deb/rpm), `pkgbuild` (macOS), WiX (Windows) | Standard per-platform |
 
-## Reused from ShieldNet Gateway
-
-This project reuses **data models and UI patterns** from the ShieldNet Gateway project while
-discarding the server infrastructure (Squid, SSH/SFTP, iptables, PostgreSQL, gRPC).
-
-- **Rule file format** — one-entry-per-line text files (e.g., `.facebook.com`, `.deepseek.com`)
-- **Rule types** — `dstdomain`, `dst`, `src`, `url_regex`, `dstdom_regex`, `urlpath_regex`
-- **Data model** — `WebfilteringRuleset` (name, rule_type, file_path, category) mapped to local SQLite
-- **Policy toggle UI** — `PoliciesPage` with per-category switches, adapted to three-state selector
-- **Network-to-ruleset assignment** — `NetworkWebfilteringRuleset` M:N model adapted to device-to-ruleset
-
-**Explicitly NOT reused (privacy):**
-- `WebFilteringAlertEvent` logging model — we do not log access events
-- `SecurityReportsPage` detailed alert tables — replaced with anonymous aggregate stats only
-
 ## Rule Distribution
 
 Rules can be loaded from two sources:

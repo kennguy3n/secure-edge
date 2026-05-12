@@ -57,35 +57,11 @@ any browsing history or access patterns from the agent's data. The only observab
 | 3 | Block (AI) | `deepseek.com`, `poe.com` | DNS returns NXDOMAIN |
 | 4 | Block (Other) | Phishing, gambling, social media | DNS returns NXDOMAIN |
 
-## What We Reuse from ShieldNet Gateway
+## Policy Model
 
-### Reusable Assets
-
-| Asset | ShieldNet Source | Secure Edge Usage |
-|-------|-----------------|-------------------|
-| Rule file format | `/etc/squid/categories/*.txt` — one domain per line | Identical format, stored locally |
-| Rule types | `dstdomain`, `dst`, `src`, `url_regex`, etc. | Same taxonomy; `dstdomain` covers ~90% of use cases |
-| `WebfilteringRuleset` model | `internal/model/webfiltering_ruleset.go` — GORM model with Name, RuleType, FilePath, Category | Mapped to SQLite schema |
-| `RulesetConfig` | Proto message with `ruleset_uuid`, `category`, `enabled` | Extended to three-state: `allow`, `allow_with_dlp`, `deny` |
-| `NetworkWebfilteringRuleset` | M:N join model in `internal/model/network_webfiltering_ruleset.go` | Adapted as device-to-profile assignment |
-| `PoliciesPage` UI | `src/pages/App/policies/PoliciesPage.tsx` — per-category Switch toggles | Adapted to three-option selector per category |
-| `IDSPolicy` hierarchy | `src/api/services/policies.ts` — `IDSPolicy` → `IDSPolicyCategory` → `IDSPolicyRuleset` | Adapted for local policy tree |
-
-### What Is NOT Reused
-
-| Discarded Asset | Reason |
-|----------------|--------|
-| `WebFilteringAlertEvent` logging | **Privacy** — we do not log access events |
-| `SecurityReportsPage` alert tables | **Privacy** — replaced with anonymous aggregate stats |
-| Squid proxy management via SSH/SFTP | Replaced by in-process `goproxy` |
-| `iptables` NAT rules, `ip route` commands | Not applicable to desktop agent |
-| PostgreSQL / Redis | Replaced by local SQLite |
-| gRPC server, `internal/service/` layer | Replaced by local HTTP API |
-
-## Extended Policy Model
-
-ShieldNet's `RulesetConfig` only supports `enabled: bool`. Secure Edge extends this to a
-three-state action model:
+Each category is governed by a three-state action: `allow`, `allow_with_dlp`, or `deny`. The
+model is intentionally simple — one record per category, plus a reference to the rule file that
+lists the matching domains.
 
 ```go
 type CategoryPolicy struct {
@@ -93,7 +69,7 @@ type CategoryPolicy struct {
     Name        string   `json:"name"`
     Category    string   `json:"category"`       // "AI Chat", "AI Code", "Phishing", etc.
     Action      string   `json:"action"`          // "allow", "allow_with_dlp", "deny"
-    RuleType    string   `json:"rule_type"`       // from ShieldNet: "dstdomain", "dst", "url_regex"
+    RuleType    string   `json:"rule_type"`       // "dstdomain", "dst", "url_regex"
     RuleFile    string   `json:"rule_file"`       // "ai_chat.txt"
     DLPPatterns []string `json:"dlp_patterns"`    // regex patterns, only for "allow_with_dlp"
 }

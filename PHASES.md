@@ -157,12 +157,12 @@ but cannot see WHAT was blocked.
 | Component | Difficulty | Notes |
 |-----------|-----------|-------|
 | DNS blocking agent | Easy | ~500 lines Go |
-| Rule file format + updater | Easy | Direct reuse of ShieldNet format |
+| Rule file format + updater | Easy | Plain text domain lists; small JSON manifest |
 | SQLite config store (no logging) | Easy | Simpler than logged version — fewer tables, less I/O |
 | Anonymous counter system | Easy | Atomic integer increments, periodic flush |
 | Electron tray (minimal) | Easy | ~300 lines main process |
 | Browser extension (Tier 2) | Medium | ~2000 lines TypeScript |
-| Settings UI | Medium | Adapted from ShieldNet frontend (no Reports page needed) |
+| Settings UI | Medium | Small surface area; no Reports page by design |
 | Local MITM proxy | Medium | ~1000 lines Go (goproxy handles TLS) |
 | Cross-platform installers | Medium | Three separate pipelines |
 | DLP pattern tuning | Hard | Ongoing quality problem (false positives) |

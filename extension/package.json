@@ -2,16 +2,18 @@
   "name": "secure-edge-extension",
   "version": "0.1.0",
   "private": true,
-  "description": "Chrome Manifest V3 companion extension for Secure Edge — intercepts pastes into approved AI tools and runs them through the local DLP pipeline.",
+  "description": "Chrome Manifest V3 companion extension for Secure Edge — intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local DLP pipeline.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --import tsx ./src/**/*.test.ts || echo 'no tests'",
-    "clean": "rm -rf dist"
+    "build:firefox": "npm run build && node scripts/build-firefox.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --test --import tsx 'src/**/__tests__/*.test.ts'",
+    "clean": "rm -rf dist dist-firefox"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",
     "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.4.5"
   }
 }

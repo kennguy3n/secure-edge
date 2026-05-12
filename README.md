@@ -73,11 +73,18 @@ rule_paths:
   - rules/news.txt
 dlp_patterns: rules/dlp_patterns.json     # optional — enables /api/dlp/*
 dlp_exclusions: rules/dlp_exclusions.json # optional
+
+# Phase 3 rule updater. Leaving rule_update_url blank disables the
+# updater; everything else (DNS, policies, DLP) keeps working.
+rule_update_url: ""                       # e.g. https://example.com/manifest.json
+rule_update_interval: 6h                  # cadence; default 6h
+rules_dir: rules                          # output dir for downloaded rule files
 ```
 
 Leaving `dlp_patterns` blank disables the DLP pipeline and returns `503` from
 the `/api/dlp/*` endpoints; everything else (DNS, policies, stats) keeps
-working.
+working. Likewise, leaving `rule_update_url` blank returns `503` from
+`/api/rules/*`.
 
 ## Project Structure
 
@@ -92,7 +99,7 @@ secure-edge/
 │   │   ├── dlp/                      # Layered DLP pipeline (Phase 2)
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
 │   │   ├── policy/                   # Policy engine
-│   │   ├── rules/                    # Rule-file parser + lookup index
+│   │   ├── rules/                    # Rule-file parser + lookup + updater (Phase 3)
 │   │   ├── stats/                    # Anonymous aggregate counters
 │   │   └── store/                    # SQLite (modernc.org/sqlite, WAL)
 │   ├── nfpm.yaml                     # .deb packaging
@@ -108,9 +115,12 @@ secure-edge/
 │   │   └── api/agent.ts              # HTTP client for the Go agent
 │   ├── package.json
 │   └── electron-builder.yml
-├── extension/                        # Chrome Manifest V3 companion extension
-│   ├── manifest.json
+├── extension/                        # Chrome / Firefox Manifest V3 companion
+│   ├── manifest.json                 # Chrome MV3
+│   ├── manifest.firefox.json         # Firefox MV3 (browser_specific_settings)
+│   ├── native-messaging/             # Native Messaging host manifest + installers
 │   ├── src/{background,content,popup}/
+│   ├── scripts/build-firefox.mjs
 │   ├── package.json
 │   └── tsconfig.json
 ├── rules/                            # Bundled domain lists + DLP rules
@@ -119,11 +129,18 @@ secure-edge/
 │   ├── news.txt              manifest.json
 │   ├── dlp_patterns.json
 │   └── dlp_exclusions.json
-├── scripts/                          # Platform DNS / service install scripts
-│   ├── macos/{configure-dns.sh,com.secureedge.agent.plist}
-│   ├── windows/{configure-dns.ps1,register-service.ps1}
-│   └── linux/{configure-dns.sh,secure-edge.service}
-└── .github/workflows/ci.yml          # Go + Electron + extension typecheck
+├── scripts/                          # Platform install / DNS scripts
+│   ├── macos/                        # build-pkg.sh, postinstall.sh, uninstall.sh,
+│   │                                 # configure-dns.sh, com.secureedge.agent.plist
+│   ├── windows/                      # secure-edge.wxs, build-msi.ps1,
+│   │                                 # postinstall.ps1, uninstall.ps1,
+│   │                                 # configure-dns.ps1, register-service.ps1
+│   └── linux/                        # build-packages.sh, postinstall.sh,
+│                                     # preremove.sh, uninstall.sh,
+│                                     # configure-dns.sh, secure-edge.service
+└── .github/workflows/
+    ├── ci.yml                        # Go + Electron + extension typecheck + tests
+    └── release.yml                   # multi-arch builds + GitHub Release on tags
 ```
 
 ## API
@@ -140,11 +157,20 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 | POST   | `/api/dlp/scan`            | Scan `{content}` through the DLP pipeline; returns `{blocked, pattern_name, score}`. Content is processed in memory and never persisted. |
 | GET    | `/api/dlp/config`          | Current DLP scoring weights and per-severity thresholds |
 | PUT    | `/api/dlp/config`          | Update DLP scoring weights and thresholds |
+| POST   | `/api/rules/update`        | Trigger an immediate rule-manifest check; returns `{updated, version, files_downloaded}` |
+| GET    | `/api/rules/status`        | Current rule version + last/next check time + manifest URL |
 
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
 
 The DLP endpoints return `503 Service Unavailable` when the agent is started
-without a `dlp_patterns` config entry (Phase 1 deployments).
+without a `dlp_patterns` config entry (Phase 1 deployments). The `/api/rules/*`
+endpoints return `503` when `rule_update_url` is blank.
+
+The extension prefers to reach the agent through Chrome Native Messaging
+(no CORS, survives air-gapped networks) and falls back to direct HTTP to
+`127.0.0.1:8080` when the native host is unavailable. Install the host
+manifest with `extension/native-messaging/install.sh` (macOS/Linux) or
+`install.ps1` (Windows).
 
 ## Testing
 
@@ -158,6 +184,7 @@ npm run typecheck         # TypeScript strict mode against renderer + main
 
 cd ../extension
 npm install && npm run typecheck   # browser-extension Manifest V3 typecheck
+npm test                            # node --test on content + background scripts
 ```
 
 DLP coverage includes one `*_test.go` per pipeline component

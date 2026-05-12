@@ -86,3 +86,7 @@ jobs:
       - name: typecheck
         working-directory: extension
         run: npm run typecheck
+
+      - name: test
+        working-directory: extension
+        run: npm test

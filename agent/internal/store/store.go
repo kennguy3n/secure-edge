@@ -338,3 +338,35 @@ func (s *Store) ResetStats(ctx context.Context) error {
 	}
 	return nil
 }
+
+// CurrentRuleVersion returns the most recent rule manifest version
+// recorded in rule_versions. An empty string is returned when no
+// version has been written yet (fresh install).
+func (s *Store) CurrentRuleVersion(ctx context.Context) (string, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, `
+SELECT manifest_version FROM rule_versions ORDER BY id DESC LIMIT 1
+`).Scan(&v)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("current rule_version: %w", err)
+	}
+	return v, nil
+}
+
+// AppendRuleVersion records that the agent successfully synced rules
+// to the given manifest version. The append-only history preserves an
+// audit trail; CurrentRuleVersion always returns the newest row.
+func (s *Store) AppendRuleVersion(ctx context.Context, version string) error {
+	if version == "" {
+		return errors.New("append rule_version: version is empty")
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO rule_versions (manifest_version) VALUES (?)`, version)
+	if err != nil {
+		return fmt.Errorf("append rule_version: %w", err)
+	}
+	return nil
+}

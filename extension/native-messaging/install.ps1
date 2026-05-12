@@ -1,0 +1,47 @@
+# Install the Secure Edge Native Messaging host manifest on Windows.
+#
+# Usage:
+#   .\install.ps1 -ExtensionId <ID> [-AgentPath <C:\Path\To\secure-edge-agent.exe>]
+#
+# Writes a host JSON to %LOCALAPPDATA%\SecureEdge\NativeMessagingHosts\
+# and registers it under
+#   HKCU\Software\Google\Chrome\NativeMessagingHosts\com.secureedge.agent
+# pointing at the JSON. Chrome's Native Messaging discovery reads that
+# registry key on the next browser launch.
+
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$ExtensionId,
+
+    [string]$AgentPath = "$env:ProgramFiles\SecureEdge\secure-edge-agent.exe"
+)
+
+$ErrorActionPreference = "Stop"
+
+$hostName  = "com.secureedge.agent"
+$origin    = "chrome-extension://${ExtensionId}/"
+$installDir = Join-Path $env:LOCALAPPDATA "SecureEdge\NativeMessagingHosts"
+$manifest  = Join-Path $installDir "${hostName}.json"
+
+New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+
+$json = [ordered]@{
+    name = $hostName
+    description = "Secure Edge DLP companion native messaging host"
+    path = $AgentPath
+    type = "stdio"
+    allowed_origins = @($origin)
+} | ConvertTo-Json -Depth 4
+
+Set-Content -Path $manifest -Value $json -Encoding ASCII
+
+# Register the manifest with Chrome (per-user; HKCU avoids needing
+# admin). The default value of the key is the absolute path to the
+# manifest JSON file.
+$regKey = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$hostName"
+New-Item -Path $regKey -Force | Out-Null
+Set-ItemProperty -Path $regKey -Name "(default)" -Value $manifest
+
+Write-Host "Installed $hostName manifest to $manifest"
+Write-Host "  agent binary: $AgentPath"
+Write-Host "  origin:       $origin"

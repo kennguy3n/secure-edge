@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -94,14 +95,23 @@ type DLPScanner interface {
 	SetWeights(w dlp.ScoreWeights)
 }
 
+// RuleUpdater is the subset of rules.Updater the API needs. Wired in
+// SetRuleUpdater so the API package does not import the rules package
+// for handler tests.
+type RuleUpdater interface {
+	CheckNow(ctx context.Context) (rules.Result, error)
+	Status() rules.Status
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store     *store.Store
-	Policy    PolicyEngine
-	Stats     StatsView
-	DLP       DLPScanner
-	startedAt time.Time
-	once      sync.Once
+	Store       *store.Store
+	Policy      PolicyEngine
+	Stats       StatsView
+	DLP         DLPScanner
+	RuleUpdater RuleUpdater
+	startedAt   time.Time
+	once        sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -113,6 +123,10 @@ func NewServer(s *store.Store, p PolicyEngine, st StatsView) *Server {
 // Phase 1 callers don't have to provide one; Phase 2 callers do.
 func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
 
+// SetRuleUpdater wires the rule updater into the server. Phase 3 only;
+// when nil the /api/rules/* endpoints return 503.
+func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -123,6 +137,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/stats/reset", s.handleStatsReset)
 	mux.HandleFunc("/api/dlp/scan", s.handleDLPScan)
 	mux.HandleFunc("/api/dlp/config", s.handleDLPConfig)
+	mux.HandleFunc("/api/rules/update", s.handleRulesUpdate)
+	mux.HandleFunc("/api/rules/status", s.handleRulesStatus)
 	return withCORS(mux)
 }
 

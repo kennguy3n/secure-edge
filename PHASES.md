@@ -5,18 +5,18 @@
 **Covers:** Tiers 1, 3, 4 fully. Basic system tray presence. Zero-logging architecture.
 
 ### Deliverables
-- [ ] Go agent binary with embedded DNS resolver (`miekg/dns`)
-- [ ] SQLite database with `rulesets`, `category_policies`, `aggregate_stats` tables (no alert_events)
-- [ ] Policy engine: load rule files, match domains, return NXDOMAIN or forward
-- [ ] Anonymous counter system: increment `dns_blocks_total` on block, `dns_queries_total` on any query
-- [ ] Local HTTP API (`/api/policies`, `/api/stats`, `/api/status`)
-- [ ] Bundled rule files: `ai_chat_blocked.txt`, `phishing.txt`, `social.txt`, `news.txt`
-- [ ] Electron tray app (hidden window, tray icon only)
-- [ ] Tray context menu: Status, Open Settings, Quit
-- [ ] Settings page: per-category policy toggles (Block / Allow)
-- [ ] Status page: anonymous aggregate stats display (total blocks, uptime)
-- [ ] Platform DNS configuration scripts (macOS, Windows, Linux)
-- [ ] Basic installer for one platform (Linux `.deb` or macOS `.pkg`)
+- [x] Go agent binary with embedded DNS resolver (`miekg/dns`)
+- [x] SQLite database with `rulesets`, `category_policies`, `aggregate_stats` tables (no alert_events)
+- [x] Policy engine: load rule files, match domains, return NXDOMAIN or forward
+- [x] Anonymous counter system: increment `dns_blocks_total` on block, `dns_queries_total` on any query
+- [x] Local HTTP API (`/api/policies`, `/api/stats`, `/api/status`)
+- [x] Bundled rule files: `ai_chat_blocked.txt`, `phishing.txt`, `social.txt`, `news.txt`
+- [x] Electron tray app (hidden window, tray icon only)
+- [x] Tray context menu: Status, Open Settings, Quit
+- [x] Settings page: per-category policy toggles (Block / Allow)
+- [x] Status page: anonymous aggregate stats display (total blocks, uptime)
+- [x] Platform DNS configuration scripts (macOS, Windows, Linux)
+- [x] Basic installer for one platform (Linux `.deb` or macOS `.pkg`)
 
 ### Architecture
 ```
@@ -35,33 +35,33 @@ Logging:       NONE for user access. Operational errors only to stderr.
 ### Deliverables
 
 #### DLP Pipeline Core (Go agent)
-- [ ] Content type classifier (code/data/credentials/natural language heuristics)
-- [ ] Aho-Corasick automaton builder from pattern prefixes (e.g., `cloudflare/ahocorasick`)
-- [ ] Single-pass prefix scan returning candidate locations
-- [ ] Candidate-only regex validation
-- [ ] Hotword proximity checker (scan N chars around match for context keywords)
-- [ ] Shannon entropy calculator for secret/key candidates
-- [ ] Exclusion rule engine (dictionary + regex suppressions)
-- [ ] Multi-signal scoring system with configurable weights
-- [ ] Per-severity threshold configuration (`/api/dlp/config` endpoint)
-- [ ] `/api/dlp/scan` endpoint — receives content, runs pipeline, returns block/allow + pattern name
+- [x] Content type classifier (code/data/credentials/natural language heuristics)
+- [x] Aho-Corasick automaton builder from pattern prefixes (e.g., `cloudflare/ahocorasick`)
+- [x] Single-pass prefix scan returning candidate locations
+- [x] Candidate-only regex validation
+- [x] Hotword proximity checker (scan N chars around match for context keywords)
+- [x] Shannon entropy calculator for secret/key candidates
+- [x] Exclusion rule engine (dictionary + regex suppressions)
+- [x] Multi-signal scoring system with configurable weights
+- [x] Per-severity threshold configuration (`/api/dlp/config` endpoint)
+- [x] `/api/dlp/scan` endpoint — receives content, runs pipeline, returns block/allow + pattern name
 
 #### DLP Rule Files
-- [ ] `dlp_patterns.json` — extended format with `prefix`, `hotwords`, `hotword_window`, `entropy_min`, `severity`, `min_matches`
-- [ ] `dlp_exclusions.json` — dictionary and regex exclusions per pattern (or global)
-- [ ] Scoring thresholds config in `dlp_config` SQLite table
+- [x] `dlp_patterns.json` — extended format with `prefix`, `hotwords`, `hotword_window`, `entropy_min`, `severity`, `min_matches`
+- [x] `dlp_exclusions.json` — dictionary and regex exclusions per pattern (or global)
+- [x] Scoring thresholds config in `dlp_config` SQLite table
 
 #### Browser Extension
-- [ ] Chrome extension (Manifest V3) with content scripts for Tier 2 AI domains
-- [ ] Firefox extension (WebExtensions) port
-- [ ] Native Messaging host configuration for extension ↔ agent communication
-- [ ] Extension intercepts: paste events, form submissions, fetch/XHR requests
-- [ ] Ephemeral block notification: shows pattern name only, no matched content, auto-dismisses
+- [x] Chrome extension (Manifest V3) with content scripts for Tier 2 AI domains
+- [x] Firefox extension (WebExtensions) port
+- [x] Native Messaging host configuration for extension ↔ agent communication
+- [x] Extension intercepts: paste events, form submissions, fetch/XHR requests
+- [x] Ephemeral block notification: shows pattern name only, no matched content, auto-dismisses
 
 #### Integration
-- [ ] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` (no content/domain stored)
-- [ ] Category toggles extended to three-state: Allow / Allow + Inspect / Block
-- [ ] Automaton rebuilt when rules update (triggered by `/api/rules/update`)
+- [x] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` (no content/domain stored)
+- [x] Category toggles extended to three-state: Allow / Allow + Inspect / Block
+- [x] Automaton rebuilt when rules update (triggered by `/api/rules/update`)
 
 ### Privacy Guarantees
 - DLP scan content is received via HTTP POST, scanned in-memory, and response sent. The request body is garbage-collected. Never written to disk.
@@ -86,16 +86,16 @@ Logging:       NONE for user access. Operational errors only to stderr.
 **Covers:** Server-side rule distribution (including DLP patterns + exclusions). Production-ready packaging.
 
 ### Deliverables
-- [ ] Rule updater: polls `manifest.json` from configurable URL (default: GitHub Releases)
-- [ ] Manifest format: version, checksums (SHA256), file list (includes `dlp_patterns.json` + `dlp_exclusions.json`)
-- [ ] Delta updates: only download changed rule files
-- [ ] On rule update: rebuild Aho-Corasick automaton and exclusion hash sets
-- [ ] Electron auto-update via `electron-updater` (Squirrel on Windows, zip on macOS)
-- [ ] macOS installer: `.pkg` via `pkgbuild` + `productbuild`
-- [ ] Windows installer: MSI via WiX Toolset
-- [ ] Linux installers: `.deb` + `.rpm` via `nfpm`
-- [ ] CI/CD pipeline: GitHub Actions for cross-platform builds
-- [ ] Code signing for macOS (Developer ID) and Windows (Authenticode)
+- [x] Rule updater: polls `manifest.json` from configurable URL (default: GitHub Releases)
+- [x] Manifest format: version, checksums (SHA256), file list (includes `dlp_patterns.json` + `dlp_exclusions.json`)
+- [x] Delta updates: only download changed rule files
+- [x] On rule update: rebuild Aho-Corasick automaton and exclusion hash sets
+- [x] Electron auto-update via `electron-updater` (Squirrel on Windows, zip on macOS)
+- [x] macOS installer: `.pkg` via `pkgbuild` + `productbuild`
+- [x] Windows installer: MSI via WiX Toolset
+- [x] Linux installers: `.deb` + `.rpm` via `nfpm`
+- [x] CI/CD pipeline: GitHub Actions for cross-platform builds
+- [ ] Code signing for macOS (Developer ID) and Windows (Authenticode) — deferred until signing certificates are provisioned
 
 ### Rule Server (Minimal)
 ```

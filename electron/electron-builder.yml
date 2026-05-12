@@ -17,3 +17,10 @@ linux:
 win:
   target:
     - nsis
+# Publish artifacts to GitHub Releases so electron-updater can find
+# the latest .yml manifest and incremental binaries.
+publish:
+  - provider: github
+    owner: kennguy3n
+    repo: secure-edge
+    releaseType: release

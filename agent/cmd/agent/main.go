@@ -27,14 +27,59 @@ var version = "0.1.0"
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to YAML config file")
+	nativeMode := flag.Bool("native-messaging", false,
+		"run as a Chrome Native Messaging host on stdin/stdout instead of a daemon")
 	flag.Parse()
 
 	api.Version = version
+
+	if *nativeMode {
+		if err := runNativeMessaging(*configPath); err != nil {
+			fmt.Fprintf(os.Stderr, "agent (native): %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*configPath); err != nil {
 		fmt.Fprintf(os.Stderr, "agent: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runNativeMessaging serves the Chrome Native Messaging protocol on
+// stdin/stdout. It loads the same DLP pipeline as the daemon mode (so
+// scan results match the HTTP fallback) but skips the DNS / API
+// servers entirely — Chrome spawns one host process per extension
+// session and tears it down on disconnect.
+func runNativeMessaging(configPath string) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if cfg.DLPPatternsPath == "" {
+		return fmt.Errorf("native messaging requires dlp_patterns in config")
+	}
+	patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+	if err != nil {
+		return err
+	}
+	var exclusions []dlp.Exclusion
+	if cfg.DLPExclusionsPath != "" {
+		exclusions, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+		if err != nil {
+			return err
+		}
+	}
+	pipeline := dlp.NewPipeline(
+		dlp.ScoreWeights{},
+		dlp.NewThresholdEngine(dlp.DefaultThresholds()),
+	)
+	pipeline.Rebuild(patterns, exclusions)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return api.ServeNativeMessaging(ctx, pipeline, os.Stdin, os.Stdout)
 }
 
 func run(configPath string) error {
@@ -115,6 +160,45 @@ func run(configPath string) error {
 		pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
+
+		// Wire the rule updater after the pipeline so the reload
+		// callback can refresh both the policy engine's lookup table
+		// and the DLP automaton from the freshly-downloaded files.
+		if cfg.RuleUpdateURL != "" {
+			rulesDir := cfg.RulesDir
+			if rulesDir == "" {
+				rulesDir = defaultRulesDir(cfg.RulePaths)
+			}
+			updater, err := rules.New(rules.Options{
+				ManifestURL:  cfg.RuleUpdateURL,
+				PollInterval: cfg.RuleUpdateInterval,
+				RulesDir:     rulesDir,
+				Store:        s,
+				Reload: func(ctx context.Context) error {
+					if err := engine.Reload(ctx); err != nil {
+						return err
+					}
+					p, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+					if err != nil {
+						return err
+					}
+					var ex []dlp.Exclusion
+					if cfg.DLPExclusionsPath != "" {
+						ex, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+						if err != nil {
+							return err
+						}
+					}
+					pipeline.Rebuild(p, ex)
+					return nil
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("build updater: %w", err)
+			}
+			apiServer.SetRuleUpdater(updater)
+			go updater.Start(ctx)
+		}
 	}
 
 	httpServer, err := apiServer.ListenAndServe(cfg.APIListen)
@@ -134,6 +218,23 @@ func run(configPath string) error {
 	<-sig
 	fmt.Fprintln(os.Stderr, "agent: shutting down")
 	return nil
+}
+
+// defaultRulesDir derives the directory rule files live in when the
+// caller did not set RulesDir explicitly. Each RulePaths entry is
+// typically RulesDir/<category>.txt, so the parent of the first entry
+// is a safe default. Returns "rules" if RulePaths is empty.
+func defaultRulesDir(rulePaths []string) string {
+	if len(rulePaths) == 0 {
+		return "rules"
+	}
+	dir := rulePaths[0]
+	for i := len(dir) - 1; i >= 0; i-- {
+		if dir[i] == '/' || dir[i] == '\\' {
+			return dir[:i]
+		}
+	}
+	return "."
 }
 
 // categoryAcronyms lists rule-file words that should be emitted in all

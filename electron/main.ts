@@ -11,6 +11,7 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain } from 'electron';
 import * as path from 'path';
 import * as http from 'http';
+import { autoUpdater } from 'electron-updater';
 
 const AGENT_PORT = Number(process.env.SECURE_EDGE_AGENT_PORT ?? 8080);
 const AGENT_HOST = process.env.SECURE_EDGE_AGENT_HOST ?? '127.0.0.1';
@@ -22,6 +23,7 @@ let tray: Tray | null = null;
 let window: BrowserWindow | null = null;
 let healthTimer: NodeJS.Timeout | null = null;
 let lastHealthy: boolean | null = null;
+let updateAvailable = false;
 
 function rendererPath(): string {
   // In production main.ts is compiled to dist/main.js and the renderer
@@ -82,12 +84,24 @@ function showView(view: View) {
 }
 
 function buildMenu(): Menu {
-  return Menu.buildFromTemplate([
+  const template: Electron.MenuItemConstructorOptions[] = [
     { label: 'Status', click: () => showView('status') },
     { label: 'Open Settings', click: () => showView('settings') },
-    { type: 'separator' },
-    { label: 'Quit', role: 'quit' },
-  ]);
+  ];
+  if (updateAvailable) {
+    template.push({ type: 'separator' });
+    template.push({
+      label: 'Update available — install and restart',
+      click: () => autoUpdater.quitAndInstall(),
+    });
+  }
+  template.push({ type: 'separator' });
+  template.push({ label: 'Quit', role: 'quit' });
+  return Menu.buildFromTemplate(template);
+}
+
+function refreshTrayMenu(): void {
+  tray?.setContextMenu(buildMenu());
 }
 
 function updateTrayHealth(healthy: boolean) {
@@ -156,6 +170,31 @@ app.whenReady().then(() => {
   );
 
   startHealthPolling();
+
+  // electron-updater wiring. The auto-update feed URL comes from
+  // electron-builder.yml's publish.github block. We surface availability
+  // in the tray menu but never silently install — the user explicitly
+  // clicks "Update available" to apply.
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.on('update-available', () => {
+    updateAvailable = true;
+    refreshTrayMenu();
+  });
+  autoUpdater.on('update-downloaded', () => {
+    updateAvailable = true;
+    refreshTrayMenu();
+  });
+  autoUpdater.on('error', (err) => {
+    // Update failures are not fatal — log to stderr and continue.
+    console.error('auto-update error:', err);
+  });
+  // Dev runs (no packaged app) cannot self-update; suppress the call.
+  if (app.isPackaged) {
+    void autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('checkForUpdatesAndNotify failed:', err);
+    });
+  }
 });
 
 // Keep the tray (and main process) alive when the settings window closes.

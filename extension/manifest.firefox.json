@@ -4,6 +4,13 @@
   "version": "0.1.0",
   "description": "Intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local Secure Edge DLP pipeline.",
 
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "secure-edge@shieldnet.example",
+      "strict_min_version": "115.0"
+    }
+  },
+
   "permissions": [
     "activeTab",
     "storage",
@@ -16,7 +23,7 @@
   ],
 
   "background": {
-    "service_worker": "dist/background/service-worker.js",
+    "scripts": ["dist/background/service-worker.js"],
     "type": "module"
   },
 

@@ -355,18 +355,73 @@ The Status page shows only anonymous counters: "Total blocks: 142 | DLP blocks: 
 
 ### 5. Browser Extension (Chrome + Firefox)
 
-TypeScript extension using Manifest V3 (Chrome) and WebExtensions (Firefox).
+TypeScript extension using Manifest V3 for both Chrome (`manifest.json`) and
+Firefox (`manifest.firefox.json`, with `browser_specific_settings.gecko`).
+A `npm run build:firefox` script produces a Firefox-ready bundle in
+`dist-firefox/`.
 
 **Capabilities:**
-- Content script injected into Tier 2 AI tool domains only
-- Intercepts: `paste` events, form `submit`, `fetch`/`XMLHttpRequest` calls
-- Sends content to Go agent's DLP pipeline via Chrome Native Messaging API
-- Shows ephemeral notification on block (pattern name only, not matched content)
+- Three content scripts injected on the 10 Tier 2 AI tool domains:
+  - `paste-interceptor.ts` — captures `paste` events
+  - `form-interceptor.ts`  — captures `<form>` `submit` events; concatenates
+    textarea + text-input values before scanning
+  - `network-interceptor.ts` — monkey-patches `window.fetch` and
+    `XMLHttpRequest.prototype.send` to scan outbound bodies > 50 bytes
+- Content scripts route DLP scans through the background service worker.
+  The service worker prefers Chrome Native Messaging
+  (`chrome.runtime.connectNative('com.secureedge.agent')`) and falls back to
+  direct HTTP (`POST 127.0.0.1:8080/api/dlp/scan`) when the native host is
+  unavailable. Both paths share the same `dlp.Pipeline.Scan()` on the agent.
+- Shows an ephemeral toast on block (pattern name only, never the matched
+  content). The toast is sanitised to printable ASCII so the page cannot
+  trivially trigger XSS via a hostile pattern name.
+- Falls open (allows the action) on any agent error or timeout so a crashed
+  agent never blocks productivity.
+
+**Native Messaging host manifest:** `extension/native-messaging/com.secureedge.agent.json`
+is installed per-user by `install.sh` (macOS/Linux) or `install.ps1`
+(Windows). On Chrome it lives under
+`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/` (macOS),
+`~/.config/google-chrome/NativeMessagingHosts/` (Linux), or
+`HKCU\Software\Google\Chrome\NativeMessagingHosts\com.secureedge.agent`
+(Windows). The agent binary launched with `--native-messaging` serves the
+Chrome protocol (4-byte little-endian length prefix + JSON payload) on
+stdin/stdout without standing up the DNS / API server.
 
 **Privacy:** The extension does not store any history of scanned content. When the DLP pipeline
 blocks content, the notification displays the pattern name (e.g., "AWS Access Key detected") but
 does NOT include the actual key or matched content. After the user dismisses the notification, no
 trace remains.
+
+### 5b. Rule Updater (Phase 3)
+
+`agent/internal/rules/updater.go` polls a configurable manifest URL on a
+configurable cadence (default 6 h) and applies delta updates to the on-disk
+rule bundle.
+
+**Flow:**
+1. `GET` the manifest URL configured via `config.yaml`'s `rule_update_url`.
+   The manifest is JSON: `{version: string, files: [{name, sha256, url?}]}`.
+2. For each file, compute the SHA256 of the existing copy in `rules_dir`. If
+   it already matches the manifest entry, skip the file (delta optimisation).
+3. Otherwise, download the file into a temporary path next to its
+   destination, verify the SHA256, then `os.Rename` it onto the destination
+   path. `os.Rename` is atomic on POSIX filesystems and NTFS, so a partially
+   downloaded file can never be observed by the rest of the agent.
+4. After any file was replaced, invoke the reload callback wired by
+   `cmd/agent/main.go` — this calls `policy.Engine.Reload(ctx)` to
+   re-ingest the domain lookup map and `dlp.Pipeline.Rebuild(...)` to
+   reconstruct the Aho-Corasick automaton from the new patterns +
+   exclusions.
+5. Append the new version string to the `rule_versions` SQLite table for
+   audit, and update the in-memory `currentVersion` / `lastCheck` /
+   `nextCheck` fields used by `GET /api/rules/status`.
+
+**Safety:** the manifest's `files[].name` is rejected if it contains a path
+separator, parent reference (`..`), or starts with a dot. URLs are resolved
+against the manifest's own URL when relative, and downloads happen through
+the same `http.Client` (configurable timeout) so a network stall cannot
+hang the updater past its poll interval.
 
 ### 6. SQLite Database Schema
 
@@ -538,7 +593,7 @@ sequenceDiagram
 | `POST` | `/api/dlp/scan` | Scan content through layered DLP pipeline | Content processed in-memory, never persisted |
 | `GET` | `/api/dlp/config` | Get DLP scoring thresholds | Config only |
 | `PUT` | `/api/dlp/config` | Update DLP scoring thresholds | Config only |
-| `GET` | `/api/rules` | List loaded rule files | Metadata only |
-| `POST` | `/api/rules/update` | Trigger rule file update check | — |
+| `GET` | `/api/rules/status` | Current rule version, last/next check, manifest URL | Metadata only |
+| `POST` | `/api/rules/update` | Trigger immediate manifest check; returns `{updated, version, files_downloaded}` | — |
 
 **There is no `/api/alerts` endpoint. There is no `/api/logs` endpoint. This is by design.**

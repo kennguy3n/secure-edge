@@ -158,7 +158,12 @@ func (r *Resolver) handle(w mdns.ResponseWriter, req *mdns.Msg) {
 func (r *Resolver) respond(req *mdns.Msg) *mdns.Msg {
 	r.stats.IncrementDNSQueries()
 
-	if req == nil || len(req.Question) == 0 {
+	// A nil request can reach respond() via HandleQuery; mdns.Msg.SetRcode
+	// dereferences its first argument, so we cannot pass nil to it.
+	if req == nil {
+		return nil
+	}
+	if len(req.Question) == 0 {
 		m := new(mdns.Msg)
 		m.SetRcode(req, mdns.RcodeFormatError)
 		return m

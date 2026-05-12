@@ -45,9 +45,25 @@ func newTestServer(t *testing.T) (*Server, *fakeReloader, *fakeStatsView) {
 	return NewServer(s, rel, view), rel, view
 }
 
+// newLocalRequest builds an httptest request whose Host header is
+// 127.0.0.1, matching the loopback-only allowlist enforced by the API.
+func newLocalRequest(method, path string, body interface{}) *http.Request {
+	var r *http.Request
+	switch b := body.(type) {
+	case nil:
+		r = httptest.NewRequest(method, path, nil)
+	case *bytes.Buffer:
+		r = httptest.NewRequest(method, path, b)
+	default:
+		panic("unsupported body type")
+	}
+	r.Host = "127.0.0.1:8080"
+	return r
+}
+
 func TestStatusEndpoint(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	r := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 
@@ -68,7 +84,7 @@ func TestStatusEndpoint(t *testing.T) {
 
 func TestPoliciesCollection(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	r := httptest.NewRequest(http.MethodGet, "/api/policies", nil)
+	r := newLocalRequest(http.MethodGet, "/api/policies", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
@@ -86,7 +102,7 @@ func TestPoliciesCollection(t *testing.T) {
 func TestUpdatePolicyTriggersReload(t *testing.T) {
 	srv, rel, _ := newTestServer(t)
 	body := bytes.NewBufferString(`{"action":"allow"}`)
-	r := httptest.NewRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
+	r := newLocalRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
@@ -100,7 +116,7 @@ func TestUpdatePolicyTriggersReload(t *testing.T) {
 func TestUpdatePolicyInvalidAction(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	body := bytes.NewBufferString(`{"action":"bogus"}`)
-	r := httptest.NewRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
+	r := newLocalRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
@@ -111,7 +127,7 @@ func TestUpdatePolicyInvalidAction(t *testing.T) {
 func TestUpdatePolicyMissingCategory(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	body := bytes.NewBufferString(`{"action":"allow"}`)
-	r := httptest.NewRequest(http.MethodPut, "/api/policies/", body)
+	r := newLocalRequest(http.MethodPut, "/api/policies/", body)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
@@ -121,7 +137,7 @@ func TestUpdatePolicyMissingCategory(t *testing.T) {
 
 func TestStatsEndpoint(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	r := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
+	r := newLocalRequest(http.MethodGet, "/api/stats", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
@@ -138,7 +154,7 @@ func TestStatsEndpoint(t *testing.T) {
 
 func TestStatsResetEndpoint(t *testing.T) {
 	srv, _, view := newTestServer(t)
-	r := httptest.NewRequest(http.MethodPost, "/api/stats/reset", nil)
+	r := newLocalRequest(http.MethodPost, "/api/stats/reset", nil)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
@@ -162,7 +178,7 @@ func TestMethodNotAllowed(t *testing.T) {
 		{http.MethodGet, "/api/stats/reset"},
 	}
 	for _, c := range cases {
-		r := httptest.NewRequest(c.method, c.path, nil)
+		r := newLocalRequest(c.method, c.path, nil)
 		w := httptest.NewRecorder()
 		srv.Handler().ServeHTTP(w, r)
 		if w.Code != http.StatusMethodNotAllowed {
@@ -171,15 +187,62 @@ func TestMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestCORSPreflight(t *testing.T) {
+func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	r := httptest.NewRequest(http.MethodOptions, "/api/policies", nil)
+	for _, origin := range []string{"null", "http://localhost:5173", "http://127.0.0.1:5173"} {
+		r := newLocalRequest(http.MethodOptions, "/api/policies", nil)
+		r.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("%s: code = %d", origin, w.Code)
+		}
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Errorf("%s: ACAO = %q", origin, got)
+		}
+		if w.Header().Get("Vary") != "Origin" {
+			t.Errorf("%s: Vary header missing", origin)
+		}
+	}
+}
+
+func TestCORSRejectsUnknownOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	r := newLocalRequest(http.MethodGet, "/api/policies", nil)
+	r.Header.Set("Origin", "http://evil.example.com")
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, r)
-	if w.Code != http.StatusNoContent {
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("code = %d, want 403", w.Code)
+	}
+	if w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatal("ACAO must not be echoed for rejected origin")
+	}
+}
+
+func TestRejectsNonLoopbackHost(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	cases := []string{"evil.example.com", "evil.example.com:8080", ""}
+	for _, host := range cases {
+		r := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("host=%q: code = %d, want 403", host, w.Code)
+		}
+	}
+}
+
+func TestAllowsRequestsWithoutOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
 		t.Fatalf("code = %d", w.Code)
 	}
-	if w.Header().Get("Access-Control-Allow-Origin") == "" {
-		t.Fatal("CORS header missing")
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("ACAO unexpectedly set: %q", got)
 	}
 }

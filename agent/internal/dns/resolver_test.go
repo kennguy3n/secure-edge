@@ -148,3 +148,40 @@ func TestResolverUnknownDomainAllowed(t *testing.T) {
 		t.Fatalf("forwarder calls = %d", fwd.called)
 	}
 }
+
+func TestResolverNilRequestReturnsNilWithoutPanic(t *testing.T) {
+	pol := &fakePolicy{}
+	st := &fakeStats{}
+	fwd := &fakeForwarder{}
+	r := New("127.0.0.1:0", pol, st, fwd)
+
+	resp := r.HandleQuery(nil)
+	if resp != nil {
+		t.Fatalf("expected nil response for nil request, got %+v", resp)
+	}
+	if atomic.LoadInt64(&st.queries) != 1 {
+		t.Fatalf("queries counter not incremented: %d", st.queries)
+	}
+	if atomic.LoadInt64(&fwd.called) != 0 {
+		t.Fatalf("forwarder unexpectedly called for nil request")
+	}
+}
+
+func TestResolverEmptyQuestionReturnsFormatError(t *testing.T) {
+	pol := &fakePolicy{}
+	st := &fakeStats{}
+	fwd := &fakeForwarder{}
+	r := New("127.0.0.1:0", pol, st, fwd)
+
+	req := new(mdns.Msg)
+	resp := r.HandleQuery(req)
+	if resp == nil {
+		t.Fatal("expected non-nil response for empty-question request")
+	}
+	if resp.Rcode != mdns.RcodeFormatError {
+		t.Fatalf("rcode = %d, want FORMERR", resp.Rcode)
+	}
+	if atomic.LoadInt64(&fwd.called) != 0 {
+		t.Fatalf("forwarder unexpectedly called for empty question")
+	}
+}

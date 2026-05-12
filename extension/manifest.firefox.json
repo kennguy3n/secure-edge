@@ -71,8 +71,14 @@
       ],
       "run_at": "document_start",
       "all_frames": false
-    },
+    }
+  ],
+
+  "web_accessible_resources": [
     {
+      "resources": [
+        "dist/content/main-world-network.js"
+      ],
       "matches": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
@@ -84,13 +90,7 @@
         "https://www.perplexity.ai/*",
         "https://huggingface.co/chat/*",
         "https://poe.com/*"
-      ],
-      "js": [
-        "dist/content/main-world-network.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN",
-      "all_frames": false
+      ]
     }
   ]
 }

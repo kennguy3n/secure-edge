@@ -9,9 +9,10 @@ import assert from "node:assert/strict";
 import { __test__ as mainWorld } from "../main-world-network.js";
 import { __test__ as iso } from "../network-interceptor.js";
 import type { ScanResult } from "../../shared.js";
+import type { BridgeDoc, BridgeRuntime } from "../network-interceptor.js";
 
 const { patchFetch, patchXHR, extractFetchBody, bodyToText, requestScan, BRIDGE_SOURCE, ISO_SOURCE } = mainWorld;
-const { handleBridgeMessage } = iso;
+const { handleBridgeMessage, manifestDeclaresMainWorld, injectMainWorldBridge, BRIDGE_SCRIPT_PATH } = iso;
 
 type MessageListener = (ev: MessageEvent) => void;
 
@@ -229,4 +230,146 @@ test("handleBridgeMessage falls open when scan throws", async () => {
     );
     assert.equal(replies.length, 1);
     assert.deepEqual(replies[0], { source: ISO_SOURCE, kind: "scan-resp", id: "z", result: null });
+});
+
+// --- MAIN-world bridge delivery ---------------------------------------
+//
+// Chrome MV3 honours `world: "MAIN"` in content_scripts; Firefox 128
+// silently ignores the key (Bug #7 from Devin Review). The relay's job
+// is to detect that case via the runtime manifest and inject the
+// bridge as a `<script>` element loaded via runtime.getURL().
+
+/** Build a minimal fake `chrome.runtime` whose `getManifest()` returns
+ *  the supplied content_scripts list. */
+function makeRuntime(content_scripts: Array<{ world?: string }>): BridgeRuntime {
+    return {
+        getURL: (p: string) => `moz-extension://abc/${p}`,
+        getManifest: () => ({ content_scripts }),
+    };
+}
+
+/** Build a minimal fake DOM whose `documentElement` records appended
+ *  children. Mirrors just enough of `Document` for injectMainWorldBridge. */
+function makeDoc(): { doc: BridgeDoc; appended: HTMLScriptElement[]; created: HTMLScriptElement[] } {
+    const appended: HTMLScriptElement[] = [];
+    const created: HTMLScriptElement[] = [];
+    const docElement = {
+        appendChild(node: Node) {
+            appended.push(node as HTMLScriptElement);
+            return node;
+        },
+    };
+    const doc: BridgeDoc = {
+        createElement(_tag: "script") {
+            const listeners: Array<() => void> = [];
+            const el: Partial<HTMLScriptElement> & {
+                _src?: string;
+                _type?: string;
+                _listeners: Array<() => void>;
+                parentNode: { removeChild(n: Node): Node } | null;
+            } = {
+                _src: "",
+                _type: "",
+                _listeners: listeners,
+                parentNode: null,
+                addEventListener(_t: unknown, fn: unknown) { listeners.push(fn as () => void); },
+            };
+            Object.defineProperty(el, "src", {
+                get() { return el._src ?? ""; },
+                set(v: string) { el._src = v; },
+            });
+            Object.defineProperty(el, "type", {
+                get() { return el._type ?? ""; },
+                set(v: string) { el._type = v; },
+            });
+            created.push(el as HTMLScriptElement);
+            return el as HTMLScriptElement;
+        },
+        documentElement: docElement,
+        head: null,
+    };
+    return { doc, appended, created };
+}
+
+test("manifestDeclaresMainWorld returns true when any entry declares world MAIN", () => {
+    assert.equal(
+        manifestDeclaresMainWorld(makeRuntime([{}, { world: "MAIN" }])),
+        true,
+    );
+});
+
+test("manifestDeclaresMainWorld returns false when no entry declares MAIN", () => {
+    assert.equal(manifestDeclaresMainWorld(makeRuntime([{}, { world: "ISOLATED" }])), false);
+    assert.equal(manifestDeclaresMainWorld(makeRuntime([])), false);
+});
+
+test("manifestDeclaresMainWorld defaults to false (and triggers injection) when getManifest throws", () => {
+    const rt: BridgeRuntime = {
+        getURL: (p) => p,
+        getManifest: () => { throw new Error("unavailable"); },
+    };
+    // A throwing manifest reader is treated as Firefox-shaped — we'd
+    // rather double-patch than silently disable the interceptor.
+    assert.equal(manifestDeclaresMainWorld(rt), false);
+});
+
+test("injectMainWorldBridge is a no-op on Chrome (manifest declares MAIN world)", () => {
+    const { doc, appended } = makeDoc();
+    const rt = makeRuntime([{ world: "MAIN" }]);
+    const el = injectMainWorldBridge(rt, doc);
+    assert.equal(el, null, "Chrome path must not inject (platform already loaded the bridge)");
+    assert.equal(appended.length, 0);
+});
+
+test("injectMainWorldBridge appends a script element on Firefox-shaped manifests", () => {
+    const { doc, appended, created } = makeDoc();
+    const rt = makeRuntime([{ world: "ISOLATED" }]);
+    const el = injectMainWorldBridge(rt, doc);
+    assert.notEqual(el, null);
+    assert.equal(appended.length, 1, "exactly one bridge script element must be appended");
+    assert.equal(created.length, 1);
+    const inserted = appended[0] as HTMLScriptElement & { _src?: string; _type?: string };
+    assert.ok(
+        inserted._src && inserted._src.endsWith(BRIDGE_SCRIPT_PATH),
+        `injected src must resolve via runtime.getURL(${BRIDGE_SCRIPT_PATH}), got ${inserted._src}`,
+    );
+    assert.equal(inserted._type, "text/javascript");
+});
+
+test("injectMainWorldBridge falls back to <head> when documentElement is missing", () => {
+    const appended: HTMLScriptElement[] = [];
+    const doc: BridgeDoc = {
+        createElement(_tag: "script") {
+            return {
+                addEventListener(_t: unknown, _fn: unknown) { /* unused */ },
+                src: "",
+                type: "",
+            } as unknown as HTMLScriptElement;
+        },
+        documentElement: null,
+        head: {
+            appendChild(node: Node) {
+                appended.push(node as HTMLScriptElement);
+                return node;
+            },
+        },
+    };
+    const rt = makeRuntime([]);
+    const el = injectMainWorldBridge(rt, doc);
+    assert.notEqual(el, null);
+    assert.equal(appended.length, 1, "head must receive the bridge script when documentElement is null");
+});
+
+test("injectMainWorldBridge returns null when no parent is available yet", () => {
+    const doc: BridgeDoc = {
+        createElement(_tag: "script") {
+            return {
+                addEventListener(_t: unknown, _fn: unknown) { /* unused */ },
+            } as unknown as HTMLScriptElement;
+        },
+        documentElement: null,
+        head: null,
+    };
+    // Mirrors document_start before <html> is parsed. Caller would retry.
+    assert.equal(injectMainWorldBridge(makeRuntime([]), doc), null);
 });

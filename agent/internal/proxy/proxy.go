@@ -240,7 +240,20 @@ func (s *Server) ListenAndServe(addr string) error {
 	errCh := make(chan error, 1)
 	go func() {
 		s.running.Store(true)
-		defer s.running.Store(false)
+		// Always reset lifecycle state when the listener exits so a
+		// late ListenAndServe failure (after the 100ms startup window
+		// below) does not leave httpSrv/listenOn populated, which
+		// would make subsequent Enable calls report "already running"
+		// until Disable is invoked.
+		defer func() {
+			s.running.Store(false)
+			s.mu.Lock()
+			if s.httpSrv == srv {
+				s.httpSrv = nil
+				s.listenOn = ""
+			}
+			s.mu.Unlock()
+		}()
 		err := srv.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
@@ -251,9 +264,16 @@ func (s *Server) ListenAndServe(addr string) error {
 
 	select {
 	case err := <-errCh:
+		// The deferred cleanup inside the goroutine also clears
+		// httpSrv/listenOn, but it races with this read from errCh.
+		// Clear synchronously here so a caller that retries Enable
+		// immediately after observing the error never sees a stale
+		// httpSrv pointer.
 		s.mu.Lock()
-		s.httpSrv = nil
-		s.listenOn = ""
+		if s.httpSrv == srv {
+			s.httpSrv = nil
+			s.listenOn = ""
+		}
 		s.mu.Unlock()
 		return err
 	case <-time.After(100 * time.Millisecond):

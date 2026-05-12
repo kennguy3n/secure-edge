@@ -6,9 +6,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"path/filepath"
 	"testing"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
 
 // fakeScanner is a DLPScanner that returns a fixed result.
@@ -68,7 +70,7 @@ func TestNativeMessaging_ScanRoundTrip(t *testing.T) {
 	in.Write(frame(t, NativeMessageRequest{ID: 42, Kind: "scan", Content: "AKIAEXAMPLE"}))
 
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(context.Background(), scanner, &in, &out); err != nil {
+	if err := ServeNativeMessaging(context.Background(), scanner, nil, &in, &out); err != nil {
 		t.Fatalf("ServeNativeMessaging: %v", err)
 	}
 
@@ -97,7 +99,7 @@ func TestNativeMessaging_MultipleFrames(t *testing.T) {
 	in.Write(frame(t, NativeMessageRequest{ID: 2, Kind: "scan", Content: "world"}))
 
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(context.Background(), scanner, &in, &out); err != nil {
+	if err := ServeNativeMessaging(context.Background(), scanner, nil, &in, &out); err != nil {
 		t.Fatalf("ServeNativeMessaging: %v", err)
 	}
 
@@ -115,7 +117,7 @@ func TestNativeMessaging_NilScanner(t *testing.T) {
 	in.Write(frame(t, NativeMessageRequest{ID: 7, Kind: "scan", Content: "x"}))
 
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(context.Background(), nil, &in, &out); err != nil {
+	if err := ServeNativeMessaging(context.Background(), nil, nil, &in, &out); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	frames := readFrames(t, &out)
@@ -133,7 +135,7 @@ func TestNativeMessaging_UnknownKind(t *testing.T) {
 	in.Write(frame(t, NativeMessageRequest{ID: 1, Kind: "frobnicate", Content: ""}))
 
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(context.Background(), scanner, &in, &out); err != nil {
+	if err := ServeNativeMessaging(context.Background(), scanner, nil, &in, &out); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	frames := readFrames(t, &out)
@@ -152,7 +154,7 @@ func TestNativeMessaging_MalformedJSON(t *testing.T) {
 
 	scanner := &fakeScanner{}
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(context.Background(), scanner, &in, &out); err != nil {
+	if err := ServeNativeMessaging(context.Background(), scanner, nil, &in, &out); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	frames := readFrames(t, &out)
@@ -170,7 +172,7 @@ func TestNativeMessaging_OverlargeMessageRejected(t *testing.T) {
 
 	scanner := &fakeScanner{}
 	var out bytes.Buffer
-	err := ServeNativeMessaging(context.Background(), scanner, &in, &out)
+	err := ServeNativeMessaging(context.Background(), scanner, nil, &in, &out)
 	if err == nil {
 		t.Fatalf("expected error for oversize frame")
 	}
@@ -183,7 +185,7 @@ func TestNativeMessaging_ContextCanceledBeforeRead(t *testing.T) {
 	scanner := &fakeScanner{}
 	var in bytes.Buffer
 	var out bytes.Buffer
-	if err := ServeNativeMessaging(ctx, scanner, &in, &out); err != nil {
+	if err := ServeNativeMessaging(ctx, scanner, nil, &in, &out); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 	if out.Len() != 0 {
@@ -203,7 +205,7 @@ func TestNativeMessaging_FramingRoundTripsWithReader(t *testing.T) {
 	var out bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- ServeNativeMessaging(context.Background(), scanner, pr, &out)
+		done <- ServeNativeMessaging(context.Background(), scanner, nil, pr, &out)
 	}()
 
 	for i, id := range []int{10, 11} {
@@ -222,5 +224,76 @@ func TestNativeMessaging_FramingRoundTripsWithReader(t *testing.T) {
 	}
 	if frames[0].Result == nil || !frames[0].Result.Blocked {
 		t.Fatalf("first response missing block: %+v", frames[0])
+	}
+}
+
+// TestNativeMessaging_StatsCountersBump verifies the Native Messaging
+// transport bumps the same dlp_scans_total / dlp_blocks_total counters
+// that the HTTP /api/dlp/scan handler bumps. Without this, the Status
+// page silently undercounts whenever Chrome picks NM over the HTTP
+// fallback (which is the default once the host manifest is installed).
+func TestNativeMessaging_StatsCountersBump(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "nm-stats.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	scanner := &fakeScanner{result: dlp.ScanResult{Blocked: true, PatternName: "aws_access_key_id", Score: 9}}
+	var in bytes.Buffer
+	in.Write(frame(t, NativeMessageRequest{ID: 1, Kind: "scan", Content: "AKIA00000000000000000"}))
+	in.Write(frame(t, NativeMessageRequest{ID: 2, Kind: "scan", Content: "AKIA11111111111111111"}))
+
+	var out bytes.Buffer
+	if err := ServeNativeMessaging(context.Background(), scanner, s, &in, &out); err != nil {
+		t.Fatalf("ServeNativeMessaging: %v", err)
+	}
+
+	got, err := s.GetStats(context.Background())
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	// Both frames were blocked by fakeScanner, so dlp_scans_total
+	// and dlp_blocks_total should both have advanced by exactly 2.
+	if got.DLPScansTotal != 2 {
+		t.Errorf("dlp_scans_total = %d, want 2", got.DLPScansTotal)
+	}
+	if got.DLPBlocksTotal != 2 {
+		t.Errorf("dlp_blocks_total = %d, want 2", got.DLPBlocksTotal)
+	}
+	if got.DNSQueriesTotal != 0 || got.DNSBlocksTotal != 0 {
+		t.Errorf("DNS counters touched: %+v", got)
+	}
+}
+
+// TestNativeMessaging_StatsCountersBumpOnAllow confirms that an
+// unblocked scan only increments dlp_scans_total, not dlp_blocks_total.
+func TestNativeMessaging_StatsCountersBumpOnAllow(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "nm-stats-allow.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	scanner := &fakeScanner{result: dlp.ScanResult{Blocked: false}}
+	var in bytes.Buffer
+	in.Write(frame(t, NativeMessageRequest{ID: 1, Kind: "scan", Content: "harmless"}))
+
+	var out bytes.Buffer
+	if err := ServeNativeMessaging(context.Background(), scanner, s, &in, &out); err != nil {
+		t.Fatalf("ServeNativeMessaging: %v", err)
+	}
+
+	got, err := s.GetStats(context.Background())
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	if got.DLPScansTotal != 1 {
+		t.Errorf("dlp_scans_total = %d, want 1", got.DLPScansTotal)
+	}
+	if got.DLPBlocksTotal != 0 {
+		t.Errorf("dlp_blocks_total = %d, want 0 (allow path)", got.DLPBlocksTotal)
 	}
 }

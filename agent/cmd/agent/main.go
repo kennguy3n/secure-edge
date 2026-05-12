@@ -93,6 +93,12 @@ func runNativeMessaging(configPath string) error {
 
 	weights := dlp.DefaultScoreWeights()
 	thresholds := dlp.DefaultThresholds()
+	// The store, if available, is kept open for the lifetime of the
+	// Native Messaging session so ServeNativeMessaging can bump the
+	// shared dlp_scans_total / dlp_blocks_total counters after each
+	// scan. Without this the Status page would silently undercount
+	// whenever Chrome chose the NM transport over the HTTP fallback.
+	var statsStore *store.Store
 	if cfg.DBPath != "" {
 		s, err := store.Open(cfg.DBPath)
 		if err != nil {
@@ -116,6 +122,7 @@ func runNativeMessaging(configPath string) error {
 			Medium:   dlpCfg.ThresholdMedium,
 			Low:      dlpCfg.ThresholdLow,
 		}
+		statsStore = s
 	}
 
 	patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
@@ -132,7 +139,7 @@ func runNativeMessaging(configPath string) error {
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 	pipeline.Rebuild(patterns, exclusions)
 
-	return api.ServeNativeMessaging(ctx, pipeline, os.Stdin, os.Stdout)
+	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
 }
 
 func run(configPath string) error {

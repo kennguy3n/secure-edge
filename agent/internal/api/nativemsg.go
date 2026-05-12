@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
 
 // MaxNativeMessageBytes caps both incoming and outgoing Native Messaging
@@ -39,7 +40,12 @@ type NativeMessageResponse struct {
 // a write fails. The function is intentionally synchronous: Chrome's
 // Native Messaging protocol is a half-duplex stream and the agent
 // invokes Scan() before reading the next request.
-func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, in io.Reader, out io.Writer) error {
+//
+// statsStore, when non-nil, receives bumpDLPStats() calls after every
+// successful scan so that the Status page's dlp_scans_total and
+// dlp_blocks_total stay correct in NM mode. Pass nil in tests that
+// don't care about counters; HTTP-only deployments are unaffected.
+func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, statsStore *store.Store, in io.Reader, out io.Writer) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil
@@ -69,6 +75,12 @@ func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, in io.Reader,
 					r := scanner.Scan(ctx, req.Content)
 					req.Content = "" // drop reference promptly.
 					resp.Result = &r
+					// Mirror the HTTP scan handler: anonymous
+					// aggregate counters must move whichever
+					// transport the extension picked. Errors
+					// are intentionally swallowed — counter
+					// hiccups must never break a scan reply.
+					_ = bumpDLPStats(ctx, statsStore, r.Blocked)
 				}
 			default:
 				resp.Error = fmt.Sprintf("unknown kind: %q", req.Kind)

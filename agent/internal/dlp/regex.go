@@ -41,7 +41,16 @@ func ValidateCandidates(content string, candidates []Candidate) []Match {
 		}
 		seenPattern[cand.Pattern] = true
 
-		ms := findAllInWindow(content, cand.Pattern.Compiled, cand.Offset)
+		var ms [][]int
+		if cand.Pattern.Prefix == "" {
+			// Prefix-less patterns (e.g. SSN, credit card) have no
+			// real Aho-Corasick offset; cand.Offset is a sentinel.
+			// Scan the entire content so we don't miss matches past
+			// the regexWindow boundary.
+			ms = cand.Pattern.Compiled.FindAllStringIndex(content, -1)
+		} else {
+			ms = findAllInWindow(content, cand.Pattern.Compiled, cand.Offset)
+		}
 		if len(ms) == 0 {
 			continue
 		}
@@ -58,16 +67,14 @@ func ValidateCandidates(content string, candidates []Candidate) []Match {
 }
 
 // findAllInWindow finds all matches of re over content, biased to a
-// window around offset. When the candidate offset is 0 (no prefix) or
-// the window would cover the whole content, we just scan the full
-// content. This is still O(n) per call but avoids missing matches that
-// span the window boundary.
+// window around offset. When the window would cover the whole content,
+// we just scan the full content. This is still O(n) per call but
+// avoids missing matches that span the window boundary.
+//
+// Callers must invoke this only for prefixed patterns. Prefix-less
+// patterns have no real Aho-Corasick offset (the sentinel 0 is not a
+// location) and must be scanned over the full content directly.
 func findAllInWindow(content string, re *regexp.Regexp, offset int) [][]int {
-	// Patterns without a prefix (offset == 0 sentinel) scan the
-	// entire content.
-	if offset <= 0 && len(content) <= regexWindow*2 {
-		return re.FindAllStringIndex(content, -1)
-	}
 	if len(content) <= regexWindow*2 {
 		return re.FindAllStringIndex(content, -1)
 	}

@@ -55,6 +55,7 @@ type StatsView interface {
 type DLPScanner interface {
 	Scan(ctx context.Context, content string) dlp.ScanResult
 	Threshold() *dlp.ThresholdEngine
+	SetWeights(w dlp.ScoreWeights)
 }
 
 // Server is the API server (handlers and dependencies).

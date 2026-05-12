@@ -81,6 +81,12 @@ func TestStatusEndpoint(t *testing.T) {
 	if got.Version == "" {
 		t.Errorf("version is empty")
 	}
+	// uptime_seconds is the machine-readable number consumed by the
+	// browser extension; it must always be present (>= 0) so the
+	// popup doesn't fall back to "—".
+	if got.UptimeSeconds < 0 {
+		t.Errorf("uptime_seconds = %d, want >= 0", got.UptimeSeconds)
+	}
 }
 
 func TestPoliciesCollection(t *testing.T) {
@@ -251,9 +257,10 @@ func TestAllowsRequestsWithoutOrigin(t *testing.T) {
 // --- DLP endpoint tests (Phase 2) ---
 
 type fakeDLP struct {
-	thr    *dlp.ThresholdEngine
-	result dlp.ScanResult
-	calls  int64
+	thr     *dlp.ThresholdEngine
+	result  dlp.ScanResult
+	calls   int64
+	weights dlp.ScoreWeights
 }
 
 func (f *fakeDLP) Scan(_ context.Context, _ string) dlp.ScanResult {
@@ -261,6 +268,7 @@ func (f *fakeDLP) Scan(_ context.Context, _ string) dlp.ScanResult {
 	return f.result
 }
 func (f *fakeDLP) Threshold() *dlp.ThresholdEngine { return f.thr }
+func (f *fakeDLP) SetWeights(w dlp.ScoreWeights)   { f.weights = w }
 
 func TestDLPScan_WithoutPipelineReturns503(t *testing.T) {
 	srv, _, _ := newTestServer(t)
@@ -340,5 +348,31 @@ func TestDLPConfig_GetAndPut(t *testing.T) {
 	}
 	if got := thr.Get(); got.Critical != 99 || got.Low != 102 {
 		t.Fatalf("threshold engine not updated: %+v", got)
+	}
+}
+
+func TestDLPConfig_PutPropagatesWeightsToPipeline(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fake := &fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())}
+	srv.SetDLP(fake)
+
+	cfg := store.DLPConfig{
+		ThresholdCritical: 1, ThresholdHigh: 2, ThresholdMedium: 3, ThresholdLow: 4,
+		HotwordBoost: 7, EntropyBoost: 8, EntropyPenalty: -9,
+		ExclusionPenalty: -11, MultiMatchBoost: 13,
+	}
+	body, _ := json.Marshal(cfg)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT got %d body=%q", rec.Code, rec.Body.String())
+	}
+	want := dlp.ScoreWeights{
+		HotwordBoost: 7, EntropyBoost: 8, EntropyPenalty: -9,
+		ExclusionPenalty: -11, MultiMatchBoost: 13,
+	}
+	if fake.weights != want {
+		t.Fatalf("live pipeline weights = %+v, want %+v", fake.weights, want)
 	}
 }

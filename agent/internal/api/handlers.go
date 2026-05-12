@@ -21,10 +21,14 @@ import (
 const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
 
 // StatusResponse is the body for GET /api/status.
+// Both `uptime` (human-readable) and `uptime_seconds` (machine-readable)
+// are emitted so the Electron tray and the browser extension don't have
+// to parse the formatted string.
 type StatusResponse struct {
-	Status  string `json:"status"`
-	Uptime  string `json:"uptime"`
-	Version string `json:"version"`
+	Status        string `json:"status"`
+	Uptime        string `json:"uptime"`
+	UptimeSeconds int64  `json:"uptime_seconds"`
+	Version       string `json:"version"`
 }
 
 // PolicyUpdate is the request body for PUT /api/policies/:category.
@@ -47,10 +51,15 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	since := time.Since(s.startedAt)
+	if since < 0 {
+		since = 0
+	}
 	writeJSON(w, http.StatusOK, StatusResponse{
-		Status:  "running",
-		Uptime:  formatUptime(time.Since(s.startedAt)),
-		Version: Version,
+		Status:        "running",
+		Uptime:        formatUptime(since),
+		UptimeSeconds: int64(since / time.Second),
+		Version:       Version,
 	})
 }
 
@@ -227,6 +236,17 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 			High:     body.ThresholdHigh,
 			Medium:   body.ThresholdMedium,
 			Low:      body.ThresholdLow,
+		})
+		// Propagate scoring weights to the live pipeline too —
+		// without this, weight fields are persisted to SQLite but
+		// only take effect after an agent restart, silently
+		// diverging from the values returned by GET /api/dlp/config.
+		s.DLP.SetWeights(dlp.ScoreWeights{
+			HotwordBoost:     body.HotwordBoost,
+			EntropyBoost:     body.EntropyBoost,
+			EntropyPenalty:   body.EntropyPenalty,
+			ExclusionPenalty: body.ExclusionPenalty,
+			MultiMatchBoost:  body.MultiMatchBoost,
 		})
 	}
 	writeJSON(w, http.StatusOK, body)

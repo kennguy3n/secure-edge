@@ -67,3 +67,27 @@ func TestValidateCandidates_EmptyInputs(t *testing.T) {
 		t.Fatalf("nil candidates should yield nil, got %#v", got)
 	}
 }
+
+// TestValidateCandidates_PrefixlessLargeContent guards against a class
+// of DLP bypass where a prefix-less pattern (e.g. SSN, credit card)
+// gets hidden in long pastes — the Aho-Corasick offset is a sentinel
+// (0) for prefix-less patterns, so the validator must scan the full
+// content rather than a window starting at byte 0.
+func TestValidateCandidates_PrefixlessLargeContent(t *testing.T) {
+	p := mustPattern("SSN", "", `\d{3}-\d{2}-\d{4}`)
+	// Build a paste that's well past the regexWindow*2 cutoff and
+	// puts the secret far away from byte 0 so a windowed scan
+	// starting at offset=0 would miss it.
+	pad := make([]byte, regexWindow*4)
+	for i := range pad {
+		pad[i] = 'x'
+	}
+	content := string(pad) + "ssn 123-45-6789 end"
+	got := ValidateCandidates(content, []Candidate{{Offset: 0, Pattern: p}})
+	if len(got) != 1 {
+		t.Fatalf("prefix-less pattern in large content: got %d matches, want 1", len(got))
+	}
+	if got[0].Value != "123-45-6789" {
+		t.Fatalf("got value %q, want %q", got[0].Value, "123-45-6789")
+	}
+}

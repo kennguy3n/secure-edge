@@ -82,3 +82,28 @@ func TestCheckExclusion_EmptyInputs(t *testing.T) {
 		t.Fatal("empty exclusion list should not hit")
 	}
 }
+
+// TestCheckExclusion_ProximityIgnoresMatchValue ensures the proximity
+// haystack excludes the matched secret itself: a real AWS key whose
+// body contains an exclusion word (e.g. "test") must not be wrongly
+// penalised as a sample/placeholder.
+func TestCheckExclusion_ProximityIgnoresMatchValue(t *testing.T) {
+	p := mustPattern("AWS Key", "AKIA", `AKIA[A-Z0-9_]{16,}`)
+	xs := []Exclusion{
+		{
+			AppliesTo: "*",
+			Type:      ExclusionDictionary,
+			MatchType: ProximityMatch,
+			Words:     []string{"test", "example"},
+			Window:    50,
+		},
+	}
+	// "TEST" lives only inside the secret value; nothing in the
+	// surrounding context should trip the exclusion.
+	content := "leak: AKIA_TEST_ABCDEFGH1234 end"
+	m := Match{Pattern: p, Start: 6, End: 27, Value: "AKIA_TEST_ABCDEFGH1234"}
+	got := CheckExclusion(content, m, xs)
+	if got.Hit {
+		t.Fatal("proximity exclusion must not fire on a word that only appears inside the match value")
+	}
+}

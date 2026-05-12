@@ -100,10 +100,13 @@ func evalDictionary(content string, match Match, matchValueLower string, x Exclu
 			end = len(content)
 		}
 		hay := strings.ToLower(content[start:end])
-		// Strip the match value from the haystack so a word that is
-		// itself the match (e.g. "test" matching as part of the
-		// match) doesn't trigger.
-		_ = matchValueLower
+		// Strip the matched secret value from the haystack so that
+		// an exclusion word that lives inside the match itself
+		// (e.g. "test" inside "AKIA_TEST_ABCDEFGH1234") doesn't
+		// spuriously trigger the exclusion.
+		if matchValueLower != "" {
+			hay = strings.Replace(hay, matchValueLower, "", 1)
+		}
 		for _, w := range x.Words {
 			w = strings.ToLower(strings.TrimSpace(w))
 			if w == "" {

@@ -268,7 +268,7 @@ electron/
 ├── preload.ts           # Secure bridge to renderer
 ├── src/
 │   ├── pages/
-│   │   ├── Settings.tsx       # Policy toggles (adapted from PoliciesPage)
+│   │   ├── Settings.tsx       # Policy toggles
 │   │   └── Status.tsx         # Agent health + anonymous aggregate stats
 │   ├── components/
 │   │   ├── CategoryToggle.tsx # Three-state: Allow / Allow+Inspect / Block
@@ -307,7 +307,7 @@ trace remains.
 ### 5. SQLite Database Schema
 
 ```sql
--- Rule file metadata (adapted from WebfilteringRuleset model)
+-- Rule file metadata
 CREATE TABLE rulesets (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid        TEXT UNIQUE NOT NULL,
@@ -319,7 +319,7 @@ CREATE TABLE rulesets (
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Policy configuration (extended from RulesetConfig bool → three-state)
+-- Policy configuration (three-state: allow / allow_with_dlp / deny)
 CREATE TABLE category_policies (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     category    TEXT UNIQUE NOT NULL,

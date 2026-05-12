@@ -98,36 +98,10 @@ the same rule update mechanism as domain lists. This means:
 - New secret formats → patterns added without agent binary update
 - Community PRs improve accuracy for all users
 
-## What We Reuse from ShieldNet Gateway
+## Policy Model
 
-### Reusable Assets
-
-| Asset | ShieldNet Source | Secure Edge Usage |
-|-------|-----------------|-------------------|
-| Rule file format | `/etc/squid/categories/*.txt` — one domain per line | Identical format, stored locally |
-| Rule types | `dstdomain`, `dst`, `src`, `url_regex`, etc. | Same taxonomy; `dstdomain` covers ~90% of use cases |
-| `WebfilteringRuleset` model | `internal/model/webfiltering_ruleset.go` | Mapped to SQLite schema |
-| `RulesetConfig` | Proto message with `ruleset_uuid`, `category`, `enabled` | Extended to three-state: `allow`, `allow_with_dlp`, `deny` |
-| `NetworkWebfilteringRuleset` | M:N join model | Adapted as device-to-profile assignment |
-| `PoliciesPage` UI | `src/pages/App/policies/PoliciesPage.tsx` | Adapted to three-option selector per category |
-| `IDSPolicy` hierarchy | `src/api/services/policies.ts` | Adapted for local policy tree |
-| Google DLP proto patterns | `third_party/googleapis/google/privacy/dlp/v2/dlp.proto` | `HotwordRule`, `ExclusionRule`, `InspectConfig` concepts adapted for local DLP pipeline |
-
-### What Is NOT Reused
-
-| Discarded Asset | Reason |
-|----------------|--------|
-| `WebFilteringAlertEvent` logging | **Privacy** — we do not log access events |
-| `SecurityReportsPage` alert tables | **Privacy** — replaced with anonymous aggregate stats |
-| Squid proxy management via SSH/SFTP | Replaced by in-process `goproxy` |
-| `iptables` NAT rules, `ip route` commands | Not applicable to desktop agent |
-| PostgreSQL / Redis | Replaced by local SQLite |
-| gRPC server, `internal/service/` layer | Replaced by local HTTP API |
-
-## Extended Policy Model
-
-ShieldNet's `RulesetConfig` only supports `enabled: bool`. Secure Edge extends this to a
-three-state action model:
+Categories are mapped to a three-state action model so the same rule file (e.g., AI chat
+domains) can be either allowed, allowed-with-DLP, or denied per deployment:
 
 ```go
 type CategoryPolicy struct {
@@ -135,11 +109,15 @@ type CategoryPolicy struct {
     Name        string   `json:"name"`
     Category    string   `json:"category"`       // "AI Chat", "AI Code", "Phishing", etc.
     Action      string   `json:"action"`          // "allow", "allow_with_dlp", "deny"
-    RuleType    string   `json:"rule_type"`       // from ShieldNet: "dstdomain", "dst", "url_regex"
+    RuleType    string   `json:"rule_type"`       // "dstdomain", "dst", "url_regex"
     RuleFile    string   `json:"rule_file"`       // "ai_chat.txt"
     DLPProfile  string   `json:"dlp_profile"`     // references DLP pattern/exclusion config
 }
 ```
+
+Rule files use a simple one-entry-per-line text format (e.g., `.chat.openai.com`,
+`.deepseek.com`). Supported rule types: `dstdomain`, `dst`, `src`, `url_regex`,
+`dstdom_regex`, `urlpath_regex` — `dstdomain` covers ~90% of practical use cases.
 
 ## Lightweight Design Goals
 

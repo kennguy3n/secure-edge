@@ -1,0 +1,147 @@
+// Package dlp implements the layered Data Loss Prevention (DLP)
+// pipeline described in ARCHITECTURE.md section 2. The pipeline is:
+//
+//	classifier → Aho-Corasick prefix scan → regex validation
+//	→ hotword proximity → entropy → exclusion → scoring → threshold
+//
+// Privacy invariant: scan content stays in process memory only. No
+// domain names, URLs, IP addresses, or matched substrings are ever
+// written to disk, logged, or persisted in SQLite. Only anonymous
+// integer counters (dlp_scans_total, dlp_blocks_total) cross the
+// SQLite boundary.
+package dlp
+
+import "regexp"
+
+// ContentType is the coarse classification produced by ClassifyContent.
+// It is used to narrow the active pattern set for the rest of the
+// pipeline.
+type ContentType string
+
+const (
+	// CodeContent is source code (imports / function / class lines).
+	CodeContent ContentType = "code"
+	// StructuredData is JSON, CSV, key-value blocks.
+	StructuredData ContentType = "structured"
+	// CredentialsBlock is a block of key=value or key: value secrets.
+	CredentialsBlock ContentType = "credentials"
+	// NaturalLanguage is prose-like text.
+	NaturalLanguage ContentType = "natural"
+)
+
+// Severity is the per-pattern severity level. Each severity has its
+// own configurable threshold in the dlp_config SQLite table.
+type Severity string
+
+const (
+	SeverityCritical Severity = "critical"
+	SeverityHigh     Severity = "high"
+	SeverityMedium   Severity = "medium"
+	SeverityLow      Severity = "low"
+)
+
+// Pattern is a single DLP pattern loaded from rules/dlp_patterns.json.
+// The compiled regex is filled in by LoadPatterns; callers should not
+// mutate Pattern values after loading.
+type Pattern struct {
+	Name           string   `json:"name"`
+	Regex          string   `json:"regex"`
+	Prefix         string   `json:"prefix"`
+	Severity       Severity `json:"severity"`
+	ScoreWeight    int      `json:"score_weight"`
+	MinMatches     int      `json:"min_matches,omitempty"`
+	Hotwords       []string `json:"hotwords"`
+	HotwordWindow  int      `json:"hotword_window"`
+	HotwordBoost   int      `json:"hotword_boost"`
+	RequireHotword bool     `json:"require_hotword"`
+	EntropyMin     float64  `json:"entropy_min"`
+
+	// Compiled is populated by LoadPatterns; nil until compiled.
+	Compiled *regexp.Regexp `json:"-"`
+}
+
+// Candidate is a (offset, pattern) pair emitted by the Aho-Corasick
+// scanner. Offsets are byte offsets into the scanned content.
+type Candidate struct {
+	Offset  int
+	Pattern *Pattern
+}
+
+// Match is a regex-validated hit: a Pattern matched the content at
+// [Start, End). The raw matched substring is held only in memory and
+// must never be persisted.
+type Match struct {
+	Pattern *Pattern
+	Start   int
+	End     int
+	Value   string
+}
+
+// ExclusionType is the discriminator for Exclusion entries.
+type ExclusionType string
+
+const (
+	ExclusionDictionary ExclusionType = "dictionary"
+	ExclusionRegex      ExclusionType = "regex"
+)
+
+// DictionaryMatchType describes how Exclusion.Words are evaluated.
+type DictionaryMatchType string
+
+const (
+	// ExactMatch — the Match.Value must equal one of Words.
+	ExactMatch DictionaryMatchType = "exact"
+	// ProximityMatch — any of Words must appear within Window
+	// bytes of the match (default mode when not specified).
+	ProximityMatch DictionaryMatchType = "proximity"
+)
+
+// Exclusion is a rule that suppresses or penalises matches that look
+// like known false positives (e.g. "AKIAIOSFODNN7EXAMPLE", emails on
+// @example.com, the literal word "placeholder" within 50 chars).
+type Exclusion struct {
+	AppliesTo string              `json:"applies_to"`
+	Type      ExclusionType       `json:"type"`
+	Words     []string            `json:"words,omitempty"`
+	Pattern   string              `json:"pattern,omitempty"`
+	Window    int                 `json:"window,omitempty"`
+	MatchType DictionaryMatchType `json:"match_type,omitempty"`
+
+	// Compiled is populated by LoadExclusions for regex exclusions.
+	Compiled *regexp.Regexp `json:"-"`
+}
+
+// ScoreWeights holds the per-instance scoring multipliers loaded from
+// the dlp_config SQLite table.
+type ScoreWeights struct {
+	HotwordBoost     int
+	EntropyBoost     int
+	EntropyPenalty   int
+	ExclusionPenalty int
+	MultiMatchBoost  int
+}
+
+// DefaultScoreWeights mirrors the defaults seeded into dlp_config.
+func DefaultScoreWeights() ScoreWeights {
+	return ScoreWeights{
+		HotwordBoost:     2,
+		EntropyBoost:     1,
+		EntropyPenalty:   -2,
+		ExclusionPenalty: -3,
+		MultiMatchBoost:  1,
+	}
+}
+
+// Thresholds maps each severity to the minimum score that triggers a
+// block. Values mirror the dlp_config SQLite singleton.
+type Thresholds struct {
+	Critical int
+	High     int
+	Medium   int
+	Low      int
+}
+
+// DefaultThresholds mirrors the defaults seeded into dlp_config.
+func DefaultThresholds() Thresholds {
+	return Thresholds{Critical: 1, High: 2, Medium: 3, Low: 4}
+}

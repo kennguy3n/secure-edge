@@ -1,0 +1,59 @@
+{
+  "exclusions": [
+    {
+      "applies_to": "*",
+      "type": "dictionary",
+      "words": [
+        "placeholder",
+        "example",
+        "test",
+        "dummy",
+        "sample",
+        "xxx",
+        "your-",
+        "your_",
+        "fake",
+        "redacted",
+        "<redacted>",
+        "CHANGEME",
+        "TODO"
+      ],
+      "window": 50,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "AWS Access Key",
+      "type": "dictionary",
+      "words": ["AKIAIOSFODNN7EXAMPLE", "AKIA1234567890123456"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Email Addresses (bulk)",
+      "type": "regex",
+      "pattern": "@(example\\.com|example\\.org|example\\.net|test\\.com|localhost|mailinator\\.com|invalid)"
+    },
+    {
+      "applies_to": "US Social Security Number",
+      "type": "dictionary",
+      "words": ["000-00-0000", "123-45-6789", "111-11-1111", "999-99-9999"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Credit Card Number",
+      "type": "dictionary",
+      "words": ["4111111111111111", "4242424242424242", "5555555555554444", "378282246310005"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "GitHub Personal Access Token",
+      "type": "dictionary",
+      "words": ["ghp_000000000000000000000000000000000000"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Phone Numbers (bulk, US)",
+      "type": "regex",
+      "pattern": "555-?01[0-9]{2}"
+    }
+  ]
+}

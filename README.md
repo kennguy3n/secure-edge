@@ -70,7 +70,14 @@ rule_paths:
   - rules/ai_chat_dlp.txt
   - rules/phishing.txt
   - rules/social.txt
+  - rules/news.txt
+dlp_patterns: rules/dlp_patterns.json     # optional — enables /api/dlp/*
+dlp_exclusions: rules/dlp_exclusions.json # optional
 ```
+
+Leaving `dlp_patterns` blank disables the DLP pipeline and returns `503` from
+the `/api/dlp/*` endpoints; everything else (DNS, policies, stats) keeps
+working.
 
 ## Project Structure
 
@@ -82,11 +89,14 @@ secure-edge/
 │   ├── internal/
 │   │   ├── api/                      # HTTP API server + handlers
 │   │   ├── config/                   # YAML configuration loader
+│   │   ├── dlp/                      # Layered DLP pipeline (Phase 2)
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
 │   │   ├── policy/                   # Policy engine
 │   │   ├── rules/                    # Rule-file parser + lookup index
 │   │   ├── stats/                    # Anonymous aggregate counters
 │   │   └── store/                    # SQLite (modernc.org/sqlite, WAL)
+│   ├── nfpm.yaml                     # .deb packaging
+│   ├── scripts/{post,pre}*.sh
 │   ├── go.mod / go.sum
 │   └── Makefile                      # build / test / lint targets
 ├── electron/                         # System-tray app (Electron + React)
@@ -98,13 +108,22 @@ secure-edge/
 │   │   └── api/agent.ts              # HTTP client for the Go agent
 │   ├── package.json
 │   └── electron-builder.yml
-└── rules/                            # Bundled domain lists (community-editable)
-    ├── ai_chat_blocked.txt
-    ├── ai_chat_dlp.txt
-    ├── ai_code_blocked.txt
-    ├── ai_allowed.txt
-    ├── phishing.txt
-    └── social.txt
+├── extension/                        # Chrome Manifest V3 companion extension
+│   ├── manifest.json
+│   ├── src/{background,content,popup}/
+│   ├── package.json
+│   └── tsconfig.json
+├── rules/                            # Bundled domain lists + DLP rules
+│   ├── ai_chat_blocked.txt   ai_chat_dlp.txt   ai_code_blocked.txt
+│   ├── ai_allowed.txt        phishing.txt      social.txt
+│   ├── news.txt              manifest.json
+│   ├── dlp_patterns.json
+│   └── dlp_exclusions.json
+├── scripts/                          # Platform DNS / service install scripts
+│   ├── macos/{configure-dns.sh,com.secureedge.agent.plist}
+│   ├── windows/{configure-dns.ps1,register-service.ps1}
+│   └── linux/{configure-dns.sh,secure-edge.service}
+└── .github/workflows/ci.yml          # Go + Electron + extension typecheck
 ```
 
 ## API
@@ -118,19 +137,35 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 | PUT    | `/api/policies/:category`  | Update an action; triggers policy reload |
 | GET    | `/api/stats`               | Aggregate counters (integers only) |
 | POST   | `/api/stats/reset`         | Reset all counters to zero |
+| POST   | `/api/dlp/scan`            | Scan `{content}` through the DLP pipeline; returns `{blocked, pattern_name, score}`. Content is processed in memory and never persisted. |
+| GET    | `/api/dlp/config`          | Current DLP scoring weights and per-severity thresholds |
+| PUT    | `/api/dlp/config`          | Update DLP scoring weights and thresholds |
 
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
+
+The DLP endpoints return `503 Service Unavailable` when the agent is started
+without a `dlp_patterns` config entry (Phase 1 deployments).
 
 ## Testing
 
 ```bash
 cd agent
-make test                 # runs `go test -race ./...`
+make test                 # runs `go test -race ./...`, includes DLP unit + integration tests
 make lint                 # runs `go vet ./...`
 
 cd ../electron
 npm run typecheck         # TypeScript strict mode against renderer + main
+
+cd ../extension
+npm install && npm run typecheck   # browser-extension Manifest V3 typecheck
 ```
+
+DLP coverage includes one `*_test.go` per pipeline component
+(`classifier`, `ahocorasick`, `regex`, `hotword`, `entropy`, `exclusion`,
+`scorer`, `threshold`) plus a `pipeline_test.go` integration test exercising
+real AWS keys with hotword context (block), the AWS docs example key
+`AKIAIOSFODNN7EXAMPLE` (exclude), benign prose (allow), empty content, and
+large content embedding a real-looking key.
 
 ## Documentation
 

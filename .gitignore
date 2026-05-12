@@ -10,6 +10,10 @@ electron/dist/
 electron/node_modules/
 electron/release/
 
+# Browser extension build artefacts
+extension/dist/
+extension/node_modules/
+
 # Editor / OS
 .DS_Store
 .idea/

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -96,43 +97,37 @@ func run(configPath string) error {
 	return nil
 }
 
-// categoryFromPath turns "rules/ai_chat_blocked.txt" into "AI Chat Blocked".
-func categoryFromPath(path string) string {
-	base := path
-	if idx := lastIndex(base, '/'); idx >= 0 {
-		base = base[idx+1:]
-	}
-	if idx := lastIndex(base, '\\'); idx >= 0 {
-		base = base[idx+1:]
-	}
-	if idx := lastIndex(base, '.'); idx >= 0 {
-		base = base[:idx]
-	}
-	out := make([]byte, 0, len(base))
-	upper := true
-	for i := 0; i < len(base); i++ {
-		c := base[i]
-		if c == '_' || c == '-' {
-			out = append(out, ' ')
-			upper = true
-			continue
-		}
-		if upper && c >= 'a' && c <= 'z' {
-			c -= 'a' - 'A'
-		}
-		out = append(out, c)
-		upper = false
-	}
-	return string(out)
+// categoryAcronyms lists rule-file words that should be emitted in all
+// uppercase so the derived category name matches the seeded categories
+// in store.seedDefaults. Keep this list in sync with that seed.
+var categoryAcronyms = map[string]bool{
+	"ai":  true,
+	"dlp": true,
 }
 
-func lastIndex(s string, c byte) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == c {
-			return i
-		}
+// categoryFromPath turns "rules/ai_chat_blocked.txt" into "AI Chat Blocked".
+// Words are split on '_' / '-'; recognized acronyms are uppercased and other
+// words are title-cased so the result matches store.seedDefaults entries.
+func categoryFromPath(path string) string {
+	base := path
+	if idx := strings.LastIndexAny(base, "/\\"); idx >= 0 {
+		base = base[idx+1:]
 	}
-	return -1
+	if idx := strings.LastIndexByte(base, '.'); idx >= 0 {
+		base = base[:idx]
+	}
+	words := strings.FieldsFunc(base, func(r rune) bool {
+		return r == '_' || r == '-'
+	})
+	for i, w := range words {
+		lower := strings.ToLower(w)
+		if categoryAcronyms[lower] {
+			words[i] = strings.ToUpper(lower)
+			continue
+		}
+		words[i] = strings.ToUpper(lower[:1]) + lower[1:]
+	}
+	return strings.Join(words, " ")
 }
 
 // storeAdapter bridges store.Store to stats.Store, converting between

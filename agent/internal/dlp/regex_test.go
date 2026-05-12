@@ -68,6 +68,45 @@ func TestValidateCandidates_EmptyInputs(t *testing.T) {
 	}
 }
 
+// TestValidateCandidates_PrefixedMultipleOffsets guards against a DLP
+// bypass where a prefixed pattern has multiple Aho-Corasick offsets in
+// a large paste: the first occurrence is a benign mention of the prefix
+// in prose (no full regex hit) and the real secret sits at a distant
+// offset whose window does not overlap the first. An earlier
+// implementation marked the pattern as "seen" after the first candidate
+// failed to validate and silently skipped the rest, so the real key was
+// missed.
+func TestValidateCandidates_PrefixedMultipleOffsets(t *testing.T) {
+	p := mustPattern("AWS", "AKIA", `AKIA[A-Z0-9]{16}`)
+	// First AKIA: benign — prefix appears in prose with no full
+	// match after it. Then 4 KiB of padding to push the real key
+	// well outside the first candidate's regex window.
+	head := "we use AKIA-style keys, e.g. "
+	pad := make([]byte, regexWindow*4)
+	for i := range pad {
+		pad[i] = 'x'
+	}
+	realKey := "key: AKIAABCDEFGHIJKLMNOP end"
+	content := head + string(pad) + realKey
+	realOffset := len(head) + len(pad) + len("key: ")
+	if got := content[realOffset : realOffset+20]; got != "AKIAABCDEFGHIJKLMNOP" {
+		t.Fatalf("test setup wrong; got %q", got)
+	}
+	// Mimic what BuildAutomaton + Scan would produce: two AC
+	// candidates for the same pattern at distant offsets.
+	cs := []Candidate{
+		{Offset: 7, Pattern: p},          // first AKIA inside head, no real match
+		{Offset: realOffset, Pattern: p}, // real key, far past the first window
+	}
+	got := ValidateCandidates(content, cs)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 match at distant offset, got %d: %#v", len(got), got)
+	}
+	if got[0].Value != "AKIAABCDEFGHIJKLMNOP" {
+		t.Fatalf("got value %q, want %q", got[0].Value, "AKIAABCDEFGHIJKLMNOP")
+	}
+}
+
 // TestValidateCandidates_PrefixlessLargeContent guards against a class
 // of DLP bypass where a prefix-less pattern (e.g. SSN, credit card)
 // gets hidden in long pastes — the Aho-Corasick offset is a sentinel

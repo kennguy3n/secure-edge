@@ -167,6 +167,10 @@ func (s *Store) seedDefaults(ctx context.Context) error {
 	}
 
 	// Default Phase 1 category policies. These can be updated via the API.
+	// The list must cover every category produced by categoryFromPath
+	// for a rule file shipped under rules/, otherwise the policy engine
+	// falls back to its default-Deny rule and silently blocks a whole
+	// category (e.g. news domains).
 	defaults := []CategoryPolicy{
 		{Category: "AI Chat Blocked", Action: ActionDeny},
 		{Category: "AI Code Blocked", Action: ActionDeny},
@@ -174,6 +178,7 @@ func (s *Store) seedDefaults(ctx context.Context) error {
 		{Category: "AI Chat DLP", Action: ActionAllowWithDLP},
 		{Category: "Phishing", Action: ActionDeny},
 		{Category: "Social", Action: ActionAllow},
+		{Category: "News", Action: ActionAllow},
 	}
 	for _, p := range defaults {
 		if _, err := s.db.ExecContext(ctx,

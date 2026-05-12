@@ -27,22 +27,33 @@ func ValidateCandidates(content string, candidates []Candidate) []Match {
 	if content == "" || len(candidates) == 0 {
 		return nil
 	}
-	// Run each pattern's regex at most once per scan so that a
-	// pattern with multiple Aho-Corasick hits (e.g. several emails)
-	// doesn't generate duplicate Match values.
-	seenPattern := make(map[*Pattern]bool)
+	// For prefix-less patterns the AC offset is a sentinel, so all
+	// candidates for the same pattern would re-scan the same full
+	// content; track which we've already scanned to avoid that.
+	scannedFull := make(map[*Pattern]bool)
+	// Deduplicate by (Pattern, Start, End) after regex validation,
+	// not before. A prefixed pattern (e.g. "AKIA") may have several
+	// AC offsets in the same content; if the first window contains
+	// the prefix in prose but no real match, we must still run the
+	// regex on later windows. Overlapping/repeated windows then
+	// produce identical Match values that this map collapses.
+	type dedupKey struct {
+		pattern *Pattern
+		start   int
+		end     int
+	}
+	seen := make(map[dedupKey]bool)
 	var out []Match
 	for _, cand := range candidates {
 		if cand.Pattern == nil || cand.Pattern.Compiled == nil {
 			continue
 		}
-		if seenPattern[cand.Pattern] {
-			continue
-		}
-		seenPattern[cand.Pattern] = true
-
 		var ms [][]int
 		if cand.Pattern.Prefix == "" {
+			if scannedFull[cand.Pattern] {
+				continue
+			}
+			scannedFull[cand.Pattern] = true
 			// Prefix-less patterns (e.g. SSN, credit card) have no
 			// real Aho-Corasick offset; cand.Offset is a sentinel.
 			// Scan the entire content so we don't miss matches past
@@ -55,6 +66,11 @@ func ValidateCandidates(content string, candidates []Candidate) []Match {
 			continue
 		}
 		for _, m := range ms {
+			k := dedupKey{pattern: cand.Pattern, start: m[0], end: m[1]}
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
 			out = append(out, Match{
 				Pattern: cand.Pattern,
 				Start:   m[0],

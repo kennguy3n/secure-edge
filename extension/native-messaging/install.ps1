@@ -18,6 +18,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Chrome's Native Messaging protocol invokes the host binary with the
+# caller's chrome-extension://<id>/ origin as the only positional
+# argument and offers no way to inject custom flags through the host
+# manifest. The agent binary detects that calling convention in main()
+# and routes to Native Messaging mode automatically, so the manifest
+# "path" can point directly at the production daemon binary without
+# a wrapper script.
 $hostName  = "com.secureedge.agent"
 $origin    = "chrome-extension://${ExtensionId}/"
 $installDir = Join-Path $env:LOCALAPPDATA "SecureEdge\NativeMessagingHosts"

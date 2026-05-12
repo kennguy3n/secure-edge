@@ -205,9 +205,11 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
 		// Browser extension service worker. The ID is install-time
-		// and not knowable here; any chrome-extension:// origin must
+		// and not knowable here; any chrome-extension:// (Chrome,
+		// Edge, Chromium) or moz-extension:// (Firefox) origin must
 		// be accepted so the popup's /api/status fetch works.
 		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+		"moz-extension://01234567-89ab-cdef-0123-456789abcdef",
 		// Content-script origins (Tier-2 AI tools). The browser
 		// stamps the page's own origin for content-script fetches,
 		// not the extension's, so each Tier-2 host has to be
@@ -232,19 +234,19 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	}
 }
 
-// TestCORSRejectsLookalikeChromeExtension guards the chrome-extension
-// prefix check against trivial spoofs (an attacker page can set an
+// TestCORSRejectsLookalikeExtensionOrigins guards the extension
+// prefix checks against trivial spoofs (an attacker page can set an
 // arbitrary Origin via fetch on the server side only; from a browser
 // the Origin is controlled, but the test pins the parser anyway).
-func TestCORSRejectsLookalikeChromeExtension(t *testing.T) {
+func TestCORSRejectsLookalikeExtensionOrigins(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	cases := []string{
-		// Bare scheme without an ID component.
+		// Bare schemes without an ID component.
 		"chrome-extension://",
-		// Embedded but not as a scheme prefix.
+		"moz-extension://",
+		// Embedded but not as scheme prefixes.
 		"https://chrome-extension.example.com",
-		// Different extension-style scheme.
-		"moz-extension://abcdefghijklmnopabcdefghijklmnop",
+		"https://moz-extension.example.com",
 	}
 	for _, origin := range cases {
 		r := newLocalRequest(http.MethodGet, "/api/status", nil)
@@ -333,7 +335,7 @@ func TestDLPScan_ReturnsScanResult(t *testing.T) {
 	})
 	rec := httptest.NewRecorder()
 	req := newLocalRequest(http.MethodPost, "/api/dlp/scan",
-		bytes.NewBufferString(`{"content":"AKIAABCDEFGHIJKLMNOP aws"}`))
+		bytes.NewBufferString(`{"content":"placeholder aws credentials test"}`))
 	srv.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body=%q)", rec.Code, rec.Body.String())

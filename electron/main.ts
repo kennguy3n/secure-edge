@@ -174,13 +174,12 @@ app.whenReady().then(() => {
   // electron-updater wiring. The auto-update feed URL comes from
   // electron-builder.yml's publish.github block. We surface availability
   // in the tray menu but never silently install — the user explicitly
-  // clicks "Update available" to apply.
+  // clicks "Update available" to apply. The "install and restart" menu
+  // item only appears after `update-downloaded` fires, because
+  // autoUpdater.quitAndInstall() requires the update file on disk;
+  // `update-available` only signals that metadata was fetched.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.on('update-available', () => {
-    updateAvailable = true;
-    refreshTrayMenu();
-  });
   autoUpdater.on('update-downloaded', () => {
     updateAvailable = true;
     refreshTrayMenu();

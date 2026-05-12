@@ -33,6 +33,15 @@ func main() {
 
 	api.Version = version
 
+	// Chrome / Firefox launch the Native Messaging host with the
+	// caller's chrome-extension:// (or moz-extension://) origin as the
+	// first positional argument and no flags. Auto-detect that calling
+	// convention so the same host manifest can point straight at the
+	// agent binary without needing a wrapper script.
+	if !*nativeMode && isNativeMessagingArgv(flag.Args()) {
+		*nativeMode = true
+	}
+
 	if *nativeMode {
 		if err := runNativeMessaging(*configPath); err != nil {
 			fmt.Fprintf(os.Stderr, "agent (native): %v\n", err)
@@ -47,11 +56,29 @@ func main() {
 	}
 }
 
+// isNativeMessagingArgv reports whether the positional arguments look
+// like a browser Native Messaging invocation. Chrome passes the
+// caller's extension origin as argv[1] (e.g.
+// "chrome-extension://<id>/"); Firefox uses "moz-extension://<UUID>/"
+// and additionally appends the extension ID on Windows. Returns true
+// when the first positional arg matches either scheme.
+func isNativeMessagingArgv(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	first := args[0]
+	return strings.HasPrefix(first, "chrome-extension://") ||
+		strings.HasPrefix(first, "moz-extension://")
+}
+
 // runNativeMessaging serves the Chrome Native Messaging protocol on
-// stdin/stdout. It loads the same DLP pipeline as the daemon mode (so
-// scan results match the HTTP fallback) but skips the DNS / API
-// servers entirely — Chrome spawns one host process per extension
-// session and tears it down on disconnect.
+// stdin/stdout. It mirrors daemon mode's DLP setup so scan results
+// match the HTTP fallback: configured ScoreWeights and Thresholds are
+// loaded from the SQLite store (falling back to defaults when the
+// store has no row yet) and the same pattern / exclusion files are
+// rebuilt into the pipeline. DNS and API servers are intentionally
+// skipped — Chrome spawns one host process per extension session and
+// tears it down on disconnect.
 func runNativeMessaging(configPath string) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -60,6 +87,37 @@ func runNativeMessaging(configPath string) error {
 	if cfg.DLPPatternsPath == "" {
 		return fmt.Errorf("native messaging requires dlp_patterns in config")
 	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	weights := dlp.DefaultScoreWeights()
+	thresholds := dlp.DefaultThresholds()
+	if cfg.DBPath != "" {
+		s, err := store.Open(cfg.DBPath)
+		if err != nil {
+			return fmt.Errorf("open store: %w", err)
+		}
+		defer s.Close()
+		dlpCfg, err := s.GetDLPConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("read dlp_config: %w", err)
+		}
+		weights = dlp.ScoreWeights{
+			HotwordBoost:     dlpCfg.HotwordBoost,
+			EntropyBoost:     dlpCfg.EntropyBoost,
+			EntropyPenalty:   dlpCfg.EntropyPenalty,
+			ExclusionPenalty: dlpCfg.ExclusionPenalty,
+			MultiMatchBoost:  dlpCfg.MultiMatchBoost,
+		}
+		thresholds = dlp.Thresholds{
+			Critical: dlpCfg.ThresholdCritical,
+			High:     dlpCfg.ThresholdHigh,
+			Medium:   dlpCfg.ThresholdMedium,
+			Low:      dlpCfg.ThresholdLow,
+		}
+	}
+
 	patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
 	if err != nil {
 		return err
@@ -71,14 +129,9 @@ func runNativeMessaging(configPath string) error {
 			return err
 		}
 	}
-	pipeline := dlp.NewPipeline(
-		dlp.ScoreWeights{},
-		dlp.NewThresholdEngine(dlp.DefaultThresholds()),
-	)
+	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 	pipeline.Rebuild(patterns, exclusions)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 	return api.ServeNativeMessaging(ctx, pipeline, os.Stdin, os.Stdout)
 }
 

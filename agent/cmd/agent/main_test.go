@@ -2,6 +2,28 @@ package main
 
 import "testing"
 
+func TestIsNativeMessagingArgv(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"empty", nil, false},
+		{"no extension origin", []string{"--config", "config.yaml"}, false},
+		{"chrome extension origin", []string{"chrome-extension://abcdefghijklmnopabcdefghijklmnop/"}, true},
+		{"firefox extension origin", []string{"moz-extension://01234567-89ab-cdef-0123-456789abcdef/"}, true},
+		{"firefox windows extra arg", []string{"moz-extension://01234567-89ab-cdef-0123-456789abcdef/", "secure-edge@example.com"}, true},
+		{"unrelated url", []string{"https://example.com"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isNativeMessagingArgv(tc.args); got != tc.want {
+				t.Errorf("isNativeMessagingArgv(%v) = %v, want %v", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCategoryFromPath(t *testing.T) {
 	cases := []struct {
 		path string

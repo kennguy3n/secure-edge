@@ -57,10 +57,16 @@ var allowedOrigins = map[string]struct{}{
 	"https://poe.com":               {},
 }
 
-// chromeExtensionScheme is matched as a prefix so any companion
-// extension build (unpacked dev build, signed Web Store build, etc.)
-// is accepted without hard-coding its install-time ID.
-const chromeExtensionScheme = "chrome-extension://"
+// chromeExtensionScheme / mozExtensionScheme are matched as prefixes
+// so any companion extension build (unpacked dev build, signed Web
+// Store / AMO build, etc.) is accepted without hard-coding its
+// install-time ID. Firefox stamps moz-extension://<UUID> on requests
+// from the service worker and content scripts; Chrome / Edge /
+// Chromium derivatives use chrome-extension://<id>.
+const (
+	chromeExtensionScheme = "chrome-extension://"
+	mozExtensionScheme    = "moz-extension://"
+)
 
 // allowedHostnames is the Host-header allowlist. A DNS-rebinding
 // attacker can only point a hostname under their control at 127.0.0.1;
@@ -204,11 +210,16 @@ func isAllowedOrigin(origin string) bool {
 	if _, ok := allowedOrigins[origin]; ok {
 		return true
 	}
-	// chrome-extension://<id> — any installed build of the companion
-	// extension's service worker. The host_permissions in the
-	// extension manifest gate which hosts the extension can reach.
+	// chrome-extension://<id> or moz-extension://<UUID> — any installed
+	// build of the companion extension's service worker. The
+	// host_permissions in the extension's own manifest gate which hosts
+	// the extension can reach.
 	if strings.HasPrefix(origin, chromeExtensionScheme) &&
 		len(origin) > len(chromeExtensionScheme) {
+		return true
+	}
+	if strings.HasPrefix(origin, mozExtensionScheme) &&
+		len(origin) > len(mozExtensionScheme) {
 		return true
 	}
 	return false

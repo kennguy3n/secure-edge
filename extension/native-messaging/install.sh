@@ -20,6 +20,14 @@ fi
 AGENT_BIN="${SECURE_EDGE_AGENT_BIN:-/usr/local/bin/secure-edge-agent}"
 HOST_NAME="com.secureedge.agent"
 
+# Chrome's Native Messaging protocol invokes the host binary with the
+# caller's chrome-extension://<id>/ origin as the only positional
+# argument and offers no way to inject custom flags through the host
+# manifest. The agent binary detects that calling convention in main()
+# and routes to Native Messaging mode automatically, so the manifest
+# "path" can point directly at the production daemon binary without
+# a wrapper script.
+
 # Resolve the platform-specific install directory for Chrome stable.
 # Other Chromium variants (Edge, Brave, Chromium, Opera) live in
 # different per-vendor paths; users with those browsers should set

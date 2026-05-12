@@ -83,126 +83,227 @@
 - [ ] Integration test: full pipeline with known patterns + known false positives
 
 ### DLP Rule Files
-- [ ] `rules/dlp_patterns.json` — extended pattern format (prefix, hotwords, hotword_window, entropy_min, severity, min_matches)
-- [ ] Seed patterns: AWS Access Key, AWS Secret Key, GitHub PAT, GitHub OAuth Token, Slack Token, Google API Key, Stripe Secret Key, Private Key Block, JWT, Generic API Key, Email Addresses (bulk), Phone Numbers (bulk), SSN, Credit Card (Luhn-validated)
-- [ ] `rules/dlp_exclusions.json` — exclusion rules per pattern + global dictionary
-- [ ] Seed exclusions: `example.com`, `test.com`, `localhost`, `AKIAIOSFODNN7EXAMPLE`, `your-api-key`, `<your_token_here>`, `CHANGEME`, `placeholder`, `xxx`, `dummy`, `sample`
-- [ ] Schema validation for `dlp_patterns.json` and `dlp_exclusions.json` at load time
+- [ ] `rules/dlp_patterns.json` — extended format with prefix, hotwords, hotword_window, entropy_min, severity, score_weight, min_matches
+- [ ] `rules/dlp_exclusions.json` — dictionary and regex exclusions per pattern and global
+- [ ] Default patterns: AWS keys, GitHub tokens, GitLab tokens, Google API keys, Slack tokens, private keys (PEM), email addresses (bulk), phone numbers (bulk), SSN, credit card numbers, source code heuristics, internal URL patterns
+- [ ] Default exclusions: test/example/placeholder/dummy strings, @example.com emails, 000-00-0000 SSN, known public keys
 
 ### Browser Extension
-- [ ] Chrome extension scaffolding (Manifest V3)
-- [ ] Firefox extension scaffolding (WebExtensions)
-- [ ] Content script: paste event interception
-- [ ] Content script: form submit interception
-- [ ] Content script: fetch/XMLHttpRequest interception
-- [ ] Native Messaging host manifest (per-platform install paths)
-- [ ] Background service worker: bridge to Native Messaging
-- [ ] Domain allowlist: only inject on Tier 2 AI tool domains
-- [ ] Ephemeral block notification UI (pattern name only, auto-dismiss)
-- [ ] User override prompt ("Send anyway" with timeout) — optional, configurable per deployment
-- [ ] Extension store packaging: Chrome `.crx`, Firefox `.xpi`
+- [ ] Chrome extension project setup (Manifest V3)
+- [ ] Content script: intercept paste events on Tier 2 AI tool domains
+- [ ] Content script: intercept form submission events
+- [ ] Content script: intercept fetch/XHR requests before send
+- [ ] Native Messaging host manifest (macOS, Windows, Linux paths)
+- [ ] Native Messaging communication with Go agent
+- [ ] Ephemeral block notification UI (in-page banner, auto-dismiss, shows pattern name only)
+- [ ] Firefox WebExtensions port
+- [ ] Extension popup: connection status to Go agent
 
 ### Integration
-- [ ] Category toggles in Settings UI extended to three-state (Allow / Allow + Inspect / Block)
-- [ ] DLP threshold tuning UI in Settings (per-severity sliders)
-- [ ] Aggregate counters: `dlp_scans_total`, `dlp_blocks_total` flushed periodically
-- [ ] End-to-end test: paste of test AWS key → blocked → counter incremented → no content on disk
-
-### Privacy Verification
-- [ ] Audit: trace DLP scan content through code paths, confirm no `os.WriteFile`/`db.Exec` writes content
-- [ ] Audit: extension storage (`chrome.storage`) contains no scanned content
-- [ ] Audit: notification text contains pattern name only, no matched content
-- [ ] Audit: log statements scrubbed of user-traffic data
+- [ ] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` added to `aggregate_stats`
+- [ ] Category toggles extended to three-state: Allow / Allow + Inspect / Block
+- [ ] Aho-Corasick automaton rebuild triggered on rule file change
+- [ ] Privacy review: confirm no scan content, no matched text, no domain is written to disk
 
 ## Phase 3 Detailed Breakdown
 
-### Rule Distribution
-- [ ] Manifest schema (`manifest.json`: version, list of files, SHA256 checksums)
-- [ ] Rule updater goroutine (configurable interval, default 6h)
-- [ ] Delta download: skip files whose checksum matches local
-- [ ] Atomic rule swap (download to tmp, validate, then rename)
-- [ ] Trigger Aho-Corasick automaton rebuild and exclusion set rebuild on update
-- [ ] Trigger DNS in-memory blocklist rebuild on update
-- [ ] `POST /api/rules/update` endpoint for manual trigger
-- [ ] Manifest signing (Ed25519 detached signature) — optional, future-proofing
-- [ ] GitHub Release as default rule source
+### Rule Updater
+- [ ] HTTP client to poll `manifest.json` from configurable URL
+- [ ] Manifest parser: version comparison, SHA256 checksum verification
+- [ ] Delta download: only fetch files with changed checksums
+- [ ] Atomic file replacement (write temp file, rename)
+- [ ] Trigger policy engine + DLP automaton rebuild after rule update
+- [ ] Configurable poll interval (default: 6 hours)
+- [ ] Manual trigger via `POST /api/rules/update`
+- [ ] API: `GET /api/rules/status` — last update time, current version, next check
 
-### Installers
-- [ ] macOS `.pkg` (pkgbuild + productbuild)
-- [ ] macOS: notarization workflow (Developer ID + altool)
-- [ ] Windows `.msi` (WiX Toolset)
-- [ ] Windows: Authenticode code signing in CI
-- [ ] Linux `.deb` (nfpm) — completed in Phase 1, polish here
-- [ ] Linux `.rpm` (nfpm)
-- [ ] Electron auto-update (`electron-updater`) on macOS + Windows
+### Multi-Platform Installers
+- [ ] macOS: `.pkg` installer via `pkgbuild` + `productbuild`
+- [ ] macOS: post-install script (set DNS, register LaunchDaemon, install Electron tray)
+- [ ] macOS: uninstaller script (restore DNS, remove LaunchDaemon, remove files)
+- [ ] Windows: MSI installer via WiX Toolset
+- [ ] Windows: post-install actions (set DNS via netsh, register service, install tray)
+- [ ] Windows: uninstaller (restore DNS, remove service, remove files)
+- [ ] Linux: `.deb` package via `nfpm`
+- [ ] Linux: `.rpm` package via `nfpm`
+- [ ] Linux: post-install script (configure systemd-resolved/resolv.conf, enable systemd unit)
+- [ ] Linux: uninstaller (restore DNS config, disable service, remove files)
 
 ### CI/CD
-- [ ] GitHub Actions: cross-platform build matrix (macOS, Windows, Linux)
-- [ ] GitHub Actions: release workflow (tag push → build all platforms → attach artifacts)
-- [ ] Smoke tests on each platform installer
+- [ ] GitHub Actions workflow: build Go agent (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64)
+- [ ] GitHub Actions workflow: build Electron tray app (macOS, Windows, Linux)
+- [ ] GitHub Actions workflow: build browser extensions (Chrome .zip, Firefox .xpi)
+- [ ] GitHub Actions workflow: run Go unit tests
+- [ ] GitHub Actions workflow: create GitHub Release with all artifacts
+- [ ] Electron auto-update via `electron-updater`
+- [ ] Code signing: macOS Developer ID (when available)
+- [ ] Code signing: Windows Authenticode (when available)
 
 ## Phase 4 Detailed Breakdown
 
-### Local MITM Proxy
-- [ ] `goproxy` integration on `127.0.0.1:8443`
-- [ ] Per-device Root CA generation at first run
-- [ ] Selective TLS decryption: only Tier 2 domains; everything else opaque CONNECT
-- [ ] Wire DLP pipeline into proxy request handler (in-memory scan)
-- [ ] Certificate pinning bypass list (apps that pin and would break)
+### MITM Proxy
+- [ ] `elazarl/goproxy` integration on `127.0.0.1:8443`
+- [ ] Per-device Root CA generation (`crypto/x509`, RSA 2048 or ECDSA P-256)
+- [ ] Dynamic certificate generation for Tier 2 domains
+- [ ] CONNECT tunnel passthrough for non-Tier-2 domains (no decryption)
+- [ ] Request body extraction from decrypted HTTPS for DLP pipeline
+- [ ] DLP pipeline integration (same layered pipeline as browser extension path)
+- [ ] Response forwarding after DLP pass
+- [ ] Block response page for DLP failures
 
-### Platform CA Trust + Proxy Config
-- [ ] macOS: `security add-trusted-cert` automation + System Keychain install
-- [ ] macOS: `networksetup -setsecurewebproxy` automation
-- [ ] Windows: `certutil -addstore Root` automation
-- [ ] Windows: Internet Options proxy registry config
-- [ ] Linux: `/usr/local/share/ca-certificates/` + `update-ca-certificates`
-- [ ] Linux: per-app proxy hints (Firefox, Chrome) since system proxy varies
+### CA Trust Installation Scripts
+- [ ] macOS: `security add-trusted-cert` automation
+- [ ] Windows: `certutil -addstore` automation
+- [ ] Linux: copy to `/usr/local/share/ca-certificates/` + `update-ca-certificates`
 
-### Setup Wizard
-- [ ] "Enable Advanced DLP" wizard in Electron settings page
-- [ ] Step 1: explain trade-offs (TLS decryption for Tier 2 only)
-- [ ] Step 2: trigger CA install (admin prompt)
-- [ ] Step 3: trigger proxy config
-- [ ] Step 4: validation ping through proxy
-- [ ] Uninstall path: remove CA, remove proxy config
+### System Proxy Configuration Scripts
+- [ ] macOS: `networksetup -setsecurewebproxy` for active interfaces
+- [ ] Windows: Registry `ProxyServer` + `ProxyEnable` keys
+- [ ] Linux: GNOME proxy settings via `gsettings` + KDE via `kwriteconfig5`
+- [ ] Environment variable approach: `HTTP_PROXY`/`HTTPS_PROXY` for CLI tools
 
-### Privacy Verification
-- [ ] Confirm proxy logs nothing per request
-- [ ] Confirm CONNECT tunnels for non-Tier-2 traffic are not inspected
-- [ ] Confirm decrypted content paths terminate at DLP scan + GC
+### Electron UI
+- [ ] "Advanced DLP" settings section
+- [ ] "Enable Full DLP Protection" wizard (generate CA → install CA → configure proxy)
+- [ ] Proxy status indicator in tray menu
+- [ ] Certificate pinning bypass list management UI
+- [ ] API: `POST /api/proxy/enable` — generate CA, install, configure
+- [ ] API: `POST /api/proxy/disable` — remove proxy config, optionally remove CA
+- [ ] API: `GET /api/proxy/status` — running, CA installed, proxy configured
 
 ## Phase 5 Detailed Breakdown
 
 ### Enterprise Configuration
-- [ ] Config profile schema (JSON) — categories, DLP thresholds, custom domains, custom patterns
-- [ ] `POST /api/profile/apply` endpoint (admin-signed profile)
-- [ ] Optional heartbeat to central server (version + counters only — no access data)
-- [ ] Aggregate stats JSON export endpoint
-- [ ] Custom rule file support (admin-supplied `.txt` lists)
-- [ ] Custom DLP pattern/exclusion local overrides
-- [ ] DLP threshold tuning UI in Settings
+- [ ] JSON-based policy profile format (categories, actions, DLP thresholds, rule update URL)
+- [ ] Profile download from server URL
+- [ ] Profile application on agent startup
+- [ ] Profile lock (prevent local override when managed)
+- [ ] API: `GET /api/profile` — current profile
+- [ ] API: `POST /api/profile/import` — import profile from URL or file
 
 ### Tamper Detection
-- [ ] Detect DNS settings reverted externally → ephemeral notification + counter
-- [ ] Detect proxy settings reverted externally → ephemeral notification + counter
-- [ ] Detect CA removed → ephemeral notification + counter
+- [ ] Periodic check: is OS DNS still pointing to 127.0.0.1?
+- [ ] Periodic check: is system proxy still configured (if Phase 4 enabled)?
+- [ ] Ephemeral tray notification on tamper detection (no persistent log)
+- [ ] Tamper counter in `aggregate_stats`
 
-### Hardening
-- [ ] Performance profiling pass (pprof, allocation review)
-- [ ] DLP accuracy benchmark suite (true positive + false positive corpus)
-- [ ] Privacy audit checklist + third-party review
-- [ ] Accessibility audit of Electron settings UI
-- [ ] Documentation: admin guide, user guide, rule contribution guide, DLP pattern authoring guide
-- [ ] Security disclosure policy (SECURITY.md)
+### Agent Heartbeat (Optional)
+- [ ] Configurable heartbeat URL (disabled by default)
+- [ ] Heartbeat payload: agent version, OS type, aggregate counters ONLY
+- [ ] Heartbeat interval: configurable (default: 1 hour)
+- [ ] NO access data, NO domain data, NO DLP match details in heartbeat
 
-## Risk Tracker
+### Admin Tools
+- [ ] Export aggregate stats as JSON
+- [ ] Custom rule file support (local override directory)
+- [ ] Custom DLP patterns/exclusions override files
+- [ ] DLP scoring threshold tuning UI in Electron settings
+- [ ] Allowlist/blocklist override UI (add/remove individual domains)
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| DLP false positive rate erodes user trust | High | High | Layered pipeline (content classification + hotwords + entropy + exclusions + scoring) + community-updatable exclusions |
-| Users bypass agent (change DNS, disable extension) | Medium | Medium | Tamper detection counter; MDM for managed deployments; tray-icon health indicator |
-| AI tool domain list staleness | High | Medium | Community PRs to rule files; rule distribution decoupled from binary releases |
-| Naive privacy "logging" creeps back in via debug/error paths | Medium | High | Audit checklist in each phase; lint rule banning `log.Printf` with user-traffic data; privacy review gate before each release |
-| Aho-Corasick automaton growth from many patterns | Low | Low | Cap pattern count; profile memory at rule load; reject overly large rule sets |
-| MITM proxy breaks pinned apps | High | Medium | Pinning bypass list; per-app opt-in; proxy is opt-in feature in Phase 4 |
-| Cross-platform installer drift | Medium | Medium | CI matrix; smoke tests per platform; codified signing workflows |
+### Quality & Documentation
+- [ ] Performance profiling: memory usage, CPU usage, DNS latency benchmarks
+- [ ] DLP accuracy benchmarks: false positive/negative rates against test corpus
+- [ ] Privacy audit: code review of every disk write path to verify zero access logging
+- [ ] Admin guide (installation, configuration, profile management)
+- [ ] User guide (what the tray icon means, how to report false positives)
+- [ ] Rule contribution guide (how to add domains, DLP patterns, exclusions)
+- [ ] DLP pattern authoring guide (hotwords, entropy thresholds, scoring weights)
+- [ ] Accessibility audit of Electron UI
+
+## Repository Structure (Planned)
+
+```
+secure-edge/
+├── README.md
+├── PROPOSAL.md
+├── ARCHITECTURE.md
+├── PHASES.md
+├── PROGRESS.md
+├── LICENSE
+├── agent/                          # Go backend
+│   ├── cmd/
+│   │   └── agent/
+│   │       └── main.go
+│   ├── internal/
+│   │   ├── config/                 # YAML configuration loader
+│   │   ├── dns/                    # Embedded DNS resolver
+│   │   ├── policy/                 # Policy engine
+│   │   ├── store/                  # SQLite: policies + counters (NO access logs)
+│   │   ├── api/                    # HTTP API handlers
+│   │   ├── rules/                  # Rule file parser and updater
+│   │   ├── stats/                  # Anonymous aggregate counter system
+│   │   └── dlp/                    # Layered DLP pipeline
+│   │       ├── classifier.go       # Content type classification
+│   │       ├── ahocorasick.go      # Prefix automaton builder + scanner
+│   │       ├── regex.go            # Candidate regex validation
+│   │       ├── hotword.go          # Hotword proximity checker
+│   │       ├── entropy.go          # Shannon entropy calculator
+│   │       ├── exclusion.go        # Exclusion rule engine
+│   │       ├── scorer.go           # Multi-signal scoring aggregator
+│   │       └── pipeline.go         # Pipeline orchestrator
+│   ├── go.mod
+│   └── go.sum
+├── electron/                       # Electron tray app
+│   ├── main.ts
+│   ├── preload.ts
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Settings.tsx        # Policy toggles + DLP config
+│   │   │   └── Status.tsx          # Agent health + anonymous stats
+│   │   ├── components/
+│   │   │   ├── CategoryToggle.tsx
+│   │   │   ├── StatsCard.tsx
+│   │   │   └── DLPThresholdSlider.tsx
+│   │   └── api/
+│   │       └── agent.ts
+│   ├── package.json
+│   └── electron-builder.yml
+├── extension/                      # Browser extension (Phase 2)
+│   ├── manifest.json
+│   ├── src/
+│   │   ├── content/                # Content scripts for AI tool pages
+│   │   ├── background/             # Service worker
+│   │   └── popup/                  # Extension popup UI
+│   ├── package.json
+│   └── tsconfig.json
+├── rules/                          # Bundled rule files
+│   ├── manifest.json
+│   ├── ai_chat_blocked.txt
+│   ├── ai_chat_dlp.txt
+│   ├── ai_code_blocked.txt
+│   ├── ai_allowed.txt
+│   ├── phishing.txt
+│   ├── social.txt
+│   ├── news.txt
+│   ├── dlp_patterns.json
+│   └── dlp_exclusions.json
+├── scripts/                        # Platform setup scripts
+│   ├── macos/
+│   │   ├── configure-dns.sh
+│   │   ├── install-ca.sh
+│   │   ├── configure-proxy.sh
+│   │   └── com.secureedge.agent.plist
+│   ├── windows/
+│   │   ├── configure-dns.ps1
+│   │   ├── install-ca.ps1
+│   │   └── configure-proxy.ps1
+│   └── linux/
+│       ├── configure-dns.sh
+│       ├── install-ca.sh
+│       ├── configure-proxy.sh
+│       └── secure-edge.service
+└── .github/
+    └── workflows/
+        ├── build-agent.yml
+        ├── build-electron.yml
+        ├── build-extension.yml
+        └── release.yml
+```
+
+## Changelog
+
+### 2026-05-12
+- Repository initialized with MIT license
+- Project documentation created (README, PROPOSAL, ARCHITECTURE, PHASES, PROGRESS)
+- Privacy-first design: zero access logging, anonymous aggregate counters only
+- Layered DLP pipeline design: content classification → Aho-Corasick prefix scan → regex validation → hotword/entropy/exclusion scoring

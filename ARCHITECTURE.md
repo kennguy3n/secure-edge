@@ -146,16 +146,34 @@ content. This reduces regex work by 80%+ for typical content.
 
 Each validated match receives a score from multiple signals:
 
-| Signal | Score | Description |
-|--------|-------|-------------|
-| Regex match | +1 (base) | Pattern matched |
-| Hotword proximity | +2 | Context keyword within N characters (e.g., "aws" near AKIA match) |
-| High entropy (>4.0) | +1 | Shannon entropy indicates randomness (likely real secret) |
-| Low entropy (<3.0) | -2 | Low randomness suggests placeholder/example |
-| Multiple matches | +1 each | Bulk data indicator (e.g., 10 email addresses) |
+| Signal | Default Weight | Description |
+|--------|---------------|-------------|
+| Regex match (base) | `score_weight` (default +1) | Pattern matched; per-pattern override via `score_weight` |
+| Hotword proximity | `+hotword_boost` (default +2) | Context keyword within N chars (e.g., "aws" near `AKIA...`); per-pattern override via `hotword_boost` |
+| High entropy (≥ `entropy_min`) | +1 | Shannon entropy above per-pattern `entropy_min` (likely real secret) |
+| Low entropy (< `entropy_min`) | -2 | Low randomness suggests placeholder/example |
+| Multiple matches | +1 each (capped) | Bulk data indicator; requires `min_matches` for some patterns |
 | Structured format | +1 | Match is inside a key-value or JSON structure |
 | Exclusion word nearby | -3 | "example", "test", "placeholder", "dummy", "sample" nearby |
 | Known false positive | -5 | Match is in exclusion dictionary |
+
+All weights are configurable in the `dlp_config` SQLite table (see Database Schema below).
+
+#### Scoring Formula
+
+```
+score(match) = score_weight
+             + (hotword_present ? hotword_boost : 0)
+             + (entropy >= entropy_min ? +entropy_boost : entropy_penalty)
+             + (in_structured_context ? +1 : 0)
+             + multi_match_boost * min(num_matches - 1, multi_match_cap)
+             + (exclusion_word_nearby ? exclusion_penalty : 0)
+             + (in_exclusion_dictionary ? -5 : 0)
+
+block if score >= threshold[severity]
+```
+
+If a pattern sets `require_hotword: true`, the match is suppressed entirely when no hotword is present (regardless of score). This is useful for patterns like "Generic API Key" which would otherwise match any 20+ char alphanumeric string.
 
 #### Step 5: Threshold Decision
 
@@ -175,6 +193,19 @@ Each severity level has a configurable threshold:
 A "critical" pattern (like an AWS secret key) blocks with just a base match. A "medium" pattern
 (like email addresses) requires additional corroboration (multiple matches, hotword, structured format).
 
+#### Performance Budget
+
+| Step | Time Budget | Memory Budget |
+|------|------------|---------------|
+| Content classification | < 10 μs | 0 (stack only) |
+| Aho-Corasick scan | < 100 μs (typical paste) | ~100 KB (automaton, built once) |
+| Regex validation (candidates only) | < 500 μs | Negligible |
+| Scoring (hotwords + entropy + exclusions) | < 200 μs | ~100 KB (exclusion hash sets) |
+| **Total per scan** | **< 1 ms** | **~200 KB** |
+
+All scan content is held in Go-managed memory only and released for GC immediately after the
+response is sent. No content reaches disk, SQLite, or any log.
+
 #### DLP Pattern Format (Extended)
 
 ```json
@@ -185,8 +216,11 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
       "regex": "AKIA[0-9A-Z]{16}",
       "prefix": "AKIA",
       "severity": "critical",
+      "score_weight": 1,
       "hotwords": ["aws", "access_key", "credentials", "iam", "secret"],
       "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
       "entropy_min": 3.5
     },
     {
@@ -194,18 +228,24 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
       "regex": "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{20,}",
       "prefix": "api",
       "severity": "high",
-      "hotwords": [],
-      "hotword_window": 0,
-      "entropy_min": 0
+      "score_weight": 1,
+      "hotwords": ["api", "key", "token", "secret"],
+      "hotword_window": 50,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0
     },
     {
       "name": "Email Addresses (bulk)",
       "regex": "([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+)",
       "prefix": "@",
       "severity": "medium",
+      "score_weight": 1,
       "min_matches": 5,
       "hotwords": ["email", "contact", "user", "customer"],
       "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
       "entropy_min": 0
     },
     {
@@ -213,8 +253,11 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
       "regex": "ghp_[A-Za-z0-9_]{36}",
       "prefix": "ghp_",
       "severity": "critical",
+      "score_weight": 1,
       "hotwords": ["github", "token", "auth"],
       "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
       "entropy_min": 4.0
     },
     {
@@ -222,8 +265,11 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
       "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
       "prefix": "-----BEGIN",
       "severity": "critical",
+      "score_weight": 2,
       "hotwords": [],
       "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
       "entropy_min": 0
     }
   ]
@@ -258,7 +304,25 @@ A "critical" pattern (like an AWS secret key) blocks with just a base match. A "
 
 Community can contribute exclusions via PR to reduce false positives without modifying core patterns.
 
-### 3. Electron Tray Application
+### 3. Local MITM Proxy (Optional, Phase 4)
+
+Optional component for Tier 2 coverage of non-browser AI clients (CLI tools, IDE plugins, native
+apps). Disabled by default; opt-in via the Electron Settings "Advanced DLP" wizard.
+
+| Capability | Library / Approach |
+|------------|--------------------|
+| Local HTTPS proxy | `github.com/elazarl/goproxy` on `127.0.0.1:8443` |
+| Per-device Root CA | `crypto/x509` (stdlib), RSA 2048 or ECDSA P-256, generated at first run |
+| Selective TLS decryption | Only Tier 2 domains are decrypted; everything else passes through as opaque CONNECT tunnels |
+| DLP integration | Decrypted request bodies are run through the same layered DLP pipeline (in-memory only) |
+| Block response | HTTP 451 with a short JSON body indicating pattern name; original request never forwarded |
+| Certificate pinning | Bypass list for known-pinned apps; user-managed in Settings UI |
+
+**Privacy invariant for the proxy:** decrypted content paths terminate at the DLP scan and are
+then released for GC. The proxy itself emits no per-request logs and writes no request/response
+bodies. Only the same `dlp_scans_total` / `dlp_blocks_total` counters are touched.
+
+### 4. Electron Tray Application
 
 Minimal Electron shell for system tray presence and settings UI.
 
@@ -289,7 +353,7 @@ electron/
 **No Reports page.** Since we don't log access events, there is no detailed reports page.
 The Status page shows only anonymous counters: "Total blocks: 142 | DLP blocks: 7 | Uptime: 3d 14h".
 
-### 4. Browser Extension (Chrome + Firefox)
+### 5. Browser Extension (Chrome + Firefox)
 
 TypeScript extension using Manifest V3 (Chrome) and WebExtensions (Firefox).
 
@@ -304,7 +368,7 @@ blocks content, the notification displays the pattern name (e.g., "AWS Access Ke
 does NOT include the actual key or matched content. After the user dismisses the notification, no
 trace remains.
 
-### 5. SQLite Database Schema
+### 6. SQLite Database Schema
 
 ```sql
 -- Rule file metadata
@@ -364,7 +428,7 @@ CREATE TABLE dlp_config (
 -- This is a privacy design decision, not an oversight.
 ```
 
-### 6. DNS Resolver Flow
+### 7. DNS Resolver Flow
 
 ```mermaid
 flowchart TD
@@ -384,7 +448,7 @@ loaded from rule files. Lookup is O(1). Rule files are re-read only when the upd
 new version. Counters are atomically incremented in-memory and flushed to SQLite periodically
 (e.g., every 60 seconds) to minimize disk I/O.
 
-### 7. Platform-Specific Integration
+### 8. Platform-Specific Integration
 
 #### macOS
 | Capability | Approach | Admin Required |
@@ -413,7 +477,7 @@ new version. Counters are atomically incremented in-memory and flushed to SQLite
 | Auto-start | systemd unit file | Yes (root) |
 | Installer | `.deb` + `.rpm` via `nfpm` | Standard |
 
-### 8. Communication Diagram
+### 9. Communication Diagram
 
 ```mermaid
 sequenceDiagram
@@ -462,7 +526,7 @@ sequenceDiagram
     Note over DB: No content stored. No pattern details. Just counter++.
 ```
 
-### 9. API Endpoints
+### 10. API Endpoints
 
 | Method | Path | Description | Privacy Notes |
 |--------|------|-------------|---------------|

@@ -30,7 +30,7 @@ MIT — see [LICENSE](./LICENSE).
 | Tier | Policy | Mechanism |
 |------|--------|-----------|
 | 1 | **Allowed AI tools** | Pass-through, no inspection |
-| 2 | **Allowed AI tools + DLP** | Allow but block if sensitive data detected (browser extension + optional MITM proxy) |
+| 2 | **Allowed AI tools + DLP** | Allow but block if sensitive data detected (layered DLP pipeline via browser extension + optional MITM proxy) |
 | 3 | **Blocked AI tools** | Deny at DNS level |
 | 4 | **Blocked other categories** | Deny phishing, gambling, social media, etc. at DNS level |
 
@@ -38,6 +38,7 @@ MIT — see [LICENSE](./LICENSE).
 
 - **Zero logging** — no browsing history, no domain access logs, no identifiable event data stored locally
 - **Lightweight first** — idle memory target < 50 MB (Go agent ~15 MB + Electron tray ~35 MB). CPU near 0% when idle.
+- **Accurate DLP** — layered pipeline (hotword context, scoring, exclusions, entropy, Aho-Corasick) instead of naive regex
 - **System tray native** — runs in the status bar on Windows, macOS, and Linux. No visible window unless the user opens settings.
 - **Offline-capable** — ships with bundled rule files from this repository. Server sync is optional.
 - **Minimal privileges** — DNS blocking requires one-time admin setup; day-to-day operation runs in user space.
@@ -54,7 +55,8 @@ MIT — see [LICENSE](./LICENSE).
 │  └──────────────┘  │              │  └─────┬──────┘ │
 │                    │  DNS Resolver│        │         │
 │                    │  Policy Eng. │◄───────┘         │
-│                    │  SQLite      │  Native Messaging │
+│                    │  DLP Pipeline│  Native Messaging │
+│                    │  SQLite      │                   │
 │                    │  (config     │                   │
 │                    │   only, no   │                   │
 │                    │   access log)│                   │
@@ -64,6 +66,8 @@ MIT — see [LICENSE](./LICENSE).
 │                    ┌──────▼───────┐                   │
 │                    │  Local Rules │                   │
 │                    │  (.txt files)│                   │
+│                    │  DLP patterns│                   │
+│                    │  + exclusions│                   │
 │                    └──────────────┘                   │
 └─────────────────────────────────────────────────────┘
          │ (optional HTTPS GET)
@@ -74,6 +78,38 @@ MIT — see [LICENSE](./LICENSE).
   └──────────────────┘
 ```
 
+## Layered DLP Pipeline
+
+Instead of naive regex matching (high false positive rate), Secure Edge uses a multi-stage
+pipeline that runs entirely in-memory on-device:
+
+```
+Content arrives (paste/submit/fetch)
+  │
+  ├─ Step 1: Content type classification (< 10 μs)
+  │           → code, structured data, credentials block, or natural language
+  │           → select applicable pattern subset (reduces regex work by 60-70%)
+  │
+  ├─ Step 2: Aho-Corasick fixed-prefix scan (single pass, O(n))
+  │           → candidate locations only (e.g., "AKIA", "ghp_", "-----BEGIN")
+  │
+  ├─ Step 3: Full regex validation on candidates only
+  │
+  ├─ Step 4: Per-match scoring
+  │           + hotword proximity check ("aws" near "AKIA..." = +2)
+  │           + Shannon entropy check (high entropy = likely real secret)
+  │           + exclusion dictionary check ("example", "test" = suppress)
+  │           + multi-match count (bulk PII = higher score)
+  │
+  ├─ Step 5: Score vs. threshold → block or allow
+  │
+  └─ Step 6: Ephemeral notification if blocked
+             Content discarded. Counter++. No logging.
+```
+
+**Additional memory:** ~200 KB (Aho-Corasick automaton + exclusion hash sets)
+**Additional CPU per scan:** < 1 ms for typical paste content
+
 ## Technology Stack
 
 | Component | Technology | Rationale |
@@ -81,10 +117,27 @@ MIT — see [LICENSE](./LICENSE).
 | Core Agent | Go 1.22+ | Single static binary, low memory, cross-compiles |
 | DNS Resolver | `github.com/miekg/dns` | Mature, lightweight embedded DNS |
 | SQLite | `modernc.org/sqlite` | Pure Go, no CGO dependency |
+| DLP Multi-Pattern | Aho-Corasick (e.g., `cloudflare/ahocorasick`) | Single-pass O(n) pattern matching |
 | System Tray UI | Electron (minimal) | Cross-platform tray + webview for settings panel |
 | Browser Extension | TypeScript, Manifest V3 | Chrome + Firefox DLP content inspection |
 | MITM Proxy (opt-in) | `github.com/elazarl/goproxy` | Tier 2 non-browser traffic |
 | Installer | `goreleaser` + `nfpm` (deb/rpm), `pkgbuild` (macOS), WiX (Windows) | Standard per-platform |
+
+## Reused from ShieldNet Gateway
+
+This project reuses **data models and UI patterns** from the ShieldNet Gateway project while
+discarding the server infrastructure (Squid, SSH/SFTP, iptables, PostgreSQL, gRPC).
+
+- **Rule file format** — one-entry-per-line text files (e.g., `.facebook.com`, `.deepseek.com`)
+- **Rule types** — `dstdomain`, `dst`, `src`, `url_regex`, `dstdom_regex`, `urlpath_regex`
+- **Data model** — `WebfilteringRuleset` (name, rule_type, file_path, category) mapped to local SQLite
+- **Policy toggle UI** — `PoliciesPage` with per-category switches, adapted to three-state selector
+- **DLP inspection concepts** — Google DLP proto patterns (HotwordRule, ExclusionRule, InspectConfig likelihood) adapted for local use
+- **Network-to-ruleset assignment** — `NetworkWebfilteringRuleset` M:N model adapted to device-to-ruleset
+
+**Explicitly NOT reused (privacy):**
+- `WebFilteringAlertEvent` logging model — we do not log access events
+- `SecurityReportsPage` detailed alert tables — replaced with anonymous aggregate stats only
 
 ## Rule Distribution
 
@@ -103,8 +156,13 @@ rules/
 ├── phishing.txt
 ├── social.txt
 ├── news.txt
-└── dlp_patterns.json
+├── dlp_patterns.json
+└── dlp_exclusions.json
 ```
+
+DLP patterns and exclusions are updated via the same rule distribution mechanism — no agent
+binary update required to tune DLP accuracy. Community can contribute exclusions via PR to
+reduce false positives.
 
 ## Quick Start
 
@@ -135,3 +193,10 @@ cd ../electron && npm install && npm run build
 ## Contributing
 
 Contributions welcome under the MIT license. Please read the docs above before submitting PRs.
+
+### Contributing DLP Patterns
+
+DLP accuracy improves with community contributions. You can help by:
+- Adding new patterns to `rules/dlp_patterns.json` (with hotword context and entropy thresholds)
+- Adding exclusion rules to `rules/dlp_exclusions.json` to suppress known false positives
+- Reporting false positives/negatives via GitHub Issues

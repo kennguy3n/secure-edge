@@ -21,9 +21,9 @@ graph TD
 
     subgraph "Layer 2 - DLP Inspection"
         I["Browser Extension"] -->|"Native Messaging"| B
-        B -->|"DLP Pattern Scan"| J["Pattern Scanner"]
-        J -->|"sensitive data found"| K["Block + Ephemeral Notification"]
-        J -->|"clean"| L["Allow"]
+        B -->|"Layered DLP Pipeline"| J["DLP Scanner"]
+        J -->|"score above threshold"| K["Block + Ephemeral Notification"]
+        J -->|"score below threshold"| L["Allow"]
     end
 
     subgraph "Layer 3 - MITM Proxy - optional"
@@ -43,14 +43,14 @@ flowchart LR
     A["Incoming\nrequest"] --> B{"Policy\ncheck"}
     B -->|"allow"| C["Forward\n(no trace)"]
     B -->|"block"| D["Block +\nIncrement counter"]
-    B -->|"dlp scan"| E{"Content\nsafe?"}
-    E -->|"yes"| C
-    E -->|"no"| F["Block +\nShow notification +\nIncrement counter"]
+    B -->|"dlp scan"| E{"Layered\nDLP pipeline"}
+    E -->|"score below\nthreshold"| C
+    E -->|"score above\nthreshold"| F["Block +\nShow notification +\nIncrement counter"]
     D --> G["Counter: dns_blocks++\n(no domain stored)"]
     F --> H["Counter: dlp_blocks++\n(no content stored)"]
 ```
 
-**Key invariant:** At no point in the data flow is a domain name, URL, IP address, or request content written to any persistent storage (disk, database, log file). Counters are bare integers.
+**Key invariant:** At no point in the data flow is a domain name, URL, IP address, or request content written to any persistent storage (disk, database, log file). Counters are bare integers. DLP scan content is processed in-memory and garbage-collected immediately after the response is sent.
 
 ### What Gets Stored (Exhaustive List)
 
@@ -64,7 +64,8 @@ SQLite Database (~4 KB):
 Rule Files (~500 KB):
 ├── ai_chat_blocked.txt   # domain lists (these are the RULES, not access logs)
 ├── phishing.txt
-└── dlp_patterns.json
+├── dlp_patterns.json     # DLP patterns with hotwords, entropy thresholds, scoring weights
+└── dlp_exclusions.json   # exclusion rules to suppress false positives
 
 Config File (~1 KB):
 └── config.yaml           # upstream DNS, ports, update URL
@@ -83,16 +84,181 @@ The core of the agent. A single statically-compiled Go binary providing:
 | DNS Resolver | `github.com/miekg/dns` | Listens on `127.0.0.1:53`, resolves queries against policy engine |
 | HTTP API | `net/http` (stdlib) | Local REST API on `127.0.0.1:{PORT}` for Electron UI and browser extension |
 | SQLite Store | `modernc.org/sqlite` | Pure Go SQLite — stores policies, counters, rule metadata. No CGO. No access logs. |
+| DLP Pipeline | In-process (see below) | Layered scanner: Aho-Corasick + regex + hotwords + entropy + exclusions + scoring |
 | Rule Updater | `net/http` (stdlib) | Polls `manifest.json` for rule version, downloads changed files |
 | MITM Proxy | `github.com/elazarl/goproxy` | Optional. Local proxy for Tier 2 non-browser inspection |
 | CA Generator | `crypto/x509` (stdlib) | Optional. Generates per-device Root CA for MITM proxy |
 
-**Memory profile:** ~15 MB RSS at idle. DNS server is event-driven (goroutine-per-request, no
-pre-allocated pools). SQLite WAL mode for minimal lock contention.
+**Memory profile:** ~15 MB RSS at idle + ~200 KB for DLP automaton and exclusion sets. DNS server is event-driven (goroutine-per-request, no pre-allocated pools). SQLite WAL mode for minimal lock contention.
 
-**Logging policy:** The Go binary writes operational logs to stderr (startup, errors, config changes). It NEVER logs domain names, URLs, or IP addresses from user traffic. Log level is configurable; in production, only errors are logged.
+**Logging policy:** The Go binary writes operational logs to stderr (startup, errors, config changes). It NEVER logs domain names, URLs, IP addresses, or DLP match content from user traffic. Log level is configurable; in production, only errors are logged.
 
-### 2. Electron Tray Application
+### 2. Layered DLP Pipeline
+
+The DLP scanner is the core accuracy component. Instead of running all regex patterns against all
+content (O(n × p) for n content length and p patterns), it uses a multi-stage pipeline:
+
+```mermaid
+flowchart TD
+    A["Content arrives\n(paste/submit/fetch)"] --> B["Step 1: Content Classification\n< 10 μs"]
+    B --> C["Step 2: Aho-Corasick\nPrefix Scan\nO(n) single pass"]
+    C --> D["Step 3: Regex\nValidation\n(candidates only)"]
+    D --> E["Step 4: Per-Match Scoring"]
+    E --> F{"Step 5:\nScore ≥ threshold?"}
+    F -->|"Yes"| G["Block + Notification\n+ Counter++"]
+    F -->|"No"| H["Allow"]
+    G --> I["Content discarded\nfrom memory"]
+    H --> I
+```
+
+#### Step 1: Content Type Classification
+
+Fast heuristic classification (< 10 μs) to select the appropriate pattern subset:
+
+| Content Type | Detection Heuristic | Pattern Set |
+|-------------|-------------------|-------------|
+| Source code | Lines starting with `import`, `function`, `def`, `class`, `const`, `#include` | Internal URLs, env vars, private function names, API keys |
+| Structured data | Contains `{`+`}` or consistent CSV delimiters | PII fields, database connection strings |
+| Credentials block | Key-value pairs with `=` or `:` | API keys, tokens, passwords |
+| Natural language | High space ratio, low symbol density | SSN, phone numbers, bulk email addresses |
+
+**Benefit:** Reduces the active pattern set by 60-70%, both improving speed and reducing false positives from mismatched pattern types.
+
+#### Step 2: Aho-Corasick Multi-Pattern Scan
+
+Instead of running 20+ regexes sequentially, extract the fixed-string prefixes from all patterns
+and build an Aho-Corasick automaton at rule load time:
+
+```
+Prefixes: "AKIA", "ghp_", "gho_", "sk-", "-----BEGIN", "xox", "eyJ", ...
+```
+
+Single-pass scan of content → candidate locations in O(n). Only candidates proceed to Step 3.
+
+**Cost:** ~100 KB memory for automaton (100 patterns). Built once at rule load (~1 ms).
+
+#### Step 3: Regex Validation
+
+Full regex runs only on the candidate substrings identified by Aho-Corasick, not on the entire
+content. This reduces regex work by 80%+ for typical content.
+
+#### Step 4: Per-Match Scoring
+
+Each validated match receives a score from multiple signals:
+
+| Signal | Score | Description |
+|--------|-------|-------------|
+| Regex match | +1 (base) | Pattern matched |
+| Hotword proximity | +2 | Context keyword within N characters (e.g., "aws" near AKIA match) |
+| High entropy (>4.0) | +1 | Shannon entropy indicates randomness (likely real secret) |
+| Low entropy (<3.0) | -2 | Low randomness suggests placeholder/example |
+| Multiple matches | +1 each | Bulk data indicator (e.g., 10 email addresses) |
+| Structured format | +1 | Match is inside a key-value or JSON structure |
+| Exclusion word nearby | -3 | "example", "test", "placeholder", "dummy", "sample" nearby |
+| Known false positive | -5 | Match is in exclusion dictionary |
+
+#### Step 5: Threshold Decision
+
+Each severity level has a configurable threshold:
+
+```json
+{
+  "thresholds": {
+    "critical": 1,
+    "high": 2,
+    "medium": 3,
+    "low": 4
+  }
+}
+```
+
+A "critical" pattern (like an AWS secret key) blocks with just a base match. A "medium" pattern
+(like email addresses) requires additional corroboration (multiple matches, hotword, structured format).
+
+#### DLP Pattern Format (Extended)
+
+```json
+{
+  "patterns": [
+    {
+      "name": "AWS Access Key",
+      "regex": "AKIA[0-9A-Z]{16}",
+      "prefix": "AKIA",
+      "severity": "critical",
+      "hotwords": ["aws", "access_key", "credentials", "iam", "secret"],
+      "hotword_window": 200,
+      "entropy_min": 3.5
+    },
+    {
+      "name": "Generic API Key",
+      "regex": "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "api",
+      "severity": "high",
+      "hotwords": [],
+      "hotword_window": 0,
+      "entropy_min": 0
+    },
+    {
+      "name": "Email Addresses (bulk)",
+      "regex": "([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+)",
+      "prefix": "@",
+      "severity": "medium",
+      "min_matches": 5,
+      "hotwords": ["email", "contact", "user", "customer"],
+      "hotword_window": 500,
+      "entropy_min": 0
+    },
+    {
+      "name": "GitHub Personal Access Token",
+      "regex": "ghp_[A-Za-z0-9_]{36}",
+      "prefix": "ghp_",
+      "severity": "critical",
+      "hotwords": ["github", "token", "auth"],
+      "hotword_window": 200,
+      "entropy_min": 4.0
+    },
+    {
+      "name": "Private Key Block",
+      "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+      "prefix": "-----BEGIN",
+      "severity": "critical",
+      "hotwords": [],
+      "hotword_window": 0,
+      "entropy_min": 0
+    }
+  ]
+}
+```
+
+#### DLP Exclusion Format
+
+```json
+{
+  "exclusions": [
+    {
+      "applies_to": "Email Addresses (bulk)",
+      "type": "regex",
+      "pattern": "@(example\\.com|test\\.com|localhost|mailinator\\.com)"
+    },
+    {
+      "applies_to": "*",
+      "type": "dictionary",
+      "words": ["placeholder", "example", "test", "dummy", "sample", "xxx", "your-", "CHANGEME"],
+      "window": 50
+    },
+    {
+      "applies_to": "AWS Access Key",
+      "type": "dictionary",
+      "words": ["AKIAIOSFODNN7EXAMPLE"],
+      "match_type": "exact"
+    }
+  ]
+}
+```
+
+Community can contribute exclusions via PR to reduce false positives without modifying core patterns.
+
+### 3. Electron Tray Application
 
 Minimal Electron shell for system tray presence and settings UI.
 
@@ -102,7 +268,7 @@ electron/
 ├── preload.ts           # Secure bridge to renderer
 ├── src/
 │   ├── pages/
-│   │   ├── Settings.tsx       # Policy toggles
+│   │   ├── Settings.tsx       # Policy toggles (adapted from PoliciesPage)
 │   │   └── Status.tsx         # Agent health + anonymous aggregate stats
 │   ├── components/
 │   │   ├── CategoryToggle.tsx # Three-state: Allow / Allow+Inspect / Block
@@ -123,26 +289,25 @@ electron/
 **No Reports page.** Since we don't log access events, there is no detailed reports page.
 The Status page shows only anonymous counters: "Total blocks: 142 | DLP blocks: 7 | Uptime: 3d 14h".
 
-### 3. Browser Extension (Chrome + Firefox)
+### 4. Browser Extension (Chrome + Firefox)
 
 TypeScript extension using Manifest V3 (Chrome) and WebExtensions (Firefox).
 
 **Capabilities:**
 - Content script injected into Tier 2 AI tool domains only
 - Intercepts: `paste` events, form `submit`, `fetch`/`XMLHttpRequest` calls
-- Scans intercepted content against DLP regex patterns locally
-- Communicates with Go agent via Chrome Native Messaging API
-- Shows ephemeral notification on block (never persisted)
+- Sends content to Go agent's DLP pipeline via Chrome Native Messaging API
+- Shows ephemeral notification on block (pattern name only, not matched content)
 
-**Privacy:** The extension does not store any history of scanned content. When a DLP pattern
-matches, the notification displays the pattern name (e.g., "AWS Access Key detected") but
-does NOT include the matched content itself. After the user dismisses the notification, no
+**Privacy:** The extension does not store any history of scanned content. When the DLP pipeline
+blocks content, the notification displays the pattern name (e.g., "AWS Access Key detected") but
+does NOT include the actual key or matched content. After the user dismisses the notification, no
 trace remains.
 
-### 4. SQLite Database Schema
+### 5. SQLite Database Schema
 
 ```sql
--- Rule file metadata
+-- Rule file metadata (adapted from WebfilteringRuleset model)
 CREATE TABLE rulesets (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid        TEXT UNIQUE NOT NULL,
@@ -154,7 +319,7 @@ CREATE TABLE rulesets (
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Policy configuration (three-state action)
+-- Policy configuration (extended from RulesetConfig bool → three-state)
 CREATE TABLE category_policies (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     category    TEXT UNIQUE NOT NULL,
@@ -179,12 +344,27 @@ CREATE TABLE rule_versions (
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- DLP scoring configuration
+CREATE TABLE dlp_config (
+    id                      INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+    threshold_critical      INTEGER NOT NULL DEFAULT 1,
+    threshold_high          INTEGER NOT NULL DEFAULT 2,
+    threshold_medium        INTEGER NOT NULL DEFAULT 3,
+    threshold_low           INTEGER NOT NULL DEFAULT 4,
+    hotword_boost           INTEGER NOT NULL DEFAULT 2,
+    entropy_boost           INTEGER NOT NULL DEFAULT 1,
+    entropy_penalty         INTEGER NOT NULL DEFAULT -2,
+    exclusion_penalty       INTEGER NOT NULL DEFAULT -3,
+    multi_match_boost       INTEGER NOT NULL DEFAULT 1,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- NOTE: There is deliberately NO alert_events table.
 -- NOTE: There is deliberately NO access_log table.
 -- This is a privacy design decision, not an oversight.
 ```
 
-### 5. DNS Resolver Flow
+### 6. DNS Resolver Flow
 
 ```mermaid
 flowchart TD
@@ -199,12 +379,12 @@ flowchart TD
     A --> H["Increment dns_queries_total counter\n(no domain stored)"]
 ```
 
-**Implementation detail:** The DNS resolver maintains an in-memory trie/map of blocked domains
-loaded from rule files. Lookup is O(1) hash map check. Rule files are re-read only when the
-updater detects a new version. Counters are atomically incremented in-memory and flushed to
-SQLite periodically (e.g., every 60 seconds) to minimize disk I/O.
+**Implementation detail:** The DNS resolver maintains an in-memory hash map of blocked domains
+loaded from rule files. Lookup is O(1). Rule files are re-read only when the updater detects a
+new version. Counters are atomically incremented in-memory and flushed to SQLite periodically
+(e.g., every 60 seconds) to minimize disk I/O.
 
-### 6. Platform-Specific Integration
+### 7. Platform-Specific Integration
 
 #### macOS
 | Capability | Approach | Admin Required |
@@ -233,44 +413,6 @@ SQLite periodically (e.g., every 60 seconds) to minimize disk I/O.
 | Auto-start | systemd unit file | Yes (root) |
 | Installer | `.deb` + `.rpm` via `nfpm` | Standard |
 
-### 7. Rule File Format
-
-Simple text format:
-
-```
-# ai_chat_blocked.txt
-# One domain per line, leading dot = includes all subdomains
-.deepseek.com
-.poe.com
-.perplexity.ai
-.you.com
-.phind.com
-```
-
-```json
-// dlp_patterns.json
-{
-  "patterns": [
-    {
-      "name": "AWS Access Key",
-      "regex": "AKIA[0-9A-Z]{16}",
-      "severity": "critical"
-    },
-    {
-      "name": "Generic API Key",
-      "regex": "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{20,}",
-      "severity": "high"
-    },
-    {
-      "name": "Email Addresses (bulk)",
-      "regex": "([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+)",
-      "severity": "medium",
-      "min_matches": 5
-    }
-  ]
-}
-```
-
 ### 8. Communication Diagram
 
 ```mermaid
@@ -279,6 +421,7 @@ sequenceDiagram
     participant Tray as Electron Tray
     participant Agent as Go Agent
     participant DNS as DNS Resolver
+    participant DLP as DLP Pipeline
     participant Ext as Browser Extension
     participant DB as SQLite
 
@@ -306,12 +449,17 @@ sequenceDiagram
     Note over User: User pastes code into chat.openai.com
     User->>Ext: Paste event detected
     Ext->>Agent: POST /api/dlp/scan {content: "..."}
-    Agent->>Agent: Run DLP pattern scan (in-memory, no logging)
+    Agent->>DLP: Step 1: Classify content → "source code"
+    DLP->>DLP: Step 2: Aho-Corasick scan → candidates
+    DLP->>DLP: Step 3: Regex validate candidates
+    DLP->>DLP: Step 4: Score (hotwords + entropy + exclusions)
+    DLP->>DLP: Step 5: Score 4 ≥ threshold 1 (critical) → BLOCK
+    DLP-->>Agent: {blocked: true, pattern_name: "AWS Access Key", score: 4}
+    Note over Agent: Content discarded from memory. Never written to disk.
     Agent-->>Ext: {blocked: true, pattern_name: "AWS Access Key"}
-    Note over Agent: Scanned content is discarded immediately. Not written to disk.
     Ext-->>User: Block paste, show ephemeral notification
     Agent->>DB: UPDATE aggregate_stats SET dlp_blocks_total = dlp_blocks_total + 1
-    Note over DB: No content stored. Just counter++.
+    Note over DB: No content stored. No pattern details. Just counter++.
 ```
 
 ### 9. API Endpoints
@@ -323,7 +471,9 @@ sequenceDiagram
 | `PUT` | `/api/policies/:category` | Update policy action | Config only |
 | `GET` | `/api/stats` | Anonymous aggregate counters | Integers only, no domains/IPs |
 | `POST` | `/api/stats/reset` | Reset counters to zero | — |
-| `POST` | `/api/dlp/scan` | Scan content for DLP patterns | Content processed in-memory, never persisted |
+| `POST` | `/api/dlp/scan` | Scan content through layered DLP pipeline | Content processed in-memory, never persisted |
+| `GET` | `/api/dlp/config` | Get DLP scoring thresholds | Config only |
+| `PUT` | `/api/dlp/config` | Update DLP scoring thresholds | Config only |
 | `GET` | `/api/rules` | List loaded rule files | Metadata only |
 | `POST` | `/api/rules/update` | Trigger rule file update check | — |
 

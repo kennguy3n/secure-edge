@@ -14,7 +14,7 @@
 - [ ] Electron tray app (hidden window, tray icon only)
 - [ ] Tray context menu: Status, Open Settings, Quit
 - [ ] Settings page: per-category policy toggles (Block / Allow)
-- [ ] Status page: anonymous aggregate stats (total blocks, total queries, uptime)
+- [ ] Status page: anonymous aggregate stats display (total blocks, uptime)
 - [ ] Platform DNS configuration scripts (macOS, Windows, Linux)
 - [ ] Basic installer for one platform (Linux `.deb` or macOS `.pkg`)
 
@@ -26,55 +26,70 @@ Rules:         Bundled .txt files loaded at startup
 Logging:       NONE for user access. Operational errors only to stderr.
 ```
 
-### What the Installer Does
-```
-1. Extract Go binary to install directory
-2. Write default rule files to data directory
-3. Create SQLite database with default policies and zeroed counters
-4. Set OS DNS to 127.0.0.1 (backup original)
-5. Register as system service / LaunchDaemon
-6. Install Electron tray app
-```
-
 ---
 
-## Phase 2: Browser Extension + DLP Scanning (Tier 2 Browser)
+## Phase 2: Browser Extension + Layered DLP Pipeline (Tier 2 Browser)
 
-**Covers:** Tier 2 for browser-based AI tool usage. Privacy-preserving DLP.
+**Covers:** Tier 2 for browser-based AI tool usage. High-accuracy, privacy-preserving DLP.
 
 ### Deliverables
+
+#### DLP Pipeline Core (Go agent)
+- [ ] Content type classifier (code/data/credentials/natural language heuristics)
+- [ ] Aho-Corasick automaton builder from pattern prefixes (e.g., `cloudflare/ahocorasick`)
+- [ ] Single-pass prefix scan returning candidate locations
+- [ ] Candidate-only regex validation
+- [ ] Hotword proximity checker (scan N chars around match for context keywords)
+- [ ] Shannon entropy calculator for secret/key candidates
+- [ ] Exclusion rule engine (dictionary + regex suppressions)
+- [ ] Multi-signal scoring system with configurable weights
+- [ ] Per-severity threshold configuration (`/api/dlp/config` endpoint)
+- [ ] `/api/dlp/scan` endpoint — receives content, runs pipeline, returns block/allow + pattern name
+
+#### DLP Rule Files
+- [ ] `dlp_patterns.json` — extended format with `prefix`, `hotwords`, `hotword_window`, `entropy_min`, `severity`, `min_matches`
+- [ ] `dlp_exclusions.json` — dictionary and regex exclusions per pattern (or global)
+- [ ] Scoring thresholds config in `dlp_config` SQLite table
+
+#### Browser Extension
 - [ ] Chrome extension (Manifest V3) with content scripts for Tier 2 AI domains
 - [ ] Firefox extension (WebExtensions) port
-- [ ] DLP pattern scanner in the Go agent (`/api/dlp/scan` endpoint)
-- [ ] `dlp_patterns.json` bundled rule file (API keys, emails, source code heuristics)
 - [ ] Native Messaging host configuration for extension ↔ agent communication
 - [ ] Extension intercepts: paste events, form submissions, fetch/XHR requests
 - [ ] Ephemeral block notification: shows pattern name only, no matched content, auto-dismisses
+
+#### Integration
 - [ ] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` (no content/domain stored)
 - [ ] Category toggles extended to three-state: Allow / Allow + Inspect / Block
+- [ ] Automaton rebuilt when rules update (triggered by `/api/rules/update`)
 
 ### Privacy Guarantees
 - DLP scan content is received via HTTP POST, scanned in-memory, and response sent. The request body is garbage-collected. Never written to disk.
-- Block notifications show "AWS Access Key pattern detected" — NOT the actual key.
+- Block notifications show "AWS Access Key pattern detected" — NOT the actual key or matched content.
 - The extension stores no history of scanned pages or content.
+- DLP scoring details (individual signal scores) are returned in the HTTP response for the notification, then discarded. Not persisted.
 
-### Architecture Addition
-```
-Browser Extension → Native Messaging → Go Agent → DLP Scanner (in-memory)
-                                                 → Counter increment (no content stored)
-                                                 → Extension (block/allow response)
-```
+### DLP Pipeline Performance Budget
+
+| Step | Time Budget | Memory Budget |
+|------|------------|---------------|
+| Content classification | < 10 μs | 0 (stack only) |
+| Aho-Corasick scan | < 100 μs (typical paste) | ~100 KB (automaton, built once) |
+| Regex validation (candidates) | < 500 μs | Negligible |
+| Scoring (hotwords + entropy + exclusions) | < 200 μs | ~100 KB (exclusion hash sets) |
+| **Total** | **< 1 ms** | **~200 KB** |
 
 ---
 
 ## Phase 3: Rule Updates + Multi-Platform Installers
 
-**Covers:** Server-side rule distribution. Production-ready packaging.
+**Covers:** Server-side rule distribution (including DLP patterns + exclusions). Production-ready packaging.
 
 ### Deliverables
 - [ ] Rule updater: polls `manifest.json` from configurable URL (default: GitHub Releases)
-- [ ] Manifest format: version, checksums (SHA256), file list
+- [ ] Manifest format: version, checksums (SHA256), file list (includes `dlp_patterns.json` + `dlp_exclusions.json`)
 - [ ] Delta updates: only download changed rule files
+- [ ] On rule update: rebuild Aho-Corasick automaton and exclusion hash sets
 - [ ] Electron auto-update via `electron-updater` (Squirrel on Windows, zip on macOS)
 - [ ] macOS installer: `.pkg` via `pkgbuild` + `productbuild`
 - [ ] Windows installer: MSI via WiX Toolset
@@ -86,11 +101,14 @@ Browser Extension → Native Messaging → Go Agent → DLP Scanner (in-memory)
 ```
 Static file host serving:
   GET /manifest.json       → version + checksums
-  GET /rules/{filename}    → individual rule files
+  GET /rules/{filename}    → individual rule files (domain lists + dlp_patterns.json + dlp_exclusions.json)
 ```
 
 No processing, no auth, no user data. Can be a GitHub repo with tagged releases.
 The rule server has NO knowledge of which devices downloaded which rules.
+
+DLP accuracy improvements (new patterns, new exclusions) are distributed through this
+mechanism without requiring an agent binary update.
 
 ---
 
@@ -104,27 +122,15 @@ The rule server has NO knowledge of which devices downloaded which rules.
 - [ ] Platform-specific CA trust installation (automated scripts)
 - [ ] Platform-specific system proxy configuration
 - [ ] Selective inspection: only Tier 2 domains decrypt TLS; all other traffic tunneled (CONNECT)
-- [ ] DLP scanning of decrypted request bodies (in-memory only, never persisted)
+- [ ] DLP scanning of decrypted request bodies through the same layered pipeline (in-memory only)
 - [ ] "Enable Advanced DLP" setup wizard in Electron UI
 - [ ] Certificate pinning bypass list (known pinned apps)
 
 ### Privacy Notes
 - The proxy decrypts TLS ONLY for Tier 2 domains. All other traffic passes through as opaque CONNECT tunnels.
-- Decrypted content is scanned in-memory and immediately discarded.
+- Decrypted content is scanned through the layered DLP pipeline in-memory and immediately discarded.
 - No access log. No connection log. No request/response capture.
 - The proxy increments `dlp_scans_total` and `dlp_blocks_total` counters only.
-
-### User Experience
-```
-Settings → Advanced → Enable Full DLP Protection
-  → Generates local CA
-  → Prompts for admin password
-  → Installs CA to OS trust store
-  → Configures system proxy
-  → Shows status: "Full DLP Active"
-```
-
-This is **opt-in only**. Default installation uses DNS blocking + browser extension.
 
 ---
 
@@ -138,17 +144,20 @@ This is **opt-in only**. Default installation uses DNS blocking + browser extens
 - [ ] Agent health heartbeat to optional central server (sends ONLY: "agent alive, version X" — no access data)
 - [ ] Export aggregate stats as JSON (counters only, no access data)
 - [ ] Custom rule file support (admin adds company-specific domains)
+- [ ] Custom DLP patterns and exclusions via local override files
+- [ ] DLP scoring threshold tuning UI in Electron settings
 - [ ] Allowlist/blocklist override UI
 - [ ] Performance profiling and optimization pass
-- [ ] Documentation: admin guide, user guide, rule contribution guide
+- [ ] Documentation: admin guide, user guide, rule contribution guide, DLP pattern authoring guide
 - [ ] Privacy audit: third-party review of zero-logging guarantees
+- [ ] DLP accuracy audit: measure false positive/negative rates against test corpus
 - [ ] Accessibility audit of Electron UI
 
 ### Enterprise Privacy Boundary
-Even in enterprise mode, the agent NEVER sends access logs, domain lists, or user activity
-to a central server. The heartbeat endpoint receives only: agent version, OS type, and
-aggregate counters. An enterprise admin can see "Device X has blocked 142 requests total"
-but cannot see WHAT was blocked.
+Even in enterprise mode, the agent NEVER sends access logs, domain lists, DLP match details,
+or user activity to a central server. The heartbeat endpoint receives only: agent version, OS
+type, and aggregate counters. An enterprise admin can see "Device X has blocked 142 requests
+total" but cannot see WHAT was blocked or WHAT content triggered DLP.
 
 ---
 
@@ -157,15 +166,21 @@ but cannot see WHAT was blocked.
 | Component | Difficulty | Notes |
 |-----------|-----------|-------|
 | DNS blocking agent | Easy | ~500 lines Go |
-| Rule file format + updater | Easy | Plain text domain lists; small JSON manifest |
+| Rule file format + updater | Easy | One-entry-per-line text files; simple HTTP GET |
 | SQLite config store (no logging) | Easy | Simpler than logged version — fewer tables, less I/O |
 | Anonymous counter system | Easy | Atomic integer increments, periodic flush |
 | Electron tray (minimal) | Easy | ~300 lines main process |
+| Content type classifier | Easy | ~100 lines of string heuristics |
+| Aho-Corasick prefix scanner | Easy | Library handles it; ~50 lines integration |
+| Hotword proximity checker | Easy | Substring scan within window; ~80 lines |
+| Shannon entropy calculator | Easy | ~20 lines of arithmetic |
+| Exclusion rule engine | Easy-Medium | Hash set + regex; ~200 lines |
+| Multi-signal scoring system | Medium | Configurable weights, threshold logic; ~300 lines |
 | Browser extension (Tier 2) | Medium | ~2000 lines TypeScript |
-| Settings UI | Medium | Small surface area; no Reports page by design |
+| Settings UI | Medium | Per-category three-state toggles + anonymous stats (no Reports page) |
 | Local MITM proxy | Medium | ~1000 lines Go (goproxy handles TLS) |
 | Cross-platform installers | Medium | Three separate pipelines |
-| DLP pattern tuning | Hard | Ongoing quality problem (false positives) |
+| DLP pattern tuning | Hard | Ongoing quality problem — but layered pipeline + community exclusions significantly reduce false positives compared to flat regex |
 | Preventing user bypass | Hard | Inherent limitation without MDM |
 | Keeping AI tool list current | Hard | Community maintenance IS the product |
 | Privacy audit | Hard | Needs thorough review of all code paths to ensure no accidental logging |

@@ -6,8 +6,8 @@
 
 | Phase | Status | Completion |
 |-------|--------|------------|
-| Phase 1: DNS Blocking + Electron Tray | In Progress | ~75% |
-| Phase 2: Browser Extension + Layered DLP Pipeline | Not Started | 0% |
+| Phase 1: DNS Blocking + Electron Tray | Complete | 100% |
+| Phase 2: Browser Extension + Layered DLP Pipeline | In Progress | ~60% |
 | Phase 3: Rule Updates + Installers | Not Started | 0% |
 | Phase 4: MITM Proxy (Optional) | Not Started | 0% |
 | Phase 5: Enterprise Features | Not Started | 0% |
@@ -49,61 +49,61 @@
 - [x] `rules/ai_chat_dlp.txt` — AI tools requiring DLP inspection
 - [x] `rules/phishing.txt` — phishing domains
 - [x] `rules/social.txt` — social media domains
-- [ ] `rules/news.txt` — news domains
-- [ ] `rules/manifest.json` — version and file list
+- [x] `rules/news.txt` — news domains
+- [x] `rules/manifest.json` — version and file list
 
 ### Platform Integration
-- [ ] macOS: DNS configuration script
-- [ ] macOS: LaunchDaemon plist
-- [ ] Windows: DNS configuration script (netsh)
-- [ ] Windows: Service registration
-- [ ] Linux: resolv.conf / systemd-resolved configuration
-- [ ] Linux: systemd unit file
+- [x] macOS: DNS configuration script
+- [x] macOS: LaunchDaemon plist
+- [x] Windows: DNS configuration script (netsh)
+- [x] Windows: Service registration
+- [x] Linux: resolv.conf / systemd-resolved configuration
+- [x] Linux: systemd unit file
 
 ### Packaging
-- [ ] Linux `.deb` package (nfpm)
-- [ ] Basic CI: build + test on GitHub Actions
+- [x] Linux `.deb` package (nfpm)
+- [x] Basic CI: build + test on GitHub Actions
 
 ## Phase 2 Detailed Breakdown
 
 ### DLP Pipeline Core
-- [ ] Content type classifier (code/data/credentials/natural language)
-- [ ] Aho-Corasick automaton builder from pattern prefixes
-- [ ] Single-pass prefix scan returning candidate locations
-- [ ] Candidate-only regex validation
-- [ ] Hotword proximity checker (configurable window size)
-- [ ] Shannon entropy calculator
-- [ ] Exclusion rule engine (dictionary exact match + regex + proximity)
-- [ ] Multi-signal scoring aggregator
-- [ ] Per-severity threshold engine (configurable via API + SQLite)
-- [ ] `/api/dlp/scan` endpoint
-- [ ] `/api/dlp/config` GET/PUT endpoints
-- [ ] Automaton rebuild on rule file change
-- [ ] Unit tests: each pipeline step independently
-- [ ] Integration test: full pipeline with known patterns + known false positives
+- [x] Content type classifier (code/data/credentials/natural language)
+- [x] Aho-Corasick automaton builder from pattern prefixes
+- [x] Single-pass prefix scan returning candidate locations
+- [x] Candidate-only regex validation
+- [x] Hotword proximity checker (configurable window size)
+- [x] Shannon entropy calculator
+- [x] Exclusion rule engine (dictionary exact match + regex + proximity)
+- [x] Multi-signal scoring aggregator
+- [x] Per-severity threshold engine (configurable via API + SQLite)
+- [x] `/api/dlp/scan` endpoint
+- [x] `/api/dlp/config` GET/PUT endpoints
+- [x] Automaton rebuild on rule file change
+- [x] Unit tests: each pipeline step independently
+- [x] Integration test: full pipeline with known patterns + known false positives
 
 ### DLP Rule Files
-- [ ] `rules/dlp_patterns.json` — extended format with prefix, hotwords, hotword_window, entropy_min, severity, score_weight, min_matches
-- [ ] `rules/dlp_exclusions.json` — dictionary and regex exclusions per pattern and global
-- [ ] Default patterns: AWS keys, GitHub tokens, GitLab tokens, Google API keys, Slack tokens, private keys (PEM), email addresses (bulk), phone numbers (bulk), SSN, credit card numbers, source code heuristics, internal URL patterns
-- [ ] Default exclusions: test/example/placeholder/dummy strings, @example.com emails, 000-00-0000 SSN, known public keys
+- [x] `rules/dlp_patterns.json` — extended format with prefix, hotwords, hotword_window, entropy_min, severity, score_weight, min_matches
+- [x] `rules/dlp_exclusions.json` — dictionary and regex exclusions per pattern and global
+- [x] Default patterns: AWS keys, GitHub tokens, GitLab tokens, Google API keys, Slack tokens, private keys (PEM), email addresses (bulk), phone numbers (bulk), SSN, credit card numbers, source code heuristics, internal URL patterns
+- [x] Default exclusions: test/example/placeholder/dummy strings, @example.com emails, 000-00-0000 SSN, known public keys
 
 ### Browser Extension
-- [ ] Chrome extension project setup (Manifest V3)
-- [ ] Content script: intercept paste events on Tier 2 AI tool domains
+- [x] Chrome extension project setup (Manifest V3)
+- [x] Content script: intercept paste events on Tier 2 AI tool domains
 - [ ] Content script: intercept form submission events
 - [ ] Content script: intercept fetch/XHR requests before send
 - [ ] Native Messaging host manifest (macOS, Windows, Linux paths)
 - [ ] Native Messaging communication with Go agent
-- [ ] Ephemeral block notification UI (in-page banner, auto-dismiss, shows pattern name only)
+- [x] Ephemeral block notification UI (in-page banner, auto-dismiss, shows pattern name only)
 - [ ] Firefox WebExtensions port
-- [ ] Extension popup: connection status to Go agent
+- [x] Extension popup: connection status to Go agent
 
 ### Integration
-- [ ] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` added to `aggregate_stats`
+- [x] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` added to `aggregate_stats`
 - [ ] Category toggles extended to three-state: Allow / Allow + Inspect / Block
-- [ ] Aho-Corasick automaton rebuild triggered on rule file change
-- [ ] Privacy review: confirm no scan content, no matched text, no domain is written to disk
+- [x] Aho-Corasick automaton rebuild triggered on rule file change
+- [x] Privacy review: confirm no scan content, no matched text, no domain is written to disk
 
 ## Phase 3 Detailed Breakdown
 
@@ -321,3 +321,51 @@ secure-edge/
   polling that swaps the icon between green/red variants based on agent reachability.
 - Six bundled rule files (`ai_chat_blocked.txt`, `ai_code_blocked.txt`, `ai_allowed.txt`,
   `ai_chat_dlp.txt`, `phishing.txt`, `social.txt`).
+
+### 2026-05-12 (Phase 1 finish + Phase 2 DLP core)
+- **Bundled rules**: added `rules/news.txt` (29 news domains, leading-dot apex match)
+  and `rules/manifest.json` with real SHA256 checksums for every bundled rule file
+  (including the new DLP JSON files). This is the wire format the future rule
+  updater will compare against to do delta downloads.
+- **Platform integration scripts**: `scripts/macos/configure-dns.sh`,
+  `scripts/macos/com.secureedge.agent.plist`, `scripts/windows/configure-dns.ps1`,
+  `scripts/windows/register-service.ps1`, `scripts/linux/configure-dns.sh`, and
+  `scripts/linux/secure-edge.service`. All DNS scripts support `apply`/`restore`
+  and the Linux unit hardens via `ProtectSystem=strict`, `NoNewPrivileges`, and
+  `CAP_NET_BIND_SERVICE` ambient capability.
+- **Packaging**: `agent/nfpm.yaml` plus `agent/scripts/postinstall.sh` and
+  `agent/scripts/preremove.sh` for a clean `.deb` install/uninstall cycle that
+  drops the binary at `/usr/bin`, config + rules under `/etc/secure-edge`, and
+  the systemd unit at `/lib/systemd/system`.
+- **CI**: `.github/workflows/ci.yml` runs three jobs on every push/PR — Go
+  agent (`make test && make lint && make build`), Electron tray (`npm ci && npm
+  run typecheck`), and browser extension (`tsc --noEmit`).
+- **DLP pipeline core (`agent/internal/dlp/`)**: 9 source files implementing the
+  layered DLP pipeline — `classifier.go`, `ahocorasick.go` (uses
+  `github.com/cloudflare/ahocorasick`), `regex.go` (candidate-window
+  validation), `hotword.go` (configurable proximity), `entropy.go` (Shannon),
+  `exclusion.go` (dictionary exact + proximity + regex), `scorer.go`
+  (multi-signal aggregator with multi-match cap), `threshold.go` (per-severity
+  block decision), `pipeline.go` (atomic-rebuild orchestrator), plus
+  `types.go`, `loader.go`, and a corresponding `*_test.go` file for every
+  component. `pipeline_test.go` exercises the full pipeline on true positives
+  (`AKIA…` with hotword), known false positives (`AKIAIOSFODNN7EXAMPLE`),
+  benign prose, empty content, and very long content (>100 KiB).
+- **DLP API endpoints**: `POST /api/dlp/scan` (4 MiB body cap, returns
+  `{blocked, pattern_name, score}` — content never persisted), `GET /api/dlp/config`,
+  and `PUT /api/dlp/config` (writes through to the `dlp_config` SQLite singleton
+  and the live `ThresholdEngine`). Anonymous `dlp_scans_total` /
+  `dlp_blocks_total` counters incremented on every scan.
+- **DLP rules**: `rules/dlp_patterns.json` with 13 patterns (AWS, GitHub,
+  GitLab, Google, Slack, PEM private key, generic API key, bulk email, bulk
+  US phone, US SSN, credit card with Luhn-shaped prefixes, source-code
+  heuristics, internal/corp URL); `rules/dlp_exclusions.json` with the
+  globals + AWS-doc example key + 555-01xx fictional phone numbers + test
+  credit cards + RFC 2606 email domains.
+- **Browser extension skeleton (`extension/`)**: Manifest V3 with content
+  scripts matched at 10 Tier-2 AI domains, a service worker that proxies
+  `/api/status` calls for the popup, a minimal popup showing agent
+  online/offline + version + uptime, and `paste-interceptor.ts` — captures
+  paste events, ships text to `POST /api/dlp/scan`, blocks the paste only
+  when the agent says so, falls open on agent outage, and shows a 5-second
+  toast carrying the pattern name (sanitised to printable ASCII).

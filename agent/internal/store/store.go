@@ -257,6 +257,66 @@ func (s *Store) AddStats(ctx context.Context, delta AggregateStats) error {
 	return nil
 }
 
+// DLPConfig is the singleton row in dlp_config.
+type DLPConfig struct {
+	ThresholdCritical int `json:"threshold_critical"`
+	ThresholdHigh     int `json:"threshold_high"`
+	ThresholdMedium   int `json:"threshold_medium"`
+	ThresholdLow      int `json:"threshold_low"`
+	HotwordBoost      int `json:"hotword_boost"`
+	EntropyBoost      int `json:"entropy_boost"`
+	EntropyPenalty    int `json:"entropy_penalty"`
+	ExclusionPenalty  int `json:"exclusion_penalty"`
+	MultiMatchBoost   int `json:"multi_match_boost"`
+}
+
+// GetDLPConfig reads the singleton dlp_config row.
+func (s *Store) GetDLPConfig(ctx context.Context) (DLPConfig, error) {
+	var c DLPConfig
+	err := s.db.QueryRowContext(ctx, `
+		SELECT threshold_critical, threshold_high, threshold_medium, threshold_low,
+		       hotword_boost, entropy_boost, entropy_penalty, exclusion_penalty,
+		       multi_match_boost
+		FROM dlp_config WHERE id = 1
+	`).Scan(
+		&c.ThresholdCritical, &c.ThresholdHigh, &c.ThresholdMedium, &c.ThresholdLow,
+		&c.HotwordBoost, &c.EntropyBoost, &c.EntropyPenalty, &c.ExclusionPenalty,
+		&c.MultiMatchBoost,
+	)
+	if err != nil {
+		return DLPConfig{}, fmt.Errorf("get dlp_config: %w", err)
+	}
+	return c, nil
+}
+
+// SetDLPConfig overwrites the singleton dlp_config row.
+func (s *Store) SetDLPConfig(ctx context.Context, c DLPConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE dlp_config SET
+			threshold_critical = ?,
+			threshold_high     = ?,
+			threshold_medium   = ?,
+			threshold_low      = ?,
+			hotword_boost      = ?,
+			entropy_boost      = ?,
+			entropy_penalty    = ?,
+			exclusion_penalty  = ?,
+			multi_match_boost  = ?,
+			updated_at         = CURRENT_TIMESTAMP
+		WHERE id = 1
+	`,
+		c.ThresholdCritical, c.ThresholdHigh, c.ThresholdMedium, c.ThresholdLow,
+		c.HotwordBoost, c.EntropyBoost, c.EntropyPenalty, c.ExclusionPenalty,
+		c.MultiMatchBoost,
+	)
+	if err != nil {
+		return fmt.Errorf("set dlp_config: %w", err)
+	}
+	return nil
+}
+
 // ResetStats zeroes the aggregate counters.
 func (s *Store) ResetStats(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `

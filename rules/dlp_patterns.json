@@ -1,0 +1,163 @@
+{
+  "patterns": [
+    {
+      "name": "AWS Access Key",
+      "regex": "AKIA[0-9A-Z]{16}",
+      "prefix": "AKIA",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["aws", "access_key", "credentials", "iam", "secret", "amazon"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5
+    },
+    {
+      "name": "GitHub Personal Access Token",
+      "regex": "ghp_[A-Za-z0-9]{36}",
+      "prefix": "ghp_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["github", "token", "auth", "personal"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0
+    },
+    {
+      "name": "GitLab Personal Access Token",
+      "regex": "glpat-[A-Za-z0-9_\\-]{20,}",
+      "prefix": "glpat-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["gitlab", "token", "auth", "personal"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5
+    },
+    {
+      "name": "Google API Key",
+      "regex": "AIza[0-9A-Za-z_\\-]{35}",
+      "prefix": "AIza",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["google", "api", "key", "gcp", "firebase", "maps"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5
+    },
+    {
+      "name": "Slack Token",
+      "regex": "xox[abprs]-[0-9A-Za-z\\-]{10,}",
+      "prefix": "xox",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["slack", "token", "bot", "oauth"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0
+    },
+    {
+      "name": "Private Key Block",
+      "regex": "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----",
+      "prefix": "-----BEGIN",
+      "severity": "critical",
+      "score_weight": 2,
+      "hotwords": [],
+      "hotword_window": 0,
+      "hotword_boost": 0,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "Generic API Key",
+      "regex": "(?i)(api[_-]?key|apikey)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "api",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": ["api", "key", "token", "secret"],
+      "hotword_window": 50,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0
+    },
+    {
+      "name": "Email Addresses (bulk)",
+      "regex": "[a-zA-Z0-9_.+\\-]+@[a-zA-Z0-9\\-]+\\.[a-zA-Z0-9\\-.]+",
+      "prefix": "@",
+      "severity": "medium",
+      "score_weight": 1,
+      "min_matches": 5,
+      "hotwords": ["email", "contact", "user", "customer", "subscriber"],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "Phone Numbers (bulk, US)",
+      "regex": "(?:\\+?1[\\-. ]?)?\\(?[2-9][0-9]{2}\\)?[\\-. ]?[0-9]{3}[\\-. ]?[0-9]{4}",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "min_matches": 5,
+      "hotwords": ["phone", "tel", "mobile", "contact", "customer"],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "US Social Security Number",
+      "regex": "\\b[0-9]{3}-[0-9]{2}-[0-9]{4}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["ssn", "social", "security", "tax", "ein"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "Credit Card Number",
+      "regex": "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": ["credit", "card", "cc", "visa", "mastercard", "amex", "payment"],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "Source Code Imports",
+      "regex": "(?m)^\\s*(import\\s+[\\w.]+|from\\s+[\\w.]+\\s+import|#include\\s+[<\"][^>\"]+[>\"]|package\\s+\\w+)",
+      "prefix": "",
+      "severity": "low",
+      "score_weight": 1,
+      "min_matches": 3,
+      "hotwords": ["source", "code", "package", "module"],
+      "hotword_window": 500,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 0
+    },
+    {
+      "name": "Internal URLs",
+      "regex": "(?i)https?://[a-z0-9\\-.]+\\.(?:internal|corp|intranet|local)\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": ["internal", "corp", "intranet", "vpn", "wiki", "jira", "confluence"],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -244,5 +245,100 @@ func TestAllowsRequestsWithoutOrigin(t *testing.T) {
 	}
 	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Errorf("ACAO unexpectedly set: %q", got)
+	}
+}
+
+// --- DLP endpoint tests (Phase 2) ---
+
+type fakeDLP struct {
+	thr    *dlp.ThresholdEngine
+	result dlp.ScanResult
+	calls  int64
+}
+
+func (f *fakeDLP) Scan(_ context.Context, _ string) dlp.ScanResult {
+	atomic.AddInt64(&f.calls, 1)
+	return f.result
+}
+func (f *fakeDLP) Threshold() *dlp.ThresholdEngine { return f.thr }
+
+func TestDLPScan_WithoutPipelineReturns503(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/dlp/scan",
+		bytes.NewBufferString(`{"content":"x"}`))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d (body=%q)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDLPScan_ReturnsScanResult(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetDLP(&fakeDLP{
+		thr:    dlp.NewThresholdEngine(dlp.DefaultThresholds()),
+		result: dlp.ScanResult{Blocked: true, PatternName: "AWS Access Key", Score: 3},
+	})
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/dlp/scan",
+		bytes.NewBufferString(`{"content":"AKIAABCDEFGHIJKLMNOP aws"}`))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%q)", rec.Code, rec.Body.String())
+	}
+	var got dlp.ScanResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !got.Blocked || got.PatternName != "AWS Access Key" || got.Score != 3 {
+		t.Fatalf("scan result = %+v, want blocked AWS Access Key score=3", got)
+	}
+}
+
+func TestDLPScan_RejectsNonPOST(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetDLP(&fakeDLP{thr: dlp.NewThresholdEngine(dlp.DefaultThresholds())})
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/dlp/scan", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+}
+
+func TestDLPConfig_GetAndPut(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	srv.SetDLP(&fakeDLP{thr: thr})
+
+	// GET returns the defaults seeded by store.Open.
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/dlp/config", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/dlp/config got %d", rec.Code)
+	}
+	var cfg store.DLPConfig
+	if err := json.Unmarshal(rec.Body.Bytes(), &cfg); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if cfg.ThresholdCritical == 0 {
+		t.Fatalf("expected non-zero defaults, got %+v", cfg)
+	}
+
+	// PUT updates thresholds and propagates to the engine.
+	cfg.ThresholdCritical = 99
+	cfg.ThresholdHigh = 100
+	cfg.ThresholdMedium = 101
+	cfg.ThresholdLow = 102
+	body, _ := json.Marshal(cfg)
+	rec = httptest.NewRecorder()
+	req = newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if got := thr.Get(); got.Critical != 99 || got.Low != 102 {
+		t.Fatalf("threshold engine not updated: %+v", got)
 	}
 }

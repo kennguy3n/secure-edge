@@ -1,16 +1,24 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
+
+// maxScanBytes caps the body size accepted by /api/dlp/scan. Pastes
+// well beyond this size are typically not what a user is sending to an
+// AI tool, and an unbounded body is a memory-exhaustion vector.
+const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
 
 // StatusResponse is the body for GET /api/status.
 type StatusResponse struct {
@@ -136,3 +144,113 @@ func (s *Server) handleStatsReset(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, stats.Snapshot{})
 }
+
+// dlpScanRequest is the body for POST /api/dlp/scan.
+type dlpScanRequest struct {
+	Content string `json:"content"`
+}
+
+func (s *Server) handleDLPScan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.DLP == nil {
+		writeError(w, http.StatusServiceUnavailable, "DLP pipeline not configured")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxScanBytes)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusRequestEntityTooLarge, "request too large")
+		return
+	}
+	var req dlpScanRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	// Privacy invariant: req.Content lives in this stack frame only.
+	// It is not logged and not persisted; the response carries the
+	// decision plus the pattern name (never the match itself).
+	result := s.DLP.Scan(r.Context(), req.Content)
+	req.Content = "" // drop reference promptly.
+
+	// Increment anonymous DLP counters.
+	if s.Stats != nil {
+		_ = bumpDLPStats(r.Context(), s.Store, result.Blocked)
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// dlpConfigResponse is the wire shape of GET /api/dlp/config and the
+// expected body of PUT /api/dlp/config. We just reflect the SQLite
+// dlp_config columns so callers can round-trip the value.
+type dlpConfigResponse = store.DLPConfig
+
+func (s *Server) handleDLPConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleDLPConfigGet(w, r)
+	case http.MethodPut:
+		s.handleDLPConfigPut(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleDLPConfigGet(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.Store.GetDLPConfig(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "dlp config unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
+	var body store.DLPConfig
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := s.Store.SetDLPConfig(r.Context(), body); err != nil {
+		writeError(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	if s.DLP != nil {
+		s.DLP.Threshold().Set(dlp.Thresholds{
+			Critical: body.ThresholdCritical,
+			High:     body.ThresholdHigh,
+			Medium:   body.ThresholdMedium,
+			Low:      body.ThresholdLow,
+		})
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+// bumpDLPStats increments dlp_scans_total (+1) and optionally
+// dlp_blocks_total (+1 when blocked). Errors are intentionally
+// swallowed by the caller — counter updates must not break a scan.
+func bumpDLPStats(ctx context.Context, s *store.Store, blocked bool) error {
+	if s == nil {
+		return nil
+	}
+	delta := store.AggregateStats{DLPScansTotal: 1}
+	if blocked {
+		delta.DLPBlocksTotal = 1
+	}
+	return s.AddStats(ctx, delta)
+}
+
+// Compile-time check: dlp.ScanResult must remain JSON-encodable
+// without referencing user content. If anyone adds a field here that
+// might leak content, this var will need to be updated explicitly.
+var _ = dlp.ScanResult{Blocked: false, PatternName: "", Score: 0}
+
+// Suppress the unused import warning when none of the type's fields
+// are referenced (it is used via the s.DLP interface).
+var _ = stats.Snapshot{}

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -48,11 +49,20 @@ type StatsView interface {
 	Reset(ctx context.Context) error
 }
 
+// DLPScanner is the subset of dlp.Pipeline the API needs. It is wired
+// in NewServer / SetDLP so the API package does not have to import
+// dlp.Pipeline directly for tests.
+type DLPScanner interface {
+	Scan(ctx context.Context, content string) dlp.ScanResult
+	Threshold() *dlp.ThresholdEngine
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
 	Store     *store.Store
 	Policy    PolicyEngine
 	Stats     StatsView
+	DLP       DLPScanner
 	startedAt time.Time
 	once      sync.Once
 }
@@ -62,6 +72,10 @@ func NewServer(s *store.Store, p PolicyEngine, st StatsView) *Server {
 	return &Server{Store: s, Policy: p, Stats: st, startedAt: time.Now()}
 }
 
+// SetDLP wires a DLP scanner into the server after construction.
+// Phase 1 callers don't have to provide one; Phase 2 callers do.
+func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -70,6 +84,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/policies/", s.handlePolicyItem)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/stats/reset", s.handleStatsReset)
+	mux.HandleFunc("/api/dlp/scan", s.handleDLPScan)
+	mux.HandleFunc("/api/dlp/config", s.handleDLPConfig)
 	return withCORS(mux)
 }
 

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Secure Edge LaunchDaemon
+  Install path: /Library/LaunchDaemons/com.secureedge.agent.plist
+  Load with:    sudo launchctl bootstrap system /Library/LaunchDaemons/com.secureedge.agent.plist
+  Unload with:  sudo launchctl bootout system/com.secureedge.agent
+
+  The agent must be installed at /usr/local/bin/secure-edge-agent and its
+  config at /etc/secure-edge/config.yaml. Binds to 127.0.0.1:53 — requires
+  RunAtLoad as a system daemon (root) on macOS.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.secureedge.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/secure-edge-agent</string>
+        <string>--config</string>
+        <string>/etc/secure-edge/config.yaml</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/secure-edge-agent.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/secure-edge-agent.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

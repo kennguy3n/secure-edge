@@ -14,6 +14,7 @@ import (
 
 	"github.com/kennguy3n/secure-edge/agent/internal/api"
 	"github.com/kennguy3n/secure-edge/agent/internal/config"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/dns"
 	"github.com/kennguy3n/secure-edge/agent/internal/policy"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
@@ -78,6 +79,44 @@ func run(configPath string) error {
 	defer func() { _ = resolver.Shutdown() }()
 
 	apiServer := api.NewServer(s, engine, counter)
+
+	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
+	// is configured. Phase 1 deployments leave both DLP paths blank and
+	// the /api/dlp/* endpoints return 503 service-unavailable.
+	if cfg.DLPPatternsPath != "" {
+		dlpCfg, err := s.GetDLPConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("read dlp_config: %w", err)
+		}
+		thresholds := dlp.Thresholds{
+			Critical: dlpCfg.ThresholdCritical,
+			High:     dlpCfg.ThresholdHigh,
+			Medium:   dlpCfg.ThresholdMedium,
+			Low:      dlpCfg.ThresholdLow,
+		}
+		weights := dlp.ScoreWeights{
+			HotwordBoost:     dlpCfg.HotwordBoost,
+			EntropyBoost:     dlpCfg.EntropyBoost,
+			EntropyPenalty:   dlpCfg.EntropyPenalty,
+			ExclusionPenalty: dlpCfg.ExclusionPenalty,
+			MultiMatchBoost:  dlpCfg.MultiMatchBoost,
+		}
+		patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+		if err != nil {
+			return err
+		}
+		var exclusions []dlp.Exclusion
+		if cfg.DLPExclusionsPath != "" {
+			exclusions, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+			if err != nil {
+				return err
+			}
+		}
+		pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+		pipeline.Rebuild(patterns, exclusions)
+		apiServer.SetDLP(pipeline)
+	}
+
 	httpServer, err := apiServer.ListenAndServe(cfg.APIListen)
 	if err != nil {
 		return fmt.Errorf("start API: %w", err)

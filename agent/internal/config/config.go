@@ -21,6 +21,14 @@ type Config struct {
 	RulePaths          []string      `yaml:"rule_paths"`
 	DBPath             string        `yaml:"db_path"`
 	StatsFlushInterval time.Duration `yaml:"stats_flush_interval"`
+
+	// DLPPatternsPath is the path to the rules/dlp_patterns.json file.
+	// Optional — leaving it blank disables DLP at agent startup.
+	DLPPatternsPath string `yaml:"dlp_patterns"`
+
+	// DLPExclusionsPath is the path to the rules/dlp_exclusions.json
+	// file. Optional; when blank, no exclusions are loaded.
+	DLPExclusionsPath string `yaml:"dlp_exclusions"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -83,6 +91,12 @@ func merge(defaults, override Config) Config {
 	}
 	if override.StatsFlushInterval != 0 {
 		out.StatsFlushInterval = override.StatsFlushInterval
+	}
+	if override.DLPPatternsPath != "" {
+		out.DLPPatternsPath = override.DLPPatternsPath
+	}
+	if override.DLPExclusionsPath != "" {
+		out.DLPExclusionsPath = override.DLPExclusionsPath
 	}
 	return out
 }

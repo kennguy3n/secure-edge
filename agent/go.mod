@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

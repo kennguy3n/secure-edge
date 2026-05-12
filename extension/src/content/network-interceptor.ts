@@ -1,124 +1,83 @@
-// Network-request interceptor content script.
+// Isolated-world relay for the MAIN-world fetch / XHR bridge.
 //
-// Monkey-patches window.fetch and XMLHttpRequest.prototype.send so
-// every outbound request body on a Tier-2 AI tool page is run through
-// the local agent's DLP pipeline before it leaves the browser. The
-// goals are:
+// The actual fetch / XMLHttpRequest patches live in
+// main-world-network.ts and run in the page's own JavaScript context
+// (so SPAs' native `fetch` and `XMLHttpRequest.prototype.send` are
+// intercepted; see that file for the why). MAIN-world scripts cannot
+// use `chrome.runtime`, so this isolated-world relay:
 //
-//   * Cover request bodies the paste / form interceptors miss —
-//     e.g. modern SPA chat UIs that POST JSON straight from a React
-//     handler, without ever firing a `submit` event.
-//   * Stay invisible when the agent has nothing to say — the
-//     patched fetch / send is otherwise a transparent pass-through.
-//   * Fall open on any agent failure so an offline daemon can never
-//     wedge a Tier-2 page.
+//   * Listens for `scan-req` messages the bridge posts to `window`.
+//   * Runs the body through the existing `scanContent` helper, which
+//     talks to the background service worker (Native Messaging first,
+//     loopback HTTP fallback) and ultimately to the local agent.
+//   * Posts a `scan-resp` back to `window` with the verdict.
+//   * Renders the ephemeral block toast on the page when the agent
+//     returns `blocked: true` — the bridge throws / aborts the request
+//     but doesn't touch the DOM itself.
 //
-// Only bodies above MIN_SCAN_BYTES are inspected to keep heartbeats /
-// telemetry pings out of the hot path; tiny bodies cannot realistically
-// carry a credential we'd want to block on anyway.
+// Fall-open semantics match the rest of the extension: any scan-side
+// error returns `result: null`, which the bridge treats as "allow".
 
+import type { ScanResult } from "../shared.js";
 import { scanContent } from "./scan-client.js";
 import { showBlockedToast } from "./toast.js";
 
-/** Bodies below this size are skipped — not enough material to
- *  carry a DLP-worthy secret. Mirrors the agent's hotword / regex
- *  budget so we don't waste a scan on UI ping payloads. */
-export const MIN_SCAN_BYTES = 50;
+const BRIDGE_SOURCE = "secure-edge-bridge";
+const ISO_SOURCE = "secure-edge-iso";
 
-/** ToastFn alias keeps the test signature small. */
+interface ScanRequestMessage {
+    source: typeof BRIDGE_SOURCE;
+    kind: "scan-req";
+    id: string;
+    content: string;
+}
+
+interface ScanResponseMessage {
+    source: typeof ISO_SOURCE;
+    kind: "scan-resp";
+    id: string;
+    result: ScanResult | null;
+}
+
+function isScanRequest(data: unknown): data is ScanRequestMessage {
+    if (!data || typeof data !== "object") return false;
+    const d = data as { source?: unknown; kind?: unknown; id?: unknown; content?: unknown };
+    return d.source === BRIDGE_SOURCE
+        && d.kind === "scan-req"
+        && typeof d.id === "string"
+        && typeof d.content === "string";
+}
+
 type ToastFn = (patternName: string) => void;
+type ReplyFn = (msg: ScanResponseMessage) => void;
 
-/** Patch fetch on `target`. Idempotent: if the property is already a
- *  wrapped patch we skip. The returned `unpatch` is exported for tests. */
-export function patchFetch(target: { fetch: typeof fetch }, toast: ToastFn = (p) => showBlockedToast(p, "request")) {
-    const original = target.fetch;
-    if ((original as { __secureEdgePatched?: boolean }).__secureEdgePatched) {
-        return () => { /* already patched */ };
-    }
-    const wrapped: typeof fetch = async (...args) => {
-        const body = extractFetchBody(args);
-        if (body.length >= MIN_SCAN_BYTES) {
-            const result = await scanContent(body);
-            if (result && result.blocked) {
-                toast(result.pattern_name);
-                throw new Error("Secure Edge: blocked by DLP");
-            }
-        }
-        return original.apply(target, args);
-    };
-    (wrapped as { __secureEdgePatched?: boolean }).__secureEdgePatched = true;
-    target.fetch = wrapped;
-    return () => {
-        target.fetch = original;
-    };
-}
-
-/** Patch XMLHttpRequest.prototype.send on the given constructor. */
-export function patchXHR(
-    XHR: { prototype: XMLHttpRequest },
+/** Handle a single bridge message. Exported for unit tests so we can
+ *  exercise the relay without standing up a real `window`. */
+export async function handleBridgeMessage(
+    data: unknown,
+    reply: ReplyFn,
+    scan: (content: string) => Promise<ScanResult | null> = scanContent,
     toast: ToastFn = (p) => showBlockedToast(p, "request"),
-) {
-    const proto = XHR.prototype as unknown as {
-        send: (body?: unknown) => void;
-        __secureEdgePatched?: boolean;
-    };
-    if (proto.__secureEdgePatched) return () => { /* already patched */ };
-    const original = proto.send;
-    proto.send = function patchedSend(this: XMLHttpRequest, body?: unknown) {
-        const text = bodyToText(body);
-        if (text.length < MIN_SCAN_BYTES) {
-            return original.call(this, body as Document | XMLHttpRequestBodyInit | null | undefined);
-        }
-        // XHR send() is sync from the caller's perspective; we abort
-        // the request on block but cannot suspend it pending an async
-        // scan. We start the scan and abort on block via xhr.abort().
-        void scanContent(text).then((result) => {
-            if (result && result.blocked) {
-                try {
-                    this.abort();
-                } catch { /* ignore */ }
-                toast(result.pattern_name);
-            }
-        });
-        return original.call(this, body as Document | XMLHttpRequestBodyInit | null | undefined);
-    };
-    proto.__secureEdgePatched = true;
-    return () => {
-        proto.send = original;
-        proto.__secureEdgePatched = false;
-    };
-}
-
-/** Pull a string body out of fetch()'s argument tuple. Returns "" when
- *  the body is not extractable (FormData / Blob / ReadableStream). */
-export function extractFetchBody(args: Parameters<typeof fetch>): string {
-    const init = args[1];
-    if (!init || init.body === undefined || init.body === null) return "";
-    const body = init.body;
-    if (typeof body === "string") return body;
-    if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {
-        return body.toString();
+): Promise<void> {
+    if (!isScanRequest(data)) return;
+    const { id, content } = data;
+    let result: ScanResult | null;
+    try {
+        result = await scan(content);
+    } catch {
+        result = null;
     }
-    return "";
-}
-
-/** Convert an XHR body argument into a scannable string. */
-export function bodyToText(body: unknown): string {
-    if (body === undefined || body === null) return "";
-    if (typeof body === "string") return body;
-    if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {
-        return body.toString();
+    if (result && result.blocked) {
+        toast(result.pattern_name);
     }
-    return "";
+    reply({ source: ISO_SOURCE, kind: "scan-resp", id, result });
 }
 
-// Install the patches when running inside a real browser. Tests import
-// the patch functions directly with mock globals.
 if (typeof window !== "undefined") {
-    patchFetch(window);
-    if (typeof XMLHttpRequest !== "undefined") {
-        patchXHR(XMLHttpRequest as unknown as { prototype: XMLHttpRequest });
-    }
+    window.addEventListener("message", (ev: MessageEvent) => {
+        if (ev.source && ev.source !== window) return;
+        void handleBridgeMessage(ev.data, (msg) => window.postMessage(msg, "*"));
+    });
 }
 
-export const __test__ = { patchFetch, patchXHR, extractFetchBody, bodyToText };
+export const __test__ = { handleBridgeMessage, isScanRequest, BRIDGE_SOURCE, ISO_SOURCE };

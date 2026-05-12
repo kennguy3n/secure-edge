@@ -7,7 +7,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "secure-edge@shieldnet.example",
-      "strict_min_version": "115.0"
+      "strict_min_version": "128.0"
     }
   },
 
@@ -48,10 +48,48 @@
       ],
       "js": [
         "dist/content/paste-interceptor.js",
-        "dist/content/form-interceptor.js",
-        "dist/content/network-interceptor.js"
+        "dist/content/form-interceptor.js"
       ],
       "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/network-interceptor.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://huggingface.co/chat/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "dist/content/main-world-network.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
       "all_frames": false
     }
   ]

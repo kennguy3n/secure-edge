@@ -1,0 +1,19 @@
+appId: com.shieldnet.secureedge.tray
+productName: Secure Edge
+files:
+  - dist/**/*
+  - package.json
+  - resources/**/*
+asarUnpack:
+  - resources/**/*
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+linux:
+  target:
+    - AppImage
+    - deb
+win:
+  target:
+    - nsis

@@ -1,0 +1,170 @@
+// Secure Edge — Electron main process.
+//
+// Responsibilities:
+//   * Create the system tray on app ready (no visible window on startup).
+//   * Provide a tray context menu (Status / Open Settings / Quit).
+//   * Create a BrowserWindow on-demand and DESTROY it on close to free
+//     Chromium memory (per ARCHITECTURE.md).
+//   * Poll the Go agent's /api/status endpoint every 10s and reflect the
+//     reachability state in the tray icon and tray tooltip.
+
+import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain } from 'electron';
+import * as path from 'path';
+import * as http from 'http';
+
+const AGENT_PORT = Number(process.env.SECURE_EDGE_AGENT_PORT ?? 8080);
+const AGENT_HOST = process.env.SECURE_EDGE_AGENT_HOST ?? '127.0.0.1';
+const HEALTH_INTERVAL_MS = 10_000;
+
+type View = 'status' | 'settings';
+
+let tray: Tray | null = null;
+let window: BrowserWindow | null = null;
+let healthTimer: NodeJS.Timeout | null = null;
+let lastHealthy: boolean | null = null;
+
+function rendererPath(): string {
+  // In production main.ts is compiled to dist/main.js and the renderer
+  // is at dist/renderer/index.html relative to it.
+  return path.join(__dirname, 'renderer', 'index.html');
+}
+
+function trayIconPath(healthy: boolean): string {
+  // The packaged tray icons live next to the main bundle.
+  const name = healthy ? 'tray-icon.png' : 'tray-icon-error.png';
+  return path.join(__dirname, '..', 'resources', name);
+}
+
+function buildTrayImage(healthy: boolean) {
+  const img = nativeImage.createFromPath(trayIconPath(healthy));
+  if (img.isEmpty()) {
+    // Fall back to a tiny generated image so we still have *something*
+    // in the tray on developer setups without the packaged assets.
+    return nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAAH0lEQVR42mNk+M9ABDDxQTQYwoAxYwQTAAB1AAGAVPjnXgAAAABJRU5ErkJggg==',
+    );
+  }
+  return img;
+}
+
+function showView(view: View) {
+  if (!window) {
+    window = new BrowserWindow({
+      width: 600,
+      height: 500,
+      show: false,
+      resizable: true,
+      title: 'Secure Edge',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+    window.removeMenu();
+    window.on('close', () => {
+      // Destroy the window so Chromium fully releases its memory.
+      window?.destroy();
+      window = null;
+    });
+
+    const devURL = process.env.VITE_DEV_SERVER_URL;
+    if (devURL) {
+      window.loadURL(`${devURL}#${view}`);
+    } else {
+      window.loadFile(rendererPath(), { hash: view });
+    }
+  } else {
+    window.webContents.send('navigate', view);
+  }
+  window.once('ready-to-show', () => window?.show());
+  if (window.isVisible()) window.focus();
+}
+
+function buildMenu(): Menu {
+  return Menu.buildFromTemplate([
+    { label: 'Status', click: () => showView('status') },
+    { label: 'Open Settings', click: () => showView('settings') },
+    { type: 'separator' },
+    { label: 'Quit', role: 'quit' },
+  ]);
+}
+
+function updateTrayHealth(healthy: boolean) {
+  if (!tray) return;
+  if (healthy === lastHealthy) return;
+  lastHealthy = healthy;
+  tray.setImage(buildTrayImage(healthy));
+  tray.setToolTip(healthy ? 'Secure Edge: agent running' : 'Secure Edge: agent unreachable');
+}
+
+function pingAgent(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: AGENT_HOST,
+        port: AGENT_PORT,
+        path: '/api/status',
+        method: 'GET',
+        timeout: 2000,
+      },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode === 200);
+      },
+    );
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+async function tickHealth() {
+  const ok = await pingAgent();
+  updateTrayHealth(ok);
+}
+
+function startHealthPolling() {
+  if (healthTimer) return;
+  void tickHealth();
+  healthTimer = setInterval(() => void tickHealth(), HEALTH_INTERVAL_MS);
+}
+
+function stopHealthPolling() {
+  if (!healthTimer) return;
+  clearInterval(healthTimer);
+  healthTimer = null;
+}
+
+app.whenReady().then(() => {
+  // macOS: prevent the Dock icon from appearing when the app starts
+  // hidden in the menu bar.
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.hide();
+  }
+
+  tray = new Tray(buildTrayImage(false));
+  tray.setToolTip('Secure Edge');
+  tray.setContextMenu(buildMenu());
+  tray.on('click', () => showView('status'));
+
+  ipcMain.handle('secure-edge:get-agent-base', () =>
+    `http://${AGENT_HOST}:${AGENT_PORT}`,
+  );
+
+  startHealthPolling();
+});
+
+// Keep the tray (and main process) alive when the settings window closes.
+// The standard Electron behaviour on macOS already does this; on other
+// platforms we simply do nothing in the handler.
+app.on('window-all-closed', () => {
+  // intentional no-op: the tray icon is the entrypoint to the app.
+});
+
+app.on('before-quit', () => {
+  stopHealthPolling();
+});

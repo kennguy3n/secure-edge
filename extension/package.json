@@ -6,9 +6,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-main-world.mjs",
     "build:firefox": "npm run build && node scripts/build-firefox.mjs",
+    "build:safari": "npm run build && node scripts/build-safari.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "bash -c 'shopt -s globstar nullglob && node --test --import tsx src/**/__tests__/*.test.ts'",
-    "clean": "rm -rf dist dist-firefox"
+    "clean": "rm -rf dist dist-firefox dist-safari dist-safari-xcode"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",

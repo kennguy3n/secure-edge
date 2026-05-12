@@ -1,14 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ProxySettings } from './pages/ProxySettings';
 import { Settings } from './pages/Settings';
 import { Status } from './pages/Status';
 import './styles.css';
 
-type View = 'status' | 'settings';
+type View = 'status' | 'settings' | 'proxy';
 
 function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');
-  return h === 'settings' ? 'settings' : 'status';
+  if (h === 'settings') return 'settings';
+  if (h === 'proxy') return 'proxy';
+  return 'status';
+}
+
+function renderView(view: View) {
+  switch (view) {
+    case 'settings':
+      return <Settings />;
+    case 'proxy':
+      return <ProxySettings />;
+    default:
+      return <Status />;
+  }
 }
 
 function App() {
@@ -41,8 +55,15 @@ function App() {
         >
           Settings
         </button>
+        <button
+          type="button"
+          className={view === 'proxy' ? 'active' : ''}
+          onClick={() => (window.location.hash = 'proxy')}
+        >
+          Proxy
+        </button>
       </nav>
-      {view === 'status' ? <Status /> : <Settings />}
+      {renderView(view)}
     </div>
   );
 }

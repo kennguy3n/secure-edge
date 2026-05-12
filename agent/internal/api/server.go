@@ -57,15 +57,18 @@ var allowedOrigins = map[string]struct{}{
 	"https://poe.com":               {},
 }
 
-// chromeExtensionScheme / mozExtensionScheme are matched as prefixes
-// so any companion extension build (unpacked dev build, signed Web
-// Store / AMO build, etc.) is accepted without hard-coding its
-// install-time ID. Firefox stamps moz-extension://<UUID> on requests
-// from the service worker and content scripts; Chrome / Edge /
-// Chromium derivatives use chrome-extension://<id>.
+// chromeExtensionScheme / mozExtensionScheme / safariExtensionScheme
+// are matched as prefixes so any companion extension build (unpacked
+// dev build, signed Web Store / AMO / App Store build, etc.) is
+// accepted without hard-coding its install-time ID. Firefox stamps
+// moz-extension://<UUID>, Chrome / Edge / Chromium derivatives use
+// chrome-extension://<id>, and Safari stamps
+// safari-web-extension://<UUID> on requests from the service worker
+// and content scripts.
 const (
 	chromeExtensionScheme = "chrome-extension://"
 	mozExtensionScheme    = "moz-extension://"
+	safariExtensionScheme = "safari-web-extension://"
 )
 
 // allowedHostnames is the Host-header allowlist. A DNS-rebinding
@@ -109,6 +112,26 @@ type RuleUpdater interface {
 	Status() rules.Status
 }
 
+// ProxyStatus is the snapshot returned by GET /api/proxy/status.
+type ProxyStatus struct {
+	Running          bool   `json:"running"`
+	CAInstalled      bool   `json:"ca_installed"`
+	ProxyConfigured  bool   `json:"proxy_configured"`
+	ListenAddr       string `json:"listen_addr"`
+	CACertPath       string `json:"ca_cert_path,omitempty"`
+	DLPScansTotal    int64  `json:"dlp_scans_total"`
+	DLPBlocksTotal   int64  `json:"dlp_blocks_total"`
+}
+
+// ProxyController is the subset of proxy.Server (and CA management)
+// the API needs. Wired in SetProxyController; nil means the
+// /api/proxy/* endpoints return 503.
+type ProxyController interface {
+	Enable(ctx context.Context) (caCertPath string, err error)
+	Disable(ctx context.Context, removeCA bool) error
+	Status() ProxyStatus
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
 	Store       *store.Store
@@ -116,6 +139,7 @@ type Server struct {
 	Stats       StatsView
 	DLP         DLPScanner
 	RuleUpdater RuleUpdater
+	Proxy       ProxyController
 	startedAt   time.Time
 	once        sync.Once
 }
@@ -133,6 +157,10 @@ func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
 // when nil the /api/rules/* endpoints return 503.
 func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
 
+// SetProxyController wires the MITM proxy controller into the server.
+// Phase 4 only; when nil the /api/proxy/* endpoints return 503.
+func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -145,6 +173,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/dlp/config", s.handleDLPConfig)
 	mux.HandleFunc("/api/rules/update", s.handleRulesUpdate)
 	mux.HandleFunc("/api/rules/status", s.handleRulesStatus)
+	mux.HandleFunc("/api/proxy/enable", s.handleProxyEnable)
+	mux.HandleFunc("/api/proxy/disable", s.handleProxyDisable)
+	mux.HandleFunc("/api/proxy/status", s.handleProxyStatus)
 	return withCORS(mux)
 }
 
@@ -210,16 +241,21 @@ func isAllowedOrigin(origin string) bool {
 	if _, ok := allowedOrigins[origin]; ok {
 		return true
 	}
-	// chrome-extension://<id> or moz-extension://<UUID> — any installed
-	// build of the companion extension's service worker. The
-	// host_permissions in the extension's own manifest gate which hosts
-	// the extension can reach.
+	// chrome-extension://<id>, moz-extension://<UUID>, or
+	// safari-web-extension://<UUID> — any installed build of the
+	// companion extension's service worker. The host_permissions in
+	// the extension's own manifest gate which hosts the extension can
+	// reach.
 	if strings.HasPrefix(origin, chromeExtensionScheme) &&
 		len(origin) > len(chromeExtensionScheme) {
 		return true
 	}
 	if strings.HasPrefix(origin, mozExtensionScheme) &&
 		len(origin) > len(mozExtensionScheme) {
+		return true
+	}
+	if strings.HasPrefix(origin, safariExtensionScheme) &&
+		len(origin) > len(safariExtensionScheme) {
 		return true
 	}
 	return false

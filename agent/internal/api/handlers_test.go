@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -206,10 +207,12 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 		"http://127.0.0.1:5173",
 		// Browser extension service worker. The ID is install-time
 		// and not knowable here; any chrome-extension:// (Chrome,
-		// Edge, Chromium) or moz-extension:// (Firefox) origin must
-		// be accepted so the popup's /api/status fetch works.
+		// Edge, Chromium), moz-extension:// (Firefox), or
+		// safari-web-extension:// (Safari) origin must be accepted
+		// so the popup's /api/status fetch works.
 		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
 		"moz-extension://01234567-89ab-cdef-0123-456789abcdef",
+		"safari-web-extension://01234567-89ab-cdef-0123-456789abcdef",
 		// Content-script origins (Tier-2 AI tools). The browser
 		// stamps the page's own origin for content-script fetches,
 		// not the extension's, so each Tier-2 host has to be
@@ -244,9 +247,11 @@ func TestCORSRejectsLookalikeExtensionOrigins(t *testing.T) {
 		// Bare schemes without an ID component.
 		"chrome-extension://",
 		"moz-extension://",
+		"safari-web-extension://",
 		// Embedded but not as scheme prefixes.
 		"https://chrome-extension.example.com",
 		"https://moz-extension.example.com",
+		"https://safari-web-extension.example.com",
 	}
 	for _, origin := range cases {
 		r := newLocalRequest(http.MethodGet, "/api/status", nil)
@@ -543,5 +548,197 @@ func TestRulesStatus_RejectsNonGet(t *testing.T) {
 	srv.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("got %d", rec.Code)
+	}
+}
+
+// fakeProxyController is a deterministic ProxyController for tests.
+type fakeProxyController struct {
+	enableCalls   int
+	disableCalls  int
+	lastRemoveCA  bool
+	statusSnap    ProxyStatus
+	enableErr     error
+	disableErr    error
+}
+
+func (f *fakeProxyController) Enable(_ context.Context) (string, error) {
+	f.enableCalls++
+	if f.enableErr != nil {
+		return "", f.enableErr
+	}
+	f.statusSnap.Running = true
+	f.statusSnap.CAInstalled = true
+	f.statusSnap.ProxyConfigured = true
+	if f.statusSnap.ListenAddr == "" {
+		f.statusSnap.ListenAddr = "127.0.0.1:8443"
+	}
+	if f.statusSnap.CACertPath == "" {
+		f.statusSnap.CACertPath = "/tmp/ca.crt"
+	}
+	return f.statusSnap.CACertPath, nil
+}
+
+func (f *fakeProxyController) Disable(_ context.Context, removeCA bool) error {
+	f.disableCalls++
+	f.lastRemoveCA = removeCA
+	if f.disableErr != nil {
+		return f.disableErr
+	}
+	f.statusSnap.Running = false
+	f.statusSnap.ProxyConfigured = false
+	if removeCA {
+		f.statusSnap.CAInstalled = false
+		f.statusSnap.CACertPath = ""
+	}
+	return nil
+}
+
+func (f *fakeProxyController) Status() ProxyStatus { return f.statusSnap }
+
+func TestProxyEnable_WithoutControllerReturns503(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/proxy/enable", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestProxyDisable_WithoutControllerReturns503(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/proxy/disable", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestProxyStatus_WithoutControllerReturns503(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/proxy/status", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestProxy_EnableDisableLifecycle(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fc := &fakeProxyController{statusSnap: ProxyStatus{ListenAddr: "127.0.0.1:8443"}}
+	srv.SetProxyController(fc)
+
+	// 1) Enable.
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/proxy/enable", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable: got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if fc.enableCalls != 1 {
+		t.Errorf("enable calls = %d", fc.enableCalls)
+	}
+	var enableBody proxyEnableResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &enableBody); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if enableBody.CACertPath == "" {
+		t.Error("ca_cert_path empty in enable response")
+	}
+
+	// 2) Status reports running.
+	rec = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, newLocalRequest(http.MethodGet, "/api/proxy/status", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d", rec.Code)
+	}
+	var st ProxyStatus
+	if err := json.Unmarshal(rec.Body.Bytes(), &st); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !st.Running || !st.CAInstalled || !st.ProxyConfigured {
+		t.Errorf("post-enable status = %+v", st)
+	}
+	if st.ListenAddr != "127.0.0.1:8443" {
+		t.Errorf("listen_addr = %q", st.ListenAddr)
+	}
+
+	// 3) Disable with remove_ca=true.
+	rec = httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"remove_ca": true}`)
+	srv.Handler().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/proxy/disable", body))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable: got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if fc.disableCalls != 1 {
+		t.Errorf("disable calls = %d", fc.disableCalls)
+	}
+	if !fc.lastRemoveCA {
+		t.Error("remove_ca=true not propagated to controller")
+	}
+
+	// 4) Status reports stopped.
+	rec = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, newLocalRequest(http.MethodGet, "/api/proxy/status", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d", rec.Code)
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &st); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if st.Running || st.CAInstalled {
+		t.Errorf("post-disable status = %+v", st)
+	}
+}
+
+func TestProxy_DisableEmptyBodyAllowed(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fc := &fakeProxyController{}
+	_, _ = fc.Enable(context.Background())
+	srv.SetProxyController(fc)
+
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/proxy/disable", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable: got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if fc.disableCalls != 1 {
+		t.Errorf("disable calls = %d", fc.disableCalls)
+	}
+	if fc.lastRemoveCA {
+		t.Error("remove_ca defaulted to true; expected false on empty body")
+	}
+}
+
+func TestProxy_EnableErrorReturns500(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fc := &fakeProxyController{enableErr: errors.New("ca disk full")}
+	srv.SetProxyController(fc)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, newLocalRequest(http.MethodPost, "/api/proxy/enable", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestProxy_RejectsNonMatchingMethods(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetProxyController(&fakeProxyController{})
+	cases := []struct {
+		path   string
+		method string
+	}{
+		{"/api/proxy/enable", http.MethodGet},
+		{"/api/proxy/disable", http.MethodGet},
+		{"/api/proxy/status", http.MethodPost},
+	}
+	for _, tc := range cases {
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, newLocalRequest(tc.method, tc.path, nil))
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s %s -> %d, want 405", tc.method, tc.path, rec.Code)
+		}
 	}
 }

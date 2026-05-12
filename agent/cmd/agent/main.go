@@ -18,6 +18,7 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/dns"
 	"github.com/kennguy3n/secure-edge/agent/internal/policy"
+	"github.com/kennguy3n/secure-edge/agent/internal/proxy"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
@@ -222,6 +223,41 @@ func run(configPath string) error {
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
 
+		// Wire the local MITM proxy. The controller is constructed
+		// unconditionally so the API surface always has a real
+		// implementation behind /api/proxy/*; the listener itself
+		// only starts when proxy_enabled=true (auto-start) or the
+		// caller hits POST /api/proxy/enable.
+		caCertPath, caKeyPath := resolveCAPaths(cfg)
+		pinning := buildPinningSet(cfg.ProxyPinningBypass)
+		controller, err := proxy.NewController(proxy.ControllerConfig{
+			ListenAddr: cfg.ProxyListen,
+			CertPath:   caCertPath,
+			KeyPath:    caKeyPath,
+			Policy: proxy.PolicyCheckerFunc(func(host string) bool {
+				if _, bypass := pinning[strings.ToLower(host)]; bypass {
+					return false
+				}
+				return engine.CheckDomain(host) == policy.AllowWithDLP
+			}),
+			Scanner: pipeline,
+			Stats:   proxyStats{s},
+		})
+		if err != nil {
+			return fmt.Errorf("build proxy controller: %w", err)
+		}
+		apiServer.SetProxyController(&proxyAdapter{c: controller})
+		if cfg.ProxyEnabled {
+			if _, err := controller.Enable(ctx); err != nil {
+				return fmt.Errorf("auto-enable proxy: %w", err)
+			}
+			defer func() {
+				shutdownCtx, c := context.WithTimeout(context.Background(), 3*time.Second)
+				defer c()
+				_ = controller.Disable(shutdownCtx, false)
+			}()
+		}
+
 		// Wire the rule updater after the pipeline so the reload
 		// callback can refresh both the policy engine's lookup table
 		// and the DLP automaton from the freshly-downloaded files.
@@ -415,6 +451,97 @@ func (a storeAdapter) AddStats(ctx context.Context, delta stats.Snapshot) error 
 		DLPScansTotal:   delta.DLPScansTotal,
 		DLPBlocksTotal:  delta.DLPBlocksTotal,
 	})
+}
+
+// proxyStats adapts store.Store to proxy.StatsBumper. The proxy can't
+// import store directly without inflating the package's dependency
+// graph; this tiny adapter keeps the wiring private to main.
+type proxyStats struct{ s *store.Store }
+
+func (p proxyStats) BumpDLP(ctx context.Context, blocked bool) error {
+	if p.s == nil {
+		return nil
+	}
+	delta := store.AggregateStats{DLPScansTotal: 1}
+	if blocked {
+		delta.DLPBlocksTotal = 1
+	}
+	return p.s.AddStats(ctx, delta)
+}
+
+// proxyAdapter bridges the proxy.Controller's StatusSnapshot to the
+// api.ProxyController interface. Keeping the wire shape in the api
+// package (not the proxy package) avoids the proxy package having to
+// import api just to produce its own JSON.
+type proxyAdapter struct{ c *proxy.Controller }
+
+func (p *proxyAdapter) Enable(ctx context.Context) (string, error) {
+	return p.c.Enable(ctx)
+}
+
+func (p *proxyAdapter) Disable(ctx context.Context, removeCA bool) error {
+	return p.c.Disable(ctx, removeCA)
+}
+
+func (p *proxyAdapter) Status() api.ProxyStatus {
+	snap := p.c.Status()
+	return api.ProxyStatus{
+		Running:         snap.Running,
+		CAInstalled:     snap.CAInstalled,
+		ProxyConfigured: snap.ProxyConfigured,
+		ListenAddr:      snap.ListenAddr,
+		CACertPath:      snap.CACertPath,
+		DLPScansTotal:   snap.DLPScansTotal,
+		DLPBlocksTotal:  snap.DLPBlocksTotal,
+	}
+}
+
+// resolveCAPaths returns the CA cert / key paths, falling back to
+// ~/.secure-edge/ca.{crt,key} when the config leaves them blank.
+// When HOME cannot be resolved (rare on CI containers) the fallback
+// is "./secure-edge-ca.{crt,key}" relative to the agent's working
+// directory.
+func resolveCAPaths(cfg config.Config) (string, string) {
+	cert := cfg.CACertPath
+	key := cfg.CAKeyPath
+	if cert != "" && key != "" {
+		return cert, key
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		if cert == "" {
+			cert = "secure-edge-ca.crt"
+		}
+		if key == "" {
+			key = "secure-edge-ca.key"
+		}
+		return cert, key
+	}
+	dir := filepath.Join(home, ".secure-edge")
+	if cert == "" {
+		cert = filepath.Join(dir, "ca.crt")
+	}
+	if key == "" {
+		key = filepath.Join(dir, "ca.key")
+	}
+	return cert, key
+}
+
+// buildPinningSet turns the configured proxy_pinning_bypass list into
+// a lowercased lookup set for O(1) hostname checks on the proxy hot
+// path.
+func buildPinningSet(hosts []string) map[string]struct{} {
+	if len(hosts) == 0 {
+		return map[string]struct{}{}
+	}
+	out := make(map[string]struct{}, len(hosts))
+	for _, h := range hosts {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h != "" {
+			out[h] = struct{}{}
+		}
+	}
+	return out
 }
 
 func (a storeAdapter) ResetStats(ctx context.Context) error { return a.s.ResetStats(ctx) }

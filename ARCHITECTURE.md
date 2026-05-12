@@ -27,8 +27,10 @@ graph TD
     end
 
     subgraph "Layer 3 - MITM Proxy - optional"
-        M["Local MITM Proxy\ngoproxy"] --> C
-        C -->|"inspect request body"| J
+        M["Local MITM Proxy\n127.0.0.1:8443 (goproxy)"]
+        M -->|"CONNECT, non-Tier-2: opaque tunnel"| C
+        M -->|"CONNECT, Tier-2: decrypt body"| J
+        J -->|"block on score"| K
     end
 ```
 
@@ -307,20 +309,35 @@ Community can contribute exclusions via PR to reduce false positives without mod
 ### 3. Local MITM Proxy (Optional, Phase 4)
 
 Optional component for Tier 2 coverage of non-browser AI clients (CLI tools, IDE plugins, native
-apps). Disabled by default; opt-in via the Electron Settings "Advanced DLP" wizard.
+apps). Disabled by default; opt-in via the Electron Settings "Advanced DLP" wizard or directly
+through `POST /api/proxy/enable`.
+
+```
+agent/internal/proxy/
+├── proxy.go         # goproxy.ProxyHttpServer wired with policy + DLP
+├── ca.go            # per-device ECDSA P-256 Root CA + 1 h leaf cache
+├── controller.go    # Enable / Disable / Status lifecycle
+├── proxy_test.go  ca_test.go  controller_test.go
+└── integration_test.go   # end-to-end + log-scrubbing privacy test
+```
 
 | Capability | Library / Approach |
 |------------|--------------------|
 | Local HTTPS proxy | `github.com/elazarl/goproxy` on `127.0.0.1:8443` |
-| Per-device Root CA | `crypto/x509` (stdlib), RSA 2048 or ECDSA P-256, generated at first run |
-| Selective TLS decryption | Only Tier 2 domains are decrypted; everything else passes through as opaque CONNECT tunnels |
-| DLP integration | Decrypted request bodies are run through the same layered DLP pipeline (in-memory only) |
-| Block response | HTTP 451 with a short JSON body indicating pattern name; original request never forwarded |
-| Certificate pinning | Bypass list for known-pinned apps; user-managed in Settings UI |
+| Per-device Root CA | `crypto/x509` + `crypto/ecdsa` (P-256), generated at first run, persisted to `~/.secure-edge/ca.{crt,key}` |
+| Leaf certificates | Generated on demand, signed by the Root CA, cached in-memory for 1 h |
+| Policy hook | `policy.Engine.CheckDomain == AllowWithDLP` → MITM-decrypt; everything else passes through as an opaque CONNECT tunnel |
+| Pinning bypass | `proxy_pinning_bypass` config list forces opaque pass-through for hostnames whose apps pin a specific CA |
+| DLP integration | Decrypted request bodies are run through the same `dlp.Pipeline` used by the extension path (in-memory only) |
+| Block response | HTTP 451 with `{"blocked": true, "pattern_name": "..."}`; the original request is never forwarded |
+| Counters | `dlp_scans_total` / `dlp_blocks_total` shared with the extension path |
+| Lifecycle | `proxy.Controller` owns Enable/Disable/Status; the agent main process exposes those as `/api/proxy/{enable,disable,status}` |
 
 **Privacy invariant for the proxy:** decrypted content paths terminate at the DLP scan and are
 then released for GC. The proxy itself emits no per-request logs and writes no request/response
-bodies. Only the same `dlp_scans_total` / `dlp_blocks_total` counters are touched.
+bodies. `integration_test.go` regression-tests this by capturing stdout + stderr during a
+Tier-2 request and asserting that neither the request body nor the Host header sentinel ever
+appears in the captured stream.
 
 ### 4. Electron Tray Application
 
@@ -353,12 +370,21 @@ electron/
 **No Reports page.** Since we don't log access events, there is no detailed reports page.
 The Status page shows only anonymous counters: "Total blocks: 142 | DLP blocks: 7 | Uptime: 3d 14h".
 
-### 5. Browser Extension (Chrome + Firefox)
+### 5. Browser Extension (Chrome + Firefox + Safari)
 
-TypeScript extension using Manifest V3 for both Chrome (`manifest.json`) and
-Firefox (`manifest.firefox.json`, with `browser_specific_settings.gecko`).
-A `npm run build:firefox` script produces a Firefox-ready bundle in
-`dist-firefox/`.
+TypeScript extension using Manifest V3 for Chrome (`manifest.json`), Firefox
+(`manifest.firefox.json` — `browser_specific_settings.gecko`), and Safari
+(`manifest.safari.json` — `browser_specific_settings.safari`). `npm run
+build:firefox` produces a Firefox-ready bundle in `dist-firefox/`; `npm run
+build:safari` produces `dist-safari/` and wraps it with `xcrun
+safari-web-extension-converter` into an Xcode project under
+`dist-safari-xcode/` (macOS-only).
+
+Safari Web Extensions do not implement `chrome.runtime.connectNative`, so the
+Safari port skips Native Messaging entirely and uses the HTTP fallback
+(`POST 127.0.0.1:8080/api/dlp/scan`) exclusively. The agent's CORS allowlist
+accepts `chrome-extension://`, `moz-extension://`, and
+`safari-web-extension://<UUID>` origins.
 
 **Capabilities:**
 - Three content scripts injected on the 10 Tier 2 AI tool domains:
@@ -595,5 +621,8 @@ sequenceDiagram
 | `PUT` | `/api/dlp/config` | Update DLP scoring thresholds | Config only |
 | `GET` | `/api/rules/status` | Current rule version, last/next check, manifest URL | Metadata only |
 | `POST` | `/api/rules/update` | Trigger immediate manifest check; returns `{updated, version, files_downloaded}` | — |
+| `POST` | `/api/proxy/enable` | Generate the per-device Root CA (if missing) and start the local MITM proxy; returns `{ca_cert_path}` | No user data; cert path is a local filesystem location |
+| `POST` | `/api/proxy/disable` | Stop the local MITM proxy; pass `{"remove_ca": true}` to also delete the CA files | — |
+| `GET` | `/api/proxy/status` | `{running, ca_installed, listen_addr, dlp_scans_total, dlp_blocks_total}` | Integers + booleans only |
 
 **There is no `/api/alerts` endpoint. There is no `/api/logs` endpoint. This is by design.**

@@ -17,13 +17,14 @@ const AGENT_PORT = Number(process.env.SECURE_EDGE_AGENT_PORT ?? 8080);
 const AGENT_HOST = process.env.SECURE_EDGE_AGENT_HOST ?? '127.0.0.1';
 const HEALTH_INTERVAL_MS = 10_000;
 
-type View = 'status' | 'settings';
+type View = 'status' | 'settings' | 'proxy';
 
 let tray: Tray | null = null;
 let window: BrowserWindow | null = null;
 let healthTimer: NodeJS.Timeout | null = null;
 let lastHealthy: boolean | null = null;
 let updateAvailable = false;
+let proxyRunning: boolean | null = null;
 
 function rendererPath(): string {
   // In production main.ts is compiled to dist/main.js and the renderer
@@ -84,9 +85,19 @@ function showView(view: View) {
 }
 
 function buildMenu(): Menu {
+  // Render a non-clickable status line for the proxy. "unknown" means
+  // the /api/proxy/status poll has not returned yet (Phase 1–3 agents
+  // return 503, in which case we display "unavailable").
+  let proxyLabel = 'Proxy: …';
+  if (proxyRunning === true) proxyLabel = 'Proxy: Active';
+  else if (proxyRunning === false) proxyLabel = 'Proxy: Inactive';
+
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: 'Status', click: () => showView('status') },
     { label: 'Open Settings', click: () => showView('settings') },
+    { label: 'Advanced DLP (Proxy)', click: () => showView('proxy') },
+    { type: 'separator' },
+    { label: proxyLabel, enabled: false },
   ];
   if (updateAvailable) {
     template.push({ type: 'separator' });
@@ -136,9 +147,56 @@ function pingAgent(): Promise<boolean> {
   });
 }
 
+// pingProxy returns true when the agent reports the local MITM proxy
+// as running, false otherwise (including 503 from agents that have
+// not wired the proxy controller).
+function pingProxy(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: AGENT_HOST,
+        port: AGENT_PORT,
+        path: '/api/proxy/status',
+        method: 'GET',
+        timeout: 2000,
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(false);
+          return;
+        }
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body) as { running?: boolean };
+            resolve(parsed.running === true);
+          } catch {
+            resolve(false);
+          }
+        });
+      },
+    );
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
 async function tickHealth() {
-  const ok = await pingAgent();
+  const [ok, proxyOk] = await Promise.all([pingAgent(), pingProxy()]);
   updateTrayHealth(ok);
+  if (proxyOk !== proxyRunning) {
+    proxyRunning = proxyOk;
+    refreshTrayMenu();
+  }
 }
 
 function startHealthPolling() {

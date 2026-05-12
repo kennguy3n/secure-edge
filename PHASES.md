@@ -54,6 +54,7 @@ Logging:       NONE for user access. Operational errors only to stderr.
 #### Browser Extension
 - [x] Chrome extension (Manifest V3) with content scripts for Tier 2 AI domains
 - [x] Firefox extension (WebExtensions) port
+- [x] Safari Web Extension port (Xcode wrapper via `xcrun safari-web-extension-converter`; HTTP-only since Safari has no Native Messaging)
 - [x] Native Messaging host configuration for extension ↔ agent communication
 - [x] Extension intercepts: paste events, form submissions, fetch/XHR requests
 - [x] Ephemeral block notification: shows pattern name only, no matched content, auto-dismisses
@@ -117,14 +118,14 @@ mechanism without requiring an agent binary update.
 **Covers:** Tier 2 for non-browser traffic (CLI tools, IDE plugins, API calls).
 
 ### Deliverables
-- [ ] Go MITM proxy (`elazarl/goproxy`) on `127.0.0.1:8443`
-- [ ] Per-device Root CA generation (`crypto/x509`)
-- [ ] Platform-specific CA trust installation (automated scripts)
-- [ ] Platform-specific system proxy configuration
-- [ ] Selective inspection: only Tier 2 domains decrypt TLS; all other traffic tunneled (CONNECT)
-- [ ] DLP scanning of decrypted request bodies through the same layered pipeline (in-memory only)
-- [ ] "Enable Advanced DLP" setup wizard in Electron UI
-- [ ] Certificate pinning bypass list (known pinned apps)
+- [x] Go MITM proxy (`elazarl/goproxy`) on `127.0.0.1:8443`
+- [x] Per-device Root CA generation (`crypto/x509`, ECDSA P-256)
+- [x] Platform-specific CA trust installation (automated scripts)
+- [x] Platform-specific system proxy configuration
+- [x] Selective inspection: only Tier 2 domains decrypt TLS; all other traffic tunneled (CONNECT)
+- [x] DLP scanning of decrypted request bodies through the same layered pipeline (in-memory only)
+- [x] "Enable Advanced DLP" setup wizard in Electron UI
+- [x] Certificate pinning bypass list (known pinned apps)
 
 ### Privacy Notes
 - The proxy decrypts TLS ONLY for Tier 2 domains. All other traffic passes through as opaque CONNECT tunnels.

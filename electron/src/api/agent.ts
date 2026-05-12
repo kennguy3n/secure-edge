@@ -22,6 +22,21 @@ export interface AgentStatus {
   version: string;
 }
 
+// ProxyStatus mirrors agent.api.ProxyStatus on the wire.
+export interface ProxyStatus {
+  running: boolean;
+  ca_installed: boolean;
+  proxy_configured: boolean;
+  listen_addr: string;
+  ca_cert_path?: string;
+  dlp_scans_total: number;
+  dlp_blocks_total: number;
+}
+
+export interface ProxyEnableResponse {
+  ca_cert_path: string;
+}
+
 const DEFAULT_BASE =
   (typeof window !== 'undefined' && (window as { __SECURE_EDGE_AGENT__?: string }).__SECURE_EDGE_AGENT__) ||
   'http://127.0.0.1:8080';
@@ -72,5 +87,17 @@ export const agent = {
   },
   async resetStats(): Promise<Stats> {
     return http<Stats>('/api/stats/reset', { method: 'POST' });
+  },
+  async getProxyStatus(): Promise<ProxyStatus> {
+    return http<ProxyStatus>('/api/proxy/status');
+  },
+  async enableProxy(): Promise<ProxyEnableResponse> {
+    return http<ProxyEnableResponse>('/api/proxy/enable', { method: 'POST' });
+  },
+  async disableProxy(removeCA: boolean): Promise<ProxyStatus> {
+    return http<ProxyStatus>('/api/proxy/disable', {
+      method: 'POST',
+      body: JSON.stringify({ remove_ca: removeCA }),
+    });
   },
 };

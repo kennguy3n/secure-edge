@@ -136,6 +136,50 @@ jobs:
           path: extension/artefacts/*
           if-no-files-found: error
 
+  build-extension-safari:
+    name: Browser extension (Safari)
+    # xcrun safari-web-extension-converter ships with Xcode, so the
+    # Safari Web Extension wrapper can only be produced on a macOS
+    # runner. The dist-safari/ payload itself is cross-platform; only
+    # the Xcode project (.app bundle) requires darwin.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: install
+        working-directory: extension
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      - name: build safari
+        working-directory: extension
+        run: npm run build:safari
+
+      - name: package
+        working-directory: extension
+        run: |
+          mkdir -p artefacts
+          # Raw extension payload — usable for sideloading via Safari's
+          # Develop menu and for the converter on any other macOS host.
+          (cd dist-safari && zip -r "../artefacts/secure-edge-safari-${GITHUB_REF_NAME}.zip" .)
+          # Xcode wrapper project, in case downstream packaging wants
+          # to build the .app outside the release pipeline.
+          if [ -d dist-safari-xcode ]; then
+            (cd dist-safari-xcode && zip -r "../artefacts/secure-edge-safari-xcode-${GITHUB_REF_NAME}.zip" .)
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-safari
+          path: extension/artefacts/*
+          if-no-files-found: warn
+
   build-installers:
     name: Native installers (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -197,7 +241,7 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-agent, build-electron, build-extension, build-installers]
+    needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

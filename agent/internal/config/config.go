@@ -42,6 +42,27 @@ type Config struct {
 	// files into. Defaults to the dirname of the first RulePaths
 	// entry, or "./rules" when RulePaths is empty.
 	RulesDir string `yaml:"rules_dir"`
+
+	// ProxyListen is the local MITM proxy listen address. Defaults
+	// to 127.0.0.1:8443. Always loopback only; binding a public
+	// interface is unsupported.
+	ProxyListen string `yaml:"proxy_listen"`
+
+	// ProxyEnabled toggles whether the MITM proxy auto-starts with
+	// the agent. Off by default; the Electron UI / API also flips it
+	// at runtime via POST /api/proxy/enable.
+	ProxyEnabled bool `yaml:"proxy_enabled"`
+
+	// CACertPath / CAKeyPath are where the per-device Root CA is
+	// persisted. Defaults to ~/.secure-edge/ca.crt and ca.key.
+	CACertPath string `yaml:"ca_cert_path"`
+	CAKeyPath  string `yaml:"ca_key_path"`
+
+	// ProxyPinningBypass is the list of hostnames the proxy should
+	// pass through opaquely even when the policy engine would
+	// classify them as Tier 2 — used as an escape hatch for apps
+	// that pin certificates and break under MITM.
+	ProxyPinningBypass []string `yaml:"proxy_pinning_bypass"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -55,6 +76,8 @@ func Default() Config {
 		StatsFlushInterval: 60 * time.Second,
 		RuleUpdateURL:      "",
 		RuleUpdateInterval: 6 * time.Hour,
+		ProxyListen:        "127.0.0.1:8443",
+		ProxyEnabled:       false,
 	}
 }
 
@@ -122,6 +145,21 @@ func merge(defaults, override Config) Config {
 	if override.RulesDir != "" {
 		out.RulesDir = override.RulesDir
 	}
+	if override.ProxyListen != "" {
+		out.ProxyListen = override.ProxyListen
+	}
+	if override.ProxyEnabled {
+		out.ProxyEnabled = true
+	}
+	if override.CACertPath != "" {
+		out.CACertPath = override.CACertPath
+	}
+	if override.CAKeyPath != "" {
+		out.CAKeyPath = override.CAKeyPath
+	}
+	if len(override.ProxyPinningBypass) > 0 {
+		out.ProxyPinningBypass = override.ProxyPinningBypass
+	}
 	return out
 }
 
@@ -143,6 +181,9 @@ func (c Config) validate() error {
 	}
 	if c.RuleUpdateInterval < 0 {
 		return errors.New("rule_update_interval must not be negative")
+	}
+	if c.ProxyListen == "" {
+		return errors.New("proxy_listen must not be empty")
 	}
 	return nil
 }

@@ -29,6 +29,19 @@ type Config struct {
 	// DLPExclusionsPath is the path to the rules/dlp_exclusions.json
 	// file. Optional; when blank, no exclusions are loaded.
 	DLPExclusionsPath string `yaml:"dlp_exclusions"`
+
+	// RuleUpdateURL is the absolute HTTP(S) URL of a manifest.json
+	// that the agent polls for rule-bundle updates. An empty value
+	// disables the updater.
+	RuleUpdateURL string `yaml:"rule_update_url"`
+
+	// RuleUpdateInterval is the polling cadence. Defaults to 6h.
+	RuleUpdateInterval time.Duration `yaml:"rule_update_interval"`
+
+	// RulesDir is the on-disk directory the updater writes rule
+	// files into. Defaults to the dirname of the first RulePaths
+	// entry, or "./rules" when RulePaths is empty.
+	RulesDir string `yaml:"rules_dir"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -40,6 +53,8 @@ func Default() Config {
 		RulePaths:          nil,
 		DBPath:             "secure-edge.db",
 		StatsFlushInterval: 60 * time.Second,
+		RuleUpdateURL:      "",
+		RuleUpdateInterval: 6 * time.Hour,
 	}
 }
 
@@ -98,6 +113,15 @@ func merge(defaults, override Config) Config {
 	if override.DLPExclusionsPath != "" {
 		out.DLPExclusionsPath = override.DLPExclusionsPath
 	}
+	if override.RuleUpdateURL != "" {
+		out.RuleUpdateURL = override.RuleUpdateURL
+	}
+	if override.RuleUpdateInterval != 0 {
+		out.RuleUpdateInterval = override.RuleUpdateInterval
+	}
+	if override.RulesDir != "" {
+		out.RulesDir = override.RulesDir
+	}
 	return out
 }
 
@@ -116,6 +140,9 @@ func (c Config) validate() error {
 	}
 	if c.StatsFlushInterval <= 0 {
 		return errors.New("stats_flush_interval must be positive")
+	}
+	if c.RuleUpdateInterval < 0 {
+		return errors.New("rule_update_interval must not be negative")
 	}
 	return nil
 }

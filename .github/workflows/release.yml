@@ -1,0 +1,222 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-agent:
+    name: Agent (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: windows, goarch: amd64, ext: .exe }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Build agent
+        working-directory: agent
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist
+          out="dist/secure-edge-agent-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o "$out" ./cmd/agent
+          echo "Built $out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: agent/dist/secure-edge-agent-*
+          if-no-files-found: error
+
+  build-electron:
+    name: Electron (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron/package-lock.json
+
+      - name: npm ci
+        working-directory: electron
+        run: npm ci
+
+      - name: build renderer + main
+        working-directory: electron
+        run: npm run build
+
+      - name: electron-builder
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.os }}
+          path: |
+            electron/dist-electron/*.dmg
+            electron/dist-electron/*.AppImage
+            electron/dist-electron/*.deb
+            electron/dist-electron/*.exe
+            electron/dist-electron/*.zip
+            electron/dist-electron/*.yml
+            electron/dist-electron/*.blockmap
+          if-no-files-found: warn
+
+  build-extension:
+    name: Browser extension (Chrome + Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: install
+        working-directory: extension
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      - name: build chrome
+        working-directory: extension
+        run: npm run build
+
+      - name: build firefox
+        working-directory: extension
+        run: npm run build:firefox
+
+      - name: package
+        working-directory: extension
+        run: |
+          mkdir -p artefacts
+          # Chrome: zip the dist/ tree alongside the manifest and assets.
+          (cd dist && zip -r "../artefacts/secure-edge-chrome-${GITHUB_REF_NAME}.zip" .)
+          # Firefox: same idea but as an .xpi (still a zip under the hood).
+          (cd dist-firefox && zip -r "../artefacts/secure-edge-firefox-${GITHUB_REF_NAME}.xpi" .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: extension/artefacts/*
+          if-no-files-found: error
+
+  build-installers:
+    name: Native installers (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [build-agent]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: agent-*
+          path: agent-bins
+          merge-multiple: true
+
+      - name: macOS .pkg
+        if: matrix.os == 'macos-latest'
+        run: |
+          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          BIN="agent-bins/secure-edge-agent-darwin-${ARCH}"
+          if [ ! -f "$BIN" ]; then BIN="agent-bins/secure-edge-agent-darwin-amd64"; fi
+          SECURE_EDGE_VERSION="${GITHUB_REF_NAME#v}" SECURE_EDGE_AGENT_BIN="$BIN" \
+            ./scripts/macos/build-pkg.sh
+
+      - name: Linux .deb / .rpm
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          curl -sSL https://github.com/goreleaser/nfpm/releases/download/v2.40.0/nfpm_2.40.0_Linux_x86_64.tar.gz \
+            | tar -xz -C /tmp nfpm
+          sudo mv /tmp/nfpm /usr/local/bin/
+          SECURE_EDGE_VERSION="${GITHUB_REF_NAME#v}" SECURE_EDGE_ARCH=amd64 \
+            SECURE_EDGE_AGENT_BIN="$PWD/agent-bins/secure-edge-agent-linux-amd64" \
+            ./scripts/linux/build-packages.sh
+
+      - name: Windows .msi
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $bin = "agent-bins/secure-edge-agent-windows-amd64.exe"
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          # WiX v4 ships on hosted runners; fall back to dotnet tool restore.
+          if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
+              dotnet tool install --global wix
+              $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+          }
+          ./scripts/windows/build-msi.ps1 -AgentExePath $bin -Version $version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            dist/macos/*.pkg
+            dist/linux/*.deb
+            dist/linux/*.rpm
+            dist/windows/*.msi
+          if-no-files-found: warn
+
+  release:
+    name: GitHub Release
+    needs: [build-agent, build-electron, build-extension, build-installers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+
+      - name: flatten artefacts
+        run: |
+          mkdir -p release
+          find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
+            -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
+            -o -name '*.zip' -o -name '*.xpi' -o -name 'secure-edge-agent-*' \
+            -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
+          ls -la release/
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

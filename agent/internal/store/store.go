@@ -71,7 +71,14 @@ func Open(path string) (*Store, error) {
 		_ = dir
 	}
 
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)",
+	// busy_timeout matters when more than one process holds the DB
+	// open concurrently — e.g. the long-lived daemon and a transient
+	// Native Messaging host instance both bumping aggregate_stats. WAL
+	// keeps reads non-blocking but writers still serialise; without
+	// busy_timeout SQLite returns SQLITE_BUSY immediately and the
+	// caller has to retry. We retry for up to 5s inside the driver so
+	// callers (and ultimately the stats counters) don't have to.
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)",
 		url.QueryEscape(path))
 
 	db, err := sql.Open("sqlite", dsn)
@@ -335,6 +342,38 @@ func (s *Store) ResetStats(ctx context.Context) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("reset stats: %w", err)
+	}
+	return nil
+}
+
+// CurrentRuleVersion returns the most recent rule manifest version
+// recorded in rule_versions. An empty string is returned when no
+// version has been written yet (fresh install).
+func (s *Store) CurrentRuleVersion(ctx context.Context) (string, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, `
+SELECT manifest_version FROM rule_versions ORDER BY id DESC LIMIT 1
+`).Scan(&v)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("current rule_version: %w", err)
+	}
+	return v, nil
+}
+
+// AppendRuleVersion records that the agent successfully synced rules
+// to the given manifest version. The append-only history preserves an
+// audit trail; CurrentRuleVersion always returns the newest row.
+func (s *Store) AppendRuleVersion(ctx context.Context, version string) error {
+	if version == "" {
+		return errors.New("append rule_version: version is empty")
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO rule_versions (manifest_version) VALUES (?)`, version)
+	if err != nil {
+		return fmt.Errorf("append rule_version: %w", err)
 	}
 	return nil
 }

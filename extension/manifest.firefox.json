@@ -4,6 +4,13 @@
   "version": "0.1.0",
   "description": "Intercepts pastes, form submissions, and outbound requests on approved AI tools and runs them through the local Secure Edge DLP pipeline.",
 
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "secure-edge@shieldnet.example",
+      "strict_min_version": "128.0"
+    }
+  },
+
   "permissions": [
     "activeTab",
     "storage",
@@ -16,7 +23,7 @@
   ],
 
   "background": {
-    "service_worker": "dist/background/service-worker.js",
+    "scripts": ["dist/background/service-worker.js"],
     "type": "module"
   },
 
@@ -64,8 +71,14 @@
       ],
       "run_at": "document_start",
       "all_frames": false
-    },
+    }
+  ],
+
+  "web_accessible_resources": [
     {
+      "resources": [
+        "dist/content/main-world-network.js"
+      ],
       "matches": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
@@ -77,13 +90,7 @@
         "https://www.perplexity.ai/*",
         "https://huggingface.co/chat/*",
         "https://poe.com/*"
-      ],
-      "js": [
-        "dist/content/main-world-network.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN",
-      "all_frames": false
+      ]
     }
   ]
 }

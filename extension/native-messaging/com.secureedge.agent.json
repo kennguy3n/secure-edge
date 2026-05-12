@@ -1,0 +1,9 @@
+{
+  "name": "com.secureedge.agent",
+  "description": "Secure Edge DLP companion native messaging host",
+  "path": "/usr/local/bin/secure-edge-agent",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__REPLACE_WITH_EXTENSION_ID__/"
+  ]
+}

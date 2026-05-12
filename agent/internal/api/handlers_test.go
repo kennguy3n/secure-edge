@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -202,9 +205,11 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
 		// Browser extension service worker. The ID is install-time
-		// and not knowable here; any chrome-extension:// origin must
+		// and not knowable here; any chrome-extension:// (Chrome,
+		// Edge, Chromium) or moz-extension:// (Firefox) origin must
 		// be accepted so the popup's /api/status fetch works.
 		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+		"moz-extension://01234567-89ab-cdef-0123-456789abcdef",
 		// Content-script origins (Tier-2 AI tools). The browser
 		// stamps the page's own origin for content-script fetches,
 		// not the extension's, so each Tier-2 host has to be
@@ -229,19 +234,19 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	}
 }
 
-// TestCORSRejectsLookalikeChromeExtension guards the chrome-extension
-// prefix check against trivial spoofs (an attacker page can set an
+// TestCORSRejectsLookalikeExtensionOrigins guards the extension
+// prefix checks against trivial spoofs (an attacker page can set an
 // arbitrary Origin via fetch on the server side only; from a browser
 // the Origin is controlled, but the test pins the parser anyway).
-func TestCORSRejectsLookalikeChromeExtension(t *testing.T) {
+func TestCORSRejectsLookalikeExtensionOrigins(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	cases := []string{
-		// Bare scheme without an ID component.
+		// Bare schemes without an ID component.
 		"chrome-extension://",
-		// Embedded but not as a scheme prefix.
+		"moz-extension://",
+		// Embedded but not as scheme prefixes.
 		"https://chrome-extension.example.com",
-		// Different extension-style scheme.
-		"moz-extension://abcdefghijklmnopabcdefghijklmnop",
+		"https://moz-extension.example.com",
 	}
 	for _, origin := range cases {
 		r := newLocalRequest(http.MethodGet, "/api/status", nil)
@@ -330,7 +335,7 @@ func TestDLPScan_ReturnsScanResult(t *testing.T) {
 	})
 	rec := httptest.NewRecorder()
 	req := newLocalRequest(http.MethodPost, "/api/dlp/scan",
-		bytes.NewBufferString(`{"content":"AKIAABCDEFGHIJKLMNOP aws"}`))
+		bytes.NewBufferString(`{"content":"placeholder aws credentials test"}`))
 	srv.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body=%q)", rec.Code, rec.Body.String())
@@ -415,5 +420,128 @@ func TestDLPConfig_PutPropagatesWeightsToPipeline(t *testing.T) {
 	}
 	if fake.weights != want {
 		t.Fatalf("live pipeline weights = %+v, want %+v", fake.weights, want)
+	}
+}
+
+// stubUpdater is a minimal RuleUpdater for handler tests.
+type stubUpdater struct {
+	check    func(ctx context.Context) (rules.Result, error)
+	status   rules.Status
+	checkCalls int
+}
+
+func (s *stubUpdater) CheckNow(ctx context.Context) (rules.Result, error) {
+	s.checkCalls++
+	if s.check != nil {
+		return s.check(ctx)
+	}
+	return rules.Result{Updated: true, Version: "1.2.3", FilesDownloaded: 2}, nil
+}
+
+func (s *stubUpdater) Status() rules.Status { return s.status }
+
+func TestRulesUpdate_RequiresUpdater(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/rules/update", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("got %d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRulesUpdate_PostInvokesCheckNow(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	upd := &stubUpdater{}
+	srv.SetRuleUpdater(upd)
+
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/rules/update", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if upd.checkCalls != 1 {
+		t.Errorf("CheckNow calls = %d, want 1", upd.checkCalls)
+	}
+	var res rules.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if res.Version != "1.2.3" || !res.Updated || res.FilesDownloaded != 2 {
+		t.Errorf("response = %+v", res)
+	}
+}
+
+func TestRulesUpdate_RejectsNonPost(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRuleUpdater(&stubUpdater{})
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/rules/update", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestRulesUpdate_PropagatesError(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	upd := &stubUpdater{check: func(_ context.Context) (rules.Result, error) {
+		return rules.Result{}, fmt.Errorf("manifest 404")
+	}}
+	srv.SetRuleUpdater(upd)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/rules/update", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("got %d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRulesStatus_RequiresUpdater(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/rules/status", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("got %d", rec.Code)
+	}
+}
+
+func TestRulesStatus_ReturnsSnapshot(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	when := time.Now().UTC().Truncate(time.Second)
+	srv.SetRuleUpdater(&stubUpdater{status: rules.Status{
+		CurrentVersion: "9.9.9",
+		LastCheck:      when,
+		NextCheck:      when.Add(6 * time.Hour),
+		UpdateURL:      "https://example.test/manifest.json",
+	}})
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/rules/status", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body=%q", rec.Code, rec.Body.String())
+	}
+	var got rules.Status
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.CurrentVersion != "9.9.9" || got.UpdateURL == "" {
+		t.Errorf("status = %+v", got)
+	}
+	if !got.LastCheck.Equal(when) {
+		t.Errorf("LastCheck = %v, want %v", got.LastCheck, when)
+	}
+}
+
+func TestRulesStatus_RejectsNonGet(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRuleUpdater(&stubUpdater{})
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPost, "/api/rules/status", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("got %d", rec.Code)
 	}
 }

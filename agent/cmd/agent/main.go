@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -27,14 +28,119 @@ var version = "0.1.0"
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to YAML config file")
+	nativeMode := flag.Bool("native-messaging", false,
+		"run as a Chrome Native Messaging host on stdin/stdout instead of a daemon")
 	flag.Parse()
 
 	api.Version = version
+
+	// Chrome / Firefox launch the Native Messaging host with the
+	// caller's chrome-extension:// (or moz-extension://) origin as the
+	// first positional argument and no flags. Auto-detect that calling
+	// convention so the same host manifest can point straight at the
+	// agent binary without needing a wrapper script.
+	if !*nativeMode && isNativeMessagingArgv(flag.Args()) {
+		*nativeMode = true
+	}
+
+	if *nativeMode {
+		if err := runNativeMessaging(*configPath); err != nil {
+			fmt.Fprintf(os.Stderr, "agent (native): %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*configPath); err != nil {
 		fmt.Fprintf(os.Stderr, "agent: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// isNativeMessagingArgv reports whether the positional arguments look
+// like a browser Native Messaging invocation. Chrome passes the
+// caller's extension origin as argv[1] (e.g.
+// "chrome-extension://<id>/"); Firefox uses "moz-extension://<UUID>/"
+// and additionally appends the extension ID on Windows. Returns true
+// when the first positional arg matches either scheme.
+func isNativeMessagingArgv(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	first := args[0]
+	return strings.HasPrefix(first, "chrome-extension://") ||
+		strings.HasPrefix(first, "moz-extension://")
+}
+
+// runNativeMessaging serves the Chrome Native Messaging protocol on
+// stdin/stdout. It mirrors daemon mode's DLP setup so scan results
+// match the HTTP fallback: configured ScoreWeights and Thresholds are
+// loaded from the SQLite store (falling back to defaults when the
+// store has no row yet) and the same pattern / exclusion files are
+// rebuilt into the pipeline. DNS and API servers are intentionally
+// skipped — Chrome spawns one host process per extension session and
+// tears it down on disconnect.
+func runNativeMessaging(configPath string) error {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if cfg.DLPPatternsPath == "" {
+		return fmt.Errorf("native messaging requires dlp_patterns in config")
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	weights := dlp.DefaultScoreWeights()
+	thresholds := dlp.DefaultThresholds()
+	// The store, if available, is kept open for the lifetime of the
+	// Native Messaging session so ServeNativeMessaging can bump the
+	// shared dlp_scans_total / dlp_blocks_total counters after each
+	// scan. Without this the Status page would silently undercount
+	// whenever Chrome chose the NM transport over the HTTP fallback.
+	var statsStore *store.Store
+	if cfg.DBPath != "" {
+		s, err := store.Open(cfg.DBPath)
+		if err != nil {
+			return fmt.Errorf("open store: %w", err)
+		}
+		defer s.Close()
+		dlpCfg, err := s.GetDLPConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("read dlp_config: %w", err)
+		}
+		weights = dlp.ScoreWeights{
+			HotwordBoost:     dlpCfg.HotwordBoost,
+			EntropyBoost:     dlpCfg.EntropyBoost,
+			EntropyPenalty:   dlpCfg.EntropyPenalty,
+			ExclusionPenalty: dlpCfg.ExclusionPenalty,
+			MultiMatchBoost:  dlpCfg.MultiMatchBoost,
+		}
+		thresholds = dlp.Thresholds{
+			Critical: dlpCfg.ThresholdCritical,
+			High:     dlpCfg.ThresholdHigh,
+			Medium:   dlpCfg.ThresholdMedium,
+			Low:      dlpCfg.ThresholdLow,
+		}
+		statsStore = s
+	}
+
+	patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+	if err != nil {
+		return err
+	}
+	var exclusions []dlp.Exclusion
+	if cfg.DLPExclusionsPath != "" {
+		exclusions, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+		if err != nil {
+			return err
+		}
+	}
+	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+	pipeline.Rebuild(patterns, exclusions)
+
+	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
 }
 
 func run(configPath string) error {
@@ -115,6 +221,55 @@ func run(configPath string) error {
 		pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
+
+		// Wire the rule updater after the pipeline so the reload
+		// callback can refresh both the policy engine's lookup table
+		// and the DLP automaton from the freshly-downloaded files.
+		if cfg.RuleUpdateURL != "" {
+			rulesDir := cfg.RulesDir
+			if rulesDir == "" {
+				rulesDir = defaultRulesDir(cfg.RulePaths)
+			}
+			// The updater writes downloads as rulesDir/<basename>; the
+			// reload callback below reads cfg.DLPPatternsPath /
+			// cfg.RulePaths verbatim. If any of those paths point
+			// outside rulesDir we'd download new bytes that the live
+			// pipeline never reads — a silent staleness bug. Fail loud
+			// at startup instead of letting POST /api/rules/update lie.
+			if err := validateRulesAlignment(rulesDir, cfg.RulePaths,
+				cfg.DLPPatternsPath, cfg.DLPExclusionsPath); err != nil {
+				return fmt.Errorf("rule_update_url is set but %w", err)
+			}
+			updater, err := rules.New(rules.Options{
+				ManifestURL:  cfg.RuleUpdateURL,
+				PollInterval: cfg.RuleUpdateInterval,
+				RulesDir:     rulesDir,
+				Store:        s,
+				Reload: func(ctx context.Context) error {
+					if err := engine.Reload(ctx); err != nil {
+						return err
+					}
+					p, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+					if err != nil {
+						return err
+					}
+					var ex []dlp.Exclusion
+					if cfg.DLPExclusionsPath != "" {
+						ex, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+						if err != nil {
+							return err
+						}
+					}
+					pipeline.Rebuild(p, ex)
+					return nil
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("build updater: %w", err)
+			}
+			apiServer.SetRuleUpdater(updater)
+			go updater.Start(ctx)
+		}
 	}
 
 	httpServer, err := apiServer.ListenAndServe(cfg.APIListen)
@@ -134,6 +289,73 @@ func run(configPath string) error {
 	<-sig
 	fmt.Fprintln(os.Stderr, "agent: shutting down")
 	return nil
+}
+
+// validateRulesAlignment checks that every rule file the live agent
+// reads at runtime resolves to a sibling of rulesDir. The updater
+// writes downloaded bytes to rulesDir/<basename>, then calls the
+// reload callback which re-reads cfg.DLPPatternsPath /
+// cfg.DLPExclusionsPath / cfg.RulePaths verbatim. Misaligned paths
+// therefore land in a directory the pipeline never reads, so
+// POST /api/rules/update would happily return {updated: true} while
+// every scan keeps using the on-disk file from the original install.
+//
+// Comparison is against the absolute-cleaned form of rulesDir so
+// "./rules" and "/etc/secure-edge/rules/" with a trailing slash both
+// behave the same way as canonical paths.
+func validateRulesAlignment(rulesDir string, rulePaths []string, dlpPatternsPath, dlpExclusionsPath string) error {
+	absDir, err := filepath.Abs(rulesDir)
+	if err != nil {
+		return fmt.Errorf("resolve rules_dir %q: %w", rulesDir, err)
+	}
+	absDir = filepath.Clean(absDir)
+	check := func(field, p string) error {
+		if p == "" {
+			return nil
+		}
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return fmt.Errorf("resolve %s %q: %w", field, p, err)
+		}
+		if filepath.Dir(filepath.Clean(abs)) != absDir {
+			return fmt.Errorf("%s = %q is not directly inside rules_dir = %q; "+
+				"the rule updater writes downloaded files into rules_dir but the "+
+				"live pipeline keeps reading the original path, so updates would "+
+				"silently never take effect. Move the file into rules_dir, or set "+
+				"rules_dir to the file's parent directory",
+				field, p, rulesDir)
+		}
+		return nil
+	}
+	for _, p := range rulePaths {
+		if err := check("rule_paths entry", p); err != nil {
+			return err
+		}
+	}
+	if err := check("dlp_patterns", dlpPatternsPath); err != nil {
+		return err
+	}
+	if err := check("dlp_exclusions", dlpExclusionsPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+// defaultRulesDir derives the directory rule files live in when the
+// caller did not set RulesDir explicitly. Each RulePaths entry is
+// typically RulesDir/<category>.txt, so the parent of the first entry
+// is a safe default. Returns "rules" if RulePaths is empty.
+func defaultRulesDir(rulePaths []string) string {
+	if len(rulePaths) == 0 {
+		return "rules"
+	}
+	dir := rulePaths[0]
+	for i := len(dir) - 1; i >= 0; i-- {
+		if dir[i] == '/' || dir[i] == '\\' {
+			return dir[:i]
+		}
+	}
+	return "."
 }
 
 // categoryAcronyms lists rule-file words that should be emitted in all

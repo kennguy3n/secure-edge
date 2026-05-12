@@ -7,8 +7,8 @@
 | Phase | Status | Completion |
 |-------|--------|------------|
 | Phase 1: DNS Blocking + Electron Tray | Complete | 100% |
-| Phase 2: Browser Extension + Layered DLP Pipeline | In Progress | ~60% |
-| Phase 3: Rule Updates + Installers | Not Started | 0% |
+| Phase 2: Browser Extension + Layered DLP Pipeline | Complete | 100% |
+| Phase 3: Rule Updates + Installers | Complete | 100% |
 | Phase 4: MITM Proxy (Optional) | Not Started | 0% |
 | Phase 5: Enterprise Features | Not Started | 0% |
 
@@ -91,51 +91,51 @@
 ### Browser Extension
 - [x] Chrome extension project setup (Manifest V3)
 - [x] Content script: intercept paste events on Tier 2 AI tool domains
-- [ ] Content script: intercept form submission events
-- [ ] Content script: intercept fetch/XHR requests before send
-- [ ] Native Messaging host manifest (macOS, Windows, Linux paths)
-- [ ] Native Messaging communication with Go agent
+- [x] Content script: intercept form submission events
+- [x] Content script: intercept fetch/XHR requests before send
+- [x] Native Messaging host manifest (macOS, Windows, Linux paths)
+- [x] Native Messaging communication with Go agent
 - [x] Ephemeral block notification UI (in-page banner, auto-dismiss, shows pattern name only)
-- [ ] Firefox WebExtensions port
+- [x] Firefox WebExtensions port
 - [x] Extension popup: connection status to Go agent
 
 ### Integration
 - [x] Anonymous DLP counters: `dlp_scans_total`, `dlp_blocks_total` added to `aggregate_stats`
-- [ ] Category toggles extended to three-state: Allow / Allow + Inspect / Block
+- [x] Category toggles extended to three-state: Allow / Allow + Inspect / Block
 - [x] Aho-Corasick automaton rebuild triggered on rule file change
 - [x] Privacy review: confirm no scan content, no matched text, no domain is written to disk
 
 ## Phase 3 Detailed Breakdown
 
 ### Rule Updater
-- [ ] HTTP client to poll `manifest.json` from configurable URL
-- [ ] Manifest parser: version comparison, SHA256 checksum verification
-- [ ] Delta download: only fetch files with changed checksums
-- [ ] Atomic file replacement (write temp file, rename)
-- [ ] Trigger policy engine + DLP automaton rebuild after rule update
-- [ ] Configurable poll interval (default: 6 hours)
-- [ ] Manual trigger via `POST /api/rules/update`
-- [ ] API: `GET /api/rules/status` — last update time, current version, next check
+- [x] HTTP client to poll `manifest.json` from configurable URL
+- [x] Manifest parser: version comparison, SHA256 checksum verification
+- [x] Delta download: only fetch files with changed checksums
+- [x] Atomic file replacement (write temp file, rename)
+- [x] Trigger policy engine + DLP automaton rebuild after rule update
+- [x] Configurable poll interval (default: 6 hours)
+- [x] Manual trigger via `POST /api/rules/update`
+- [x] API: `GET /api/rules/status` — last update time, current version, next check
 
 ### Multi-Platform Installers
-- [ ] macOS: `.pkg` installer via `pkgbuild` + `productbuild`
-- [ ] macOS: post-install script (set DNS, register LaunchDaemon, install Electron tray)
-- [ ] macOS: uninstaller script (restore DNS, remove LaunchDaemon, remove files)
-- [ ] Windows: MSI installer via WiX Toolset
-- [ ] Windows: post-install actions (set DNS via netsh, register service, install tray)
-- [ ] Windows: uninstaller (restore DNS, remove service, remove files)
-- [ ] Linux: `.deb` package via `nfpm`
-- [ ] Linux: `.rpm` package via `nfpm`
-- [ ] Linux: post-install script (configure systemd-resolved/resolv.conf, enable systemd unit)
-- [ ] Linux: uninstaller (restore DNS config, disable service, remove files)
+- [x] macOS: `.pkg` installer via `pkgbuild` + `productbuild`
+- [x] macOS: post-install script (set DNS, register LaunchDaemon, install Electron tray)
+- [x] macOS: uninstaller script (restore DNS, remove LaunchDaemon, remove files)
+- [x] Windows: MSI installer via WiX Toolset
+- [x] Windows: post-install actions (set DNS via netsh, register service, install tray)
+- [x] Windows: uninstaller (restore DNS, remove service, remove files)
+- [x] Linux: `.deb` package via `nfpm`
+- [x] Linux: `.rpm` package via `nfpm`
+- [x] Linux: post-install script (configure systemd-resolved/resolv.conf, enable systemd unit)
+- [x] Linux: uninstaller (restore DNS config, disable service, remove files)
 
 ### CI/CD
-- [ ] GitHub Actions workflow: build Go agent (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64)
-- [ ] GitHub Actions workflow: build Electron tray app (macOS, Windows, Linux)
-- [ ] GitHub Actions workflow: build browser extensions (Chrome .zip, Firefox .xpi)
-- [ ] GitHub Actions workflow: run Go unit tests
-- [ ] GitHub Actions workflow: create GitHub Release with all artifacts
-- [ ] Electron auto-update via `electron-updater`
+- [x] GitHub Actions workflow: build Go agent (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64)
+- [x] GitHub Actions workflow: build Electron tray app (macOS, Windows, Linux)
+- [x] GitHub Actions workflow: build browser extensions (Chrome .zip, Firefox .xpi)
+- [x] GitHub Actions workflow: run Go unit tests
+- [x] GitHub Actions workflow: create GitHub Release with all artifacts
+- [x] Electron auto-update via `electron-updater`
 - [ ] Code signing: macOS Developer ID (when available)
 - [ ] Code signing: Windows Authenticode (when available)
 
@@ -369,3 +369,75 @@ secure-edge/
   paste events, ships text to `POST /api/dlp/scan`, blocks the paste only
   when the agent says so, falls open on agent outage, and shows a 5-second
   toast carrying the pattern name (sanitised to printable ASCII).
+
+### 2026-05-12 (Phase 2 finish + Phase 3)
+- **Form / fetch / XHR interception (`extension/src/content/`)**: new
+  `form-interceptor.ts` (listens for `submit` on the 10 Tier-2 domains,
+  scans concatenated `<textarea>` + `<input type=text>` values, blocks
+  and surfaces the same toast as paste), `network-interceptor.ts`
+  (monkey-patches `window.fetch` and `XMLHttpRequest.prototype.send`,
+  scans bodies > 50 bytes), and a shared `scan-client.ts` /
+  `toast.ts` layer the paste interceptor was refactored onto. Routing
+  prefers Native Messaging through the service worker and falls back
+  to `127.0.0.1:8080/api/dlp/scan`.
+- **Native Messaging (`extension/native-messaging/` +
+  `extension/src/background/native-messaging.ts` +
+  `agent/internal/api/nativemsg.go`)**: Chrome host manifest
+  (`com.secureedge.agent.json`) plus `install.sh` (macOS/Linux) and
+  `install.ps1` (Windows) installers. The background service worker
+  owns a persistent `chrome.runtime.connectNative` port, queues per-
+  request timeouts (1500 ms), and falls back to HTTP when the port
+  closes. The agent's `nativemsg.go` implements the 4-byte little-
+  endian length-prefix protocol on stdin/stdout and dispatches scan
+  requests through the same `dlp.Pipeline.Scan()` used by the HTTP
+  endpoint. New `--native-messaging` flag on the agent binary serves
+  the protocol without standing up the DNS / API server.
+- **Firefox port (`extension/manifest.firefox.json` +
+  `extension/scripts/build-firefox.mjs`)**: MV3 manifest with
+  `browser_specific_settings.gecko` and a `npm run build:firefox`
+  script that drops a Firefox-ready bundle into `dist-firefox/`.
+- **Three-state CategoryToggle (`electron/src/components/CategoryToggle.tsx`)**:
+  Allow / Allow + Inspect / Block segmented control wired to the
+  existing `allow` / `allow_with_dlp` / `deny` action values.
+- **Rule updater (`agent/internal/rules/updater.go`)**: periodic
+  manifest poller (default 6 h) with delta downloads, SHA256
+  verification, atomic `os.Rename` replacement, path-traversal
+  rejection, and a reload callback that refreshes both the policy
+  engine and the live DLP pipeline. Version history persisted to a
+  new `rule_versions` SQLite table via `store.CurrentRuleVersion` /
+  `store.AppendRuleVersion`. Configurable through new `config.yaml`
+  fields `rule_update_url`, `rule_update_interval`, `rules_dir`.
+- **Rule updater API**: `POST /api/rules/update` triggers an
+  immediate check and returns `{updated, version, files_downloaded}`;
+  `GET /api/rules/status` returns the current version, last/next check
+  times, and configured manifest URL. Both 503 when the updater is
+  not configured.
+- **Installers**: macOS `scripts/macos/build-pkg.sh` (pkgbuild +
+  productbuild) plus `postinstall.sh` / `uninstall.sh`; Windows
+  `scripts/windows/secure-edge.wxs` (WiX v4) + `build-msi.ps1` +
+  `postinstall.ps1` + `uninstall.ps1`; Linux `scripts/linux/`
+  postinstall, preremove, `build-packages.sh` (nfpm deb + rpm), and a
+  stand-alone uninstaller.
+- **CI/CD release pipeline (`.github/workflows/release.yml`)**:
+  triggered on `v*` tags. Matrix-builds the Go agent for
+  linux/{amd64,arm64}, darwin/{amd64,arm64}, windows/amd64; the
+  Electron tray on macOS / Linux / Windows runners; the browser
+  extension as a Chrome `.zip` and Firefox `.xpi`; the native
+  installers per platform; and publishes everything to a GitHub
+  Release via `softprops/action-gh-release@v2` with auto-generated
+  notes. Electron auto-update is wired through `electron-updater` and
+  surfaced as an "Update available" entry in the tray context menu.
+- **Tests added**: `agent/internal/rules/updater_test.go` (13
+  scenarios — fresh install, delta skip, tampered SHA256 rejection,
+  atomic replace, version tracking, reload callbacks, path traversal,
+  context cancel, explicit URLs, status lifecycle, file hash helper,
+  manifest fetch errors, initial check on start);
+  `agent/internal/api/nativemsg_test.go` (8 scenarios — framing,
+  multiple frames, nil scanner, unknown kind, malformed JSON,
+  oversize, context cancel, real `io.Pipe`);
+  `agent/internal/api/handlers_test.go` adds 7 cases for the two new
+  rules endpoints; `extension/src/content/__tests__/`
+  `form-interceptor.test.ts` (5 cases) and
+  `network-interceptor.test.ts` (6 cases);
+  `extension/src/background/__tests__/native-messaging.test.ts` (5
+  cases including reconnect-on-disconnect).

@@ -274,3 +274,41 @@ var _ = dlp.ScanResult{Blocked: false, PatternName: "", Score: 0}
 // Suppress the unused import warning when none of the type's fields
 // are referenced (it is used via the s.DLP interface).
 var _ = stats.Snapshot{}
+
+// handleRulesUpdate handles POST /api/rules/update. It triggers an
+// immediate manifest check and waits for the result before responding.
+// 503 is returned when no updater was wired (Phase 1 / Phase 2
+// deployments). The reply matches rules.Result so callers can decide
+// whether to flash a "rules updated" toast in the tray UI.
+func (s *Server) handleRulesUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.RuleUpdater == nil {
+		writeError(w, http.StatusServiceUnavailable, "rule updater not configured")
+		return
+	}
+	res, err := s.RuleUpdater.CheckNow(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "rule update failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// handleRulesStatus handles GET /api/rules/status. Returns the
+// updater's current bookkeeping fields. 503 is returned when no
+// updater was wired so callers can suppress the rules section in the
+// tray UI on legacy installs.
+func (s *Server) handleRulesStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.RuleUpdater == nil {
+		writeError(w, http.StatusServiceUnavailable, "rule updater not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.RuleUpdater.Status())
+}

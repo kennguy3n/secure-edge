@@ -1,24 +1,26 @@
 // Paste interceptor content script.
 //
-// Listens for `paste` events on Tier 2 AI tool pages, extracts the
-// pasted text, and sends it to the local Secure Edge agent
-// (POST /api/dlp/scan). If the agent blocks, the paste is prevented
-// and an ephemeral in-page notification shows the matched pattern name
-// (never the matched content) and auto-dismisses after 5 seconds.
+// Listens for `paste` events on Tier-2 AI tool pages, extracts the
+// pasted text, and asks the local Secure Edge agent's DLP pipeline
+// (POST /api/dlp/scan, or Native Messaging when available) whether to
+// allow it. On block, the paste is suppressed and an ephemeral toast
+// surfaces the matched pattern name (never the matched content) and
+// auto-dismisses after 5 seconds.
 //
 // Failure modes (agent unreachable, slow response, non-2xx) fall open:
 // the paste proceeds so an outage of the agent does not break the
-// user's workflow. The agent UI surfaces an offline indicator.
+// user's workflow. The popup surfaces an offline indicator.
 
-import { AGENT_BASE, ScanResult } from "../shared.js";
+import { scanContent } from "./scan-client.js";
+import { showBlockedToast } from "./toast.js";
 
-const SCAN_TIMEOUT_MS = 1500;
-const NOTIFICATION_TTL_MS = 5000;
 const MAX_PASTE_BYTES = 1 * 1024 * 1024; // 1 MiB — silently allow huge pastes.
 
-document.addEventListener("paste", onPaste, { capture: true });
+if (typeof document !== "undefined") {
+    document.addEventListener("paste", (ev) => void onPaste(ev), { capture: true });
+}
 
-async function onPaste(ev: ClipboardEvent): Promise<void> {
+export async function onPaste(ev: ClipboardEvent): Promise<void> {
     const data = ev.clipboardData;
     if (!data) return;
     const text = data.getData("text/plain");
@@ -31,7 +33,7 @@ async function onPaste(ev: ClipboardEvent): Promise<void> {
     ev.stopPropagation();
 
     const target = ev.target as EventTarget | null;
-    const result = await scan(text);
+    const result = await scanContent(text);
 
     if (result === null) {
         // Agent unreachable → fall open: complete the paste.
@@ -42,28 +44,7 @@ async function onPaste(ev: ClipboardEvent): Promise<void> {
         await resumePaste(target, text);
         return;
     }
-    showNotification(result.pattern_name);
-}
-
-async function scan(content: string): Promise<ScanResult | null> {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), SCAN_TIMEOUT_MS);
-    try {
-        const r = await fetch(`${AGENT_BASE}/api/dlp/scan`, {
-            method: "POST",
-            mode: "cors",
-            credentials: "omit",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content }),
-            signal: ctl.signal,
-        });
-        if (!r.ok) return null;
-        return (await r.json()) as ScanResult;
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timer);
-    }
+    showBlockedToast(result.pattern_name, "paste");
 }
 
 async function resumePaste(target: EventTarget | null, text: string): Promise<void> {
@@ -89,39 +70,5 @@ async function resumePaste(target: EventTarget | null, text: string): Promise<vo
     }
 }
 
-function showNotification(patternName: string): void {
-    const id = "secure-edge-blocked-toast";
-    document.getElementById(id)?.remove();
-
-    const toast = document.createElement("div");
-    toast.id = id;
-    toast.setAttribute("role", "status");
-    toast.style.cssText = [
-        "position:fixed",
-        "right:16px",
-        "bottom:16px",
-        "z-index:2147483647",
-        "background:#fef2f2",
-        "color:#7f1d1d",
-        "border:1px solid #fecaca",
-        "border-radius:6px",
-        "padding:10px 14px",
-        "font:13px/1.4 system-ui,sans-serif",
-        "box-shadow:0 4px 16px rgba(0,0,0,.15)",
-        "max-width:320px",
-    ].join(";");
-    toast.textContent = `Secure Edge blocked this paste (${sanitise(patternName)}).`;
-
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), NOTIFICATION_TTL_MS);
-}
-
-// Strip anything that isn't a printable ASCII char so a malicious
-// pattern_name (e.g. coming from a tampered rule file) can't inject
-// HTML or break out of the toast.
-function sanitise(s: string): string {
-    return s.replace(/[^\x20-\x7e]/g, "").slice(0, 80);
-}
-
 // Export for tests; not used by the content-script entry path.
-export const __test__ = { sanitise, scan, onPaste };
+export const __test__ = { onPaste };

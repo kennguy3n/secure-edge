@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -56,10 +57,16 @@ var allowedOrigins = map[string]struct{}{
 	"https://poe.com":               {},
 }
 
-// chromeExtensionScheme is matched as a prefix so any companion
-// extension build (unpacked dev build, signed Web Store build, etc.)
-// is accepted without hard-coding its install-time ID.
-const chromeExtensionScheme = "chrome-extension://"
+// chromeExtensionScheme / mozExtensionScheme are matched as prefixes
+// so any companion extension build (unpacked dev build, signed Web
+// Store / AMO build, etc.) is accepted without hard-coding its
+// install-time ID. Firefox stamps moz-extension://<UUID> on requests
+// from the service worker and content scripts; Chrome / Edge /
+// Chromium derivatives use chrome-extension://<id>.
+const (
+	chromeExtensionScheme = "chrome-extension://"
+	mozExtensionScheme    = "moz-extension://"
+)
 
 // allowedHostnames is the Host-header allowlist. A DNS-rebinding
 // attacker can only point a hostname under their control at 127.0.0.1;
@@ -94,14 +101,23 @@ type DLPScanner interface {
 	SetWeights(w dlp.ScoreWeights)
 }
 
+// RuleUpdater is the subset of rules.Updater the API needs. Wired in
+// SetRuleUpdater so the API package does not import the rules package
+// for handler tests.
+type RuleUpdater interface {
+	CheckNow(ctx context.Context) (rules.Result, error)
+	Status() rules.Status
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store     *store.Store
-	Policy    PolicyEngine
-	Stats     StatsView
-	DLP       DLPScanner
-	startedAt time.Time
-	once      sync.Once
+	Store       *store.Store
+	Policy      PolicyEngine
+	Stats       StatsView
+	DLP         DLPScanner
+	RuleUpdater RuleUpdater
+	startedAt   time.Time
+	once        sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -113,6 +129,10 @@ func NewServer(s *store.Store, p PolicyEngine, st StatsView) *Server {
 // Phase 1 callers don't have to provide one; Phase 2 callers do.
 func (s *Server) SetDLP(d DLPScanner) { s.DLP = d }
 
+// SetRuleUpdater wires the rule updater into the server. Phase 3 only;
+// when nil the /api/rules/* endpoints return 503.
+func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -123,6 +143,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/stats/reset", s.handleStatsReset)
 	mux.HandleFunc("/api/dlp/scan", s.handleDLPScan)
 	mux.HandleFunc("/api/dlp/config", s.handleDLPConfig)
+	mux.HandleFunc("/api/rules/update", s.handleRulesUpdate)
+	mux.HandleFunc("/api/rules/status", s.handleRulesStatus)
 	return withCORS(mux)
 }
 
@@ -188,11 +210,16 @@ func isAllowedOrigin(origin string) bool {
 	if _, ok := allowedOrigins[origin]; ok {
 		return true
 	}
-	// chrome-extension://<id> — any installed build of the companion
-	// extension's service worker. The host_permissions in the
-	// extension manifest gate which hosts the extension can reach.
+	// chrome-extension://<id> or moz-extension://<UUID> — any installed
+	// build of the companion extension's service worker. The
+	// host_permissions in the extension's own manifest gate which hosts
+	// the extension can reach.
 	if strings.HasPrefix(origin, chromeExtensionScheme) &&
 		len(origin) > len(chromeExtensionScheme) {
+		return true
+	}
+	if strings.HasPrefix(origin, mozExtensionScheme) &&
+		len(origin) > len(mozExtensionScheme) {
 		return true
 	}
 	return false

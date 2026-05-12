@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "build:firefox": "npm run build && node scripts/build-firefox.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "node --test --import tsx 'src/**/__tests__/*.test.ts'",
+    "test": "bash -c 'shopt -s globstar nullglob && node --test --import tsx src/**/__tests__/*.test.ts'",
     "clean": "rm -rf dist dist-firefox"
   },
   "devDependencies": {

@@ -195,12 +195,28 @@ func TestUpdater_DeltaSkipsUnchangedFiles(t *testing.T) {
 
 	// Bump a.txt; b.txt unchanged. Re-run and assert only a.txt was
 	// re-fetched on the delta pass.
+	//
+	// newServer builds ms.manifest.Files from a Go map, so iteration
+	// order — and therefore the index of "a.txt" in the slice — is
+	// not deterministic. Look up the entry by name instead of
+	// poking Files[0] directly, otherwise this test fails ~50% of
+	// the time when "b.txt" happens to land first.
 	newA := []byte("alpha-v2\n")
 	ms.mu.Lock()
 	ms.files["a.txt"] = newA
-	ms.manifest.Files[0] = ManifestFile{Name: "a.txt", SHA256: sha256Hex(newA)}
+	found := false
+	for i := range ms.manifest.Files {
+		if ms.manifest.Files[i].Name == "a.txt" {
+			ms.manifest.Files[i] = ManifestFile{Name: "a.txt", SHA256: sha256Hex(newA)}
+			found = true
+			break
+		}
+	}
 	ms.manifest.Version = "1.0.1"
 	ms.mu.Unlock()
+	if !found {
+		t.Fatalf("a.txt entry not found in manifest")
+	}
 
 	if _, err := u.CheckNow(context.Background()); err != nil {
 		t.Fatalf("second CheckNow: %v", err)
@@ -325,6 +341,70 @@ func TestUpdater_ReloadOnlyOnChange(t *testing.T) {
 	}
 	if reloads.Load() != 1 {
 		t.Errorf("reload count after unchanged run = %d, want 1", reloads.Load())
+	}
+}
+
+// A failing Reload callback must NOT advance the persisted/in-memory
+// version. Otherwise the next CheckNow would see all files matching
+// SHAs on disk (count=0) AND a version that already equals the
+// manifest's (versionChanged=false), skipping the reload entirely —
+// the live engine would stay stuck on the previous ruleset until the
+// manifest version bumps again.
+func TestUpdater_ReloadFailurePreservesVersionForRetry(t *testing.T) {
+	dir := t.TempDir()
+	_, srv := newServer(t, map[string]string{"x.txt": "1\n"}, "1.0.0")
+	store := &memVersionStore{}
+
+	var reloads atomic.Int32
+	var failNext atomic.Bool
+	failNext.Store(true)
+
+	u, _ := New(Options{
+		ManifestURL: srv.URL + "/manifest.json",
+		RulesDir:    dir,
+		Store:       store,
+		Reload: func(_ context.Context) error {
+			reloads.Add(1)
+			if failNext.Load() {
+				return fmt.Errorf("simulated reload failure")
+			}
+			return nil
+		},
+	})
+
+	// First call: applyManifest writes the file, Reload is called
+	// but returns an error. Expect CheckNow to surface that error
+	// and leave the persisted version empty.
+	if _, err := u.CheckNow(context.Background()); err == nil {
+		t.Fatalf("expected reload error on first poll")
+	}
+	if reloads.Load() != 1 {
+		t.Fatalf("reload count after failing first poll = %d, want 1", reloads.Load())
+	}
+	if len(store.versions) != 0 {
+		t.Fatalf("version persisted despite reload failure: %v", store.versions)
+	}
+	if u.Status().CurrentVersion != "" {
+		t.Errorf("in-memory currentVersion advanced despite reload failure: %q", u.Status().CurrentVersion)
+	}
+
+	// Second call: files on disk already match the manifest SHA
+	// (count=0). The reload MUST still be retried because the
+	// persisted version is stale. Let it succeed this time and
+	// assert the version is finally committed.
+	failNext.Store(false)
+	res, err := u.CheckNow(context.Background())
+	if err != nil {
+		t.Fatalf("second CheckNow: %v", err)
+	}
+	if reloads.Load() != 2 {
+		t.Fatalf("reload count after retry = %d, want 2 (must retry even when count=0)", reloads.Load())
+	}
+	if !res.Updated || res.Version != "1.0.0" {
+		t.Errorf("retry result = %+v", res)
+	}
+	if got, _ := store.CurrentRuleVersion(context.Background()); got != "1.0.0" {
+		t.Errorf("store version after successful retry = %q, want 1.0.0", got)
 	}
 }
 

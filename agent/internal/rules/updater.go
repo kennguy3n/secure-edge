@@ -194,6 +194,23 @@ func (u *Updater) CheckNow(ctx context.Context) (Result, error) {
 	}
 
 	versionChanged := manifest.Version != current
+
+	// Reload the live engines *before* recording the new version in
+	// memory or in the store. If the reload fails — bad pattern in
+	// the new file, syntax error in a rules list, etc — `current`
+	// stays pointing at the old version so the next poll will retry
+	// the reload (versionChanged will still be true even though all
+	// downloaded files match SHAs on disk). Persisting the new
+	// version up front would mark the cycle "successful", leave the
+	// engine running on the previous rule set, and skip the reload
+	// indefinitely (until the manifest version bumps again).
+	needsReload := (count > 0 || versionChanged) && u.opts.Reload != nil
+	if needsReload {
+		if err := u.opts.Reload(ctx); err != nil {
+			return Result{}, fmt.Errorf("reload: %w", err)
+		}
+	}
+
 	u.mu.Lock()
 	u.currentVersion = manifest.Version
 	u.mu.Unlock()
@@ -201,12 +218,6 @@ func (u *Updater) CheckNow(ctx context.Context) (Result, error) {
 	if versionChanged && u.opts.Store != nil {
 		if err := u.opts.Store.AppendRuleVersion(ctx, manifest.Version); err != nil {
 			return Result{}, fmt.Errorf("persist version: %w", err)
-		}
-	}
-
-	if count > 0 && u.opts.Reload != nil {
-		if err := u.opts.Reload(ctx); err != nil {
-			return Result{}, fmt.Errorf("reload: %w", err)
 		}
 	}
 

@@ -87,6 +87,10 @@ jobs:
         working-directory: extension
         run: npm run typecheck
 
+      - name: build (tsc + IIFE bundle)
+        working-directory: extension
+        run: npm run build
+
       - name: test
         working-directory: extension
         run: npm test

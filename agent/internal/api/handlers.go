@@ -355,7 +355,7 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body proxyDisableRequest
-	if r.ContentLength > 0 {
+	if r.ContentLength != 0 {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid JSON body")
 			return

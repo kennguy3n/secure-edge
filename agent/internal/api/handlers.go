@@ -354,12 +354,15 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
 		return
 	}
+	// Always attempt to decode; treat io.EOF (empty body in any
+	// transfer encoding) as a no-op equivalent to remove_ca=false.
+	// Gating on r.ContentLength is unsafe because net/http reports
+	// -1 when no Content-Length header is present (e.g. chunked
+	// transfer encoding or a plain POST without the header).
 	var body proxyDisableRequest
-	if r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid JSON body")
-			return
-		}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
 	}
 	if err := s.Proxy.Disable(r.Context(), body.RemoveCA); err != nil {
 		writeError(w, http.StatusInternalServerError, "disable proxy: "+err.Error())

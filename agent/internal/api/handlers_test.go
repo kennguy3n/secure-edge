@@ -712,6 +712,35 @@ func TestProxy_DisableEmptyBodyAllowed(t *testing.T) {
 	}
 }
 
+// TestProxy_DisableEmptyBodyNoContentLength covers the case where a
+// client sends an empty POST without a Content-Length header (e.g.
+// chunked transfer encoding). net/http reports ContentLength=-1 for
+// this case, so a guard like `if r.ContentLength != 0` would attempt
+// to decode an empty stream and fail with io.EOF, returning a spurious
+// 400. The handler must treat this identically to remove_ca=false.
+func TestProxy_DisableEmptyBodyNoContentLength(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fc := &fakeProxyController{}
+	_, _ = fc.Enable(context.Background())
+	srv.SetProxyController(fc)
+
+	req := newLocalRequest(http.MethodPost, "/api/proxy/disable", nil)
+	req.ContentLength = -1
+	req.Header.Del("Content-Length")
+
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable: got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if fc.disableCalls != 1 {
+		t.Errorf("disable calls = %d", fc.disableCalls)
+	}
+	if fc.lastRemoveCA {
+		t.Error("remove_ca defaulted to true; expected false on empty body")
+	}
+}
+
 func TestProxy_EnableErrorReturns500(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	fc := &fakeProxyController{enableErr: errors.New("ca disk full")}

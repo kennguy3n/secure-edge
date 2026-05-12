@@ -6,7 +6,7 @@
 
 | Phase | Status | Completion |
 |-------|--------|------------|
-| Phase 1: DNS Blocking + Electron Tray | Not Started | 0% |
+| Phase 1: DNS Blocking + Electron Tray | In Progress | ~75% |
 | Phase 2: Browser Extension + Layered DLP Pipeline | Not Started | 0% |
 | Phase 3: Rule Updates + Installers | Not Started | 0% |
 | Phase 4: MITM Proxy (Optional) | Not Started | 0% |
@@ -15,40 +15,40 @@
 ## Phase 1 Detailed Breakdown
 
 ### Go Agent Core
-- [ ] Project scaffolding (`cmd/agent/main.go`, `internal/` structure)
-- [ ] Configuration loader (YAML config for upstream DNS, ports, rule paths)
-- [ ] DNS resolver implementation (`miekg/dns`, listen on 127.0.0.1:53)
-- [ ] Rule file parser (one-domain-per-line `.txt` files)
-- [ ] In-memory domain lookup (hash map)
-- [ ] Policy engine (category → action mapping)
-- [ ] SQLite database setup (`modernc.org/sqlite`, WAL mode)
-- [ ] Database migrations (rulesets, category_policies, aggregate_stats, dlp_config — NO alert_events)
-- [ ] Anonymous counter system (atomic in-memory counters, periodic SQLite flush)
-- [ ] Local HTTP API server (net/http)
-- [ ] API: `GET /api/status` — agent health, uptime
-- [ ] API: `GET /api/policies` — list category policies
-- [ ] API: `PUT /api/policies/:category` — update policy action
-- [ ] API: `GET /api/stats` — anonymous aggregate counters
-- [ ] API: `POST /api/stats/reset` — reset counters
-- [ ] Privacy review: confirm no domain/IP/URL is written to disk anywhere
+- [x] Project scaffolding (`cmd/agent/main.go`, `internal/` structure)
+- [x] Configuration loader (YAML config for upstream DNS, ports, rule paths)
+- [x] DNS resolver implementation (`miekg/dns`, listen on 127.0.0.1:53)
+- [x] Rule file parser (one-domain-per-line `.txt` files)
+- [x] In-memory domain lookup (hash map)
+- [x] Policy engine (category → action mapping)
+- [x] SQLite database setup (`modernc.org/sqlite`, WAL mode)
+- [x] Database migrations (rulesets, category_policies, aggregate_stats, dlp_config — NO alert_events)
+- [x] Anonymous counter system (atomic in-memory counters, periodic SQLite flush)
+- [x] Local HTTP API server (net/http)
+- [x] API: `GET /api/status` — agent health, uptime
+- [x] API: `GET /api/policies` — list category policies
+- [x] API: `PUT /api/policies/:category` — update policy action
+- [x] API: `GET /api/stats` — anonymous aggregate counters
+- [x] API: `POST /api/stats/reset` — reset counters
+- [x] Privacy review: confirm no domain/IP/URL is written to disk anywhere
 
 ### Electron Tray App
-- [ ] Electron project setup with electron-builder
-- [ ] Main process: create tray icon (all platforms)
-- [ ] Tray context menu: Status, Open Settings, Quit
-- [ ] Settings BrowserWindow (created on-demand, destroyed on close)
-- [ ] Settings page: list categories with policy toggles
-- [ ] Status page: anonymous aggregate stats display (total blocks, uptime)
-- [ ] Status indicator in tray icon (green = running, red = error)
-- [ ] IPC to Go agent via localhost HTTP
+- [x] Electron project setup with electron-builder
+- [x] Main process: create tray icon (all platforms)
+- [x] Tray context menu: Status, Open Settings, Quit
+- [x] Settings BrowserWindow (created on-demand, destroyed on close)
+- [x] Settings page: list categories with policy toggles
+- [x] Status page: anonymous aggregate stats display (total blocks, uptime)
+- [x] Status indicator in tray icon (green = running, red = error)
+- [x] IPC to Go agent via localhost HTTP
 
 ### Bundled Rules
-- [ ] `rules/ai_chat_blocked.txt` — blocked AI chatbot domains
-- [ ] `rules/ai_code_blocked.txt` — blocked AI code assistant domains
-- [ ] `rules/ai_allowed.txt` — enterprise-approved AI endpoints
-- [ ] `rules/ai_chat_dlp.txt` — AI tools requiring DLP inspection
-- [ ] `rules/phishing.txt` — phishing domains
-- [ ] `rules/social.txt` — social media domains
+- [x] `rules/ai_chat_blocked.txt` — blocked AI chatbot domains
+- [x] `rules/ai_code_blocked.txt` — blocked AI code assistant domains
+- [x] `rules/ai_allowed.txt` — enterprise-approved AI endpoints
+- [x] `rules/ai_chat_dlp.txt` — AI tools requiring DLP inspection
+- [x] `rules/phishing.txt` — phishing domains
+- [x] `rules/social.txt` — social media domains
 - [ ] `rules/news.txt` — news domains
 - [ ] `rules/manifest.json` — version and file list
 
@@ -307,3 +307,17 @@ secure-edge/
 - Project documentation created (README, PROPOSAL, ARCHITECTURE, PHASES, PROGRESS)
 - Privacy-first design: zero access logging, anonymous aggregate counters only
 - Layered DLP pipeline design: content classification → Aho-Corasick prefix scan → regex validation → hotword/entropy/exclusion scoring
+- Phase 1 implementation landed: Go agent (config, rules parser + hash-map lookup, policy engine,
+  SQLite store in WAL mode with `rulesets`, `category_policies`, `aggregate_stats`, `rule_versions`,
+  `dlp_config` tables — no access/alert tables), atomic anonymous counter system with periodic
+  SQLite flush, embedded DNS resolver (`miekg/dns`) returning NXDOMAIN for `deny` and forwarding
+  for `allow` / `allow_with_dlp`, and the five Phase 1 HTTP endpoints (`/api/status`,
+  `/api/policies`, `/api/policies/:category`, `/api/stats`, `/api/stats/reset`).
+- Privacy-audit test (`internal/store/privacy_test.go`) sweeps every text column to assert no
+  domain / URL / IP fingerprints reach SQLite after a sequence of DNS events.
+- Electron tray shell: hidden-on-startup tray icon with Status / Open Settings / Quit context
+  menu, on-demand BrowserWindow that destroys itself on close, React renderer with `Settings`
+  and `Status` pages, a localhost HTTP client for the Go agent, and 10-second tray health
+  polling that swaps the icon between green/red variants based on agent reachability.
+- Six bundled rule files (`ai_chat_blocked.txt`, `ai_code_blocked.txt`, `ai_allowed.txt`,
+  `ai_chat_dlp.txt`, `phishing.txt`, `social.txt`).

@@ -1,0 +1,17 @@
+# Go agent build artefacts
+agent/secure-edge-agent
+agent/secure-edge.db
+agent/secure-edge.db-shm
+agent/secure-edge.db-wal
+agent/coverage.out
+
+# Electron build artefacts
+electron/dist/
+electron/node_modules/
+electron/release/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

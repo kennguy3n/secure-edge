@@ -15,15 +15,51 @@ import (
 )
 
 // allowedOrigins is the strict allowlist of browser origins that are
-// permitted to talk to the local agent. The Electron renderer loads
-// from file:// in production (Origin: "null") and from the Vite dev
-// server in development. Wildcard CORS would be a real DNS-rebinding
-// vector here because state-changing endpoints exist (PUT/POST).
+// permitted to talk to the local agent. Three classes are accepted,
+// all enforced through isAllowedOrigin so wildcard CORS is never used
+// (state-changing endpoints exist, so wildcards would be a real
+// DNS-rebinding vector):
+//
+//  1. The Electron renderer: file:// in production (Origin: "null")
+//     and the Vite dev server. Exact match.
+//  2. The browser companion extension's service worker, which sends
+//     Origin: chrome-extension://<extension-id>. The ID is fixed once
+//     the extension is published but not knowable at compile time, so
+//     any chrome-extension://* origin is accepted. Host permissions in
+//     the extension's own manifest gate which agents the extension is
+//     allowed to call — the Origin check here is in series with that.
+//  3. The 10 Tier-2 AI tool pages where the paste-interceptor content
+//     script runs. The browser stamps the page's own origin (not the
+//     extension's) when content scripts fetch with mode:"cors", so
+//     these origins must be explicitly listed. The list is the same
+//     set as extension/manifest.json's content_scripts.matches.
+//
+// The Host-header allowlist (allowedHostnames) remains the actual
+// DNS-rebinding defence — a hostile site can hijack a DNS name to
+// point at 127.0.0.1, but it cannot forge the Host header.
 var allowedOrigins = map[string]struct{}{
 	"null":                  {}, // file:// — packaged Electron renderer
 	"http://localhost:5173": {}, // Vite dev server
 	"http://127.0.0.1:5173": {},
+
+	// Tier-2 AI tools (extension content scripts). Keep in sync with
+	// extension/manifest.json content_scripts.matches.
+	"https://chat.openai.com":       {},
+	"https://chatgpt.com":           {},
+	"https://claude.ai":             {},
+	"https://gemini.google.com":     {},
+	"https://copilot.microsoft.com": {},
+	"https://www.bing.com":          {},
+	"https://you.com":               {},
+	"https://www.perplexity.ai":     {},
+	"https://huggingface.co":        {},
+	"https://poe.com":               {},
 }
+
+// chromeExtensionScheme is matched as a prefix so any companion
+// extension build (unpacked dev build, signed Web Store build, etc.)
+// is accepted without hard-coding its install-time ID.
+const chromeExtensionScheme = "chrome-extension://"
 
 // allowedHostnames is the Host-header allowlist. A DNS-rebinding
 // attacker can only point a hostname under their control at 127.0.0.1;
@@ -130,7 +166,7 @@ func withCORS(h http.Handler) http.Handler {
 		// allowed through but receive no CORS headers.
 		origin := r.Header.Get("Origin")
 		if origin != "" {
-			if _, ok := allowedOrigins[origin]; !ok {
+			if !isAllowedOrigin(origin) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -146,6 +182,20 @@ func withCORS(h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+func isAllowedOrigin(origin string) bool {
+	if _, ok := allowedOrigins[origin]; ok {
+		return true
+	}
+	// chrome-extension://<id> — any installed build of the companion
+	// extension's service worker. The host_permissions in the
+	// extension manifest gate which hosts the extension can reach.
+	if strings.HasPrefix(origin, chromeExtensionScheme) &&
+		len(origin) > len(chromeExtensionScheme) {
+		return true
+	}
+	return false
 }
 
 func isAllowedHost(host string) bool {

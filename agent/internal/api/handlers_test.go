@@ -196,7 +196,23 @@ func TestMethodNotAllowed(t *testing.T) {
 
 func TestCORSPreflightAllowedOrigin(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	for _, origin := range []string{"null", "http://localhost:5173", "http://127.0.0.1:5173"} {
+	origins := []string{
+		// Electron renderer + Vite dev server.
+		"null",
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+		// Browser extension service worker. The ID is install-time
+		// and not knowable here; any chrome-extension:// origin must
+		// be accepted so the popup's /api/status fetch works.
+		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+		// Content-script origins (Tier-2 AI tools). The browser
+		// stamps the page's own origin for content-script fetches,
+		// not the extension's, so each Tier-2 host has to be
+		// explicitly allowed. Sample two ends of the list.
+		"https://chatgpt.com",
+		"https://poe.com",
+	}
+	for _, origin := range origins {
 		r := newLocalRequest(http.MethodOptions, "/api/policies", nil)
 		r.Header.Set("Origin", origin)
 		w := httptest.NewRecorder()
@@ -209,6 +225,31 @@ func TestCORSPreflightAllowedOrigin(t *testing.T) {
 		}
 		if w.Header().Get("Vary") != "Origin" {
 			t.Errorf("%s: Vary header missing", origin)
+		}
+	}
+}
+
+// TestCORSRejectsLookalikeChromeExtension guards the chrome-extension
+// prefix check against trivial spoofs (an attacker page can set an
+// arbitrary Origin via fetch on the server side only; from a browser
+// the Origin is controlled, but the test pins the parser anyway).
+func TestCORSRejectsLookalikeChromeExtension(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	cases := []string{
+		// Bare scheme without an ID component.
+		"chrome-extension://",
+		// Embedded but not as a scheme prefix.
+		"https://chrome-extension.example.com",
+		// Different extension-style scheme.
+		"moz-extension://abcdefghijklmnopabcdefghijklmnop",
+	}
+	for _, origin := range cases {
+		r := newLocalRequest(http.MethodGet, "/api/status", nil)
+		r.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("origin=%q: code = %d, want 403", origin, w.Code)
 		}
 	}
 }

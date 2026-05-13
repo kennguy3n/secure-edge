@@ -515,3 +515,177 @@ got.PatternName, got.Score, tc.content)
 })
 }
 }
+
+// TestExtendedPatterns_PrefixMismatchFix exercises the regex
+// alternation branches that were previously unreachable because the
+// pattern's Aho-Corasick prefix only covered ONE branch of a
+// (?:A|B|C) alternation. For each affected pattern we feed content
+// that contains a branch which the original prefix literal did NOT
+// cover. Before the fix (prefix=branch_A) these candidates would
+// never be emitted by the AC scanner and the regex would never run;
+// after the fix (prefix="") every prefix-less pattern is evaluated
+// against the full content and the regex matches the previously
+// unreachable branch.
+//
+// One case per pattern is sufficient — the AC bug is binary: either
+// the prefix covered the branch or it didn't. If empty-prefix routing
+// works for one missed branch, it works for all of them.
+func TestExtendedPatterns_PrefixMismatchFix(t *testing.T) {
+p := realPipeline(t)
+
+cases := []extendedPositive{
+{
+// was prefix "SNAPCRAFT_TOKEN"; ELECTRON_GITHUB_TOKEN
+// branch was previously unreachable.
+label: "Electron Forge: ELECTRON_GITHUB_TOKEN branch",
+content: "# .github/workflows/electron-publish.yml env\n" +
+"ELECTRON_GITHUB_TOKEN=ghp_K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU",
+allowedPatterns: []string{"Electron Forge Publish Token"},
+},
+{
+// was prefix "GH_TOKEN"; BT_TOKEN branch was missed.
+label: "Electron Builder: BT_TOKEN branch",
+content: "# electron-builder Bintray publish env\n" +
+"BT_TOKEN=bt_K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU0pqAbCdEf",
+allowedPatterns: []string{"Electron Builder Publish Credentials"},
+},
+{
+// was prefix "Server="; "Data Source=" branch was missed.
+label: "MSSQL: Data Source= branch",
+content: "ConnectionString = \"Data Source=sql.prod.internal,1433;" +
+"Initial Catalog=Orders;UID=svc_app;Password=Ub3rH4rdProdSecret42;\"",
+allowedPatterns: []string{
+"MSSQL Connection String with Password",
+"Password Assignment",
+},
+},
+{
+// was prefix "azuredevops"; "ado" branch was missed.
+// Regex demands an unbroken [a-z2-7]{52} run after the
+// alternation, so we go straight from `ado=` into a
+// 52-char base32-flavour token (no intervening
+// alphanumerics like _PAT= that would break the run).
+label: "Azure DevOps PAT: ado branch",
+content: "// azure devops api token for dev.azure.com\n" +
+"ado=k7p2qrmznlc5vxbt4yjhfwoeiuajdgxrytunl2abcdefghijklmn",
+allowedPatterns: []string{"Azure DevOps PAT"},
+},
+{
+// was prefix "hvs."; hvb. (batch) branch was missed.
+label: "HashiCorp Vault: hvb. (batch) branch",
+content: "// vault batch token\n" +
+"VAULT_TOKEN=hvb.AAAAAQJg2c4yEN9rNwM5Bt4VuKf7QcJ2DhPmgZ31",
+allowedPatterns: []string{"HashiCorp Vault Token"},
+},
+{
+// was prefix "dd_api_key"; datadog_api_key branch was missed.
+label: "Datadog API Key: datadog_api_key branch",
+content: "# datadog agent\n" +
+"datadog_api_key=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+allowedPatterns: []string{"Datadog API Key"},
+},
+{
+// was prefix "TAURI_SIGNING"; the dotted "tauri.signing"
+// branch was missed.
+label: "Tauri Signing: tauri.signing dotted branch",
+content: "// tauri.conf.json signing config\n" +
+"tauri.signingPRIVATE_KEY=\"dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5VeryLongB64SignedBlob01234567890ABCDEFG\"",
+allowedPatterns: []string{"Tauri Signing Private Key"},
+},
+{
+// was prefix "FIREBASE_TOKEN"; the longer
+// FIREBASE_APP_DISTRIBUTION_TOKEN branch was missed
+// because "firebase_token" is not a substring of
+// "firebase_app_distribution_token".
+label: "Firebase App Distribution: long form branch",
+content: "# fastlane firebase_app_distribution lane env\n" +
+"FIREBASE_APP_DISTRIBUTION_TOKEN=1//09K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU0pq",
+allowedPatterns: []string{"Firebase App Distribution Token"},
+},
+{
+// was prefix "flutter"; String.fromEnvironment branch
+// was missed. The regex expects the value to follow the
+// key within [^A-Za-z0-9]{0,8}, so use positional args
+// (no `defaultValue:` keyword that would break the run).
+label: "Flutter Dart: String.fromEnvironment branch",
+content: "// flutter dart const env\n" +
+"const apiKey = String.fromEnvironment('API_KEY', 'cWXyzABCDEFghijklmnoPQRstuVWX');",
+allowedPatterns: []string{
+"Flutter Dart Environment Secret",
+"Dart Password Literal",
+},
+},
+{
+// was prefix "CLOUDFLARE"; CF_API_TOKEN branch was missed.
+label: "Cloudflare API: CF_API_TOKEN branch",
+content: "// wrangler.toml env for cloudflare\n" +
+"CF_API_TOKEN=k9P2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTUNL_AbCdE",
+allowedPatterns: []string{"Cloudflare API Token"},
+},
+{
+// was prefix "vonage"; nexmo branch was missed.
+label: "Vonage Nexmo: nexmo branch",
+content: "# nexmo legacy api credentials\n" +
+"nexmo_api_secret=abcDEF1234567890",
+allowedPatterns: []string{"Vonage Nexmo API Secret"},
+},
+{
+// was prefix "password"; passwd branch was missed.
+label: "Password Assignment: passwd branch",
+content: "# service account credentials\n" +
+"passwd = \"Ub3rH4rdProdSecret42xyz\"",
+allowedPatterns: []string{"Password Assignment"},
+},
+{
+// was prefix "password"; apiKey branch was missed.
+label: "Go Password Literal: apiKey branch",
+content: "package main\nimport \"fmt\"\nfunc main() {\n" +
+"  apiKey := \"ProdGoAPIK3y_xyz_Q9_42_LongRand\"\n" +
+"  fmt.Println(apiKey)\n}",
+allowedPatterns: []string{
+"Go Password Literal",
+"Password Assignment",
+},
+},
+{
+// was prefix "const"; `final` branch was missed.
+label: "Dart Password Literal: final branch",
+content: "// dart config\n" +
+"final apiKey = \"ProdDartAPIK3y_xyz_Q9_42_LongRand\";",
+allowedPatterns: []string{
+"Dart Password Literal",
+"Password Assignment",
+},
+},
+{
+// was prefix "SECRET_KEY"; API_KEY branch was missed.
+label: "Python Secret Key Literal: API_KEY branch",
+content: "# django settings.py\nimport os\n" +
+"API_KEY = \"prodPythonAPIK3yForSigningRequests_Q9XmKpLAbcDe\"",
+allowedPatterns: []string{
+"Python Secret Key Literal",
+"Password Assignment",
+},
+},
+}
+
+for _, tc := range cases {
+tc := tc
+t.Run(tc.label, func(t *testing.T) {
+got := p.Scan(context.Background(), tc.content)
+if !got.Blocked {
+t.Fatalf("expected block on previously-missed AC branch, got %+v", got)
+}
+if len(tc.allowedPatterns) == 0 {
+return
+}
+for _, name := range tc.allowedPatterns {
+if got.PatternName == name {
+return
+}
+}
+t.Fatalf("pattern = %q (score=%d), want one of %v",
+got.PatternName, got.Score, tc.allowedPatterns)
+})
+}
+}

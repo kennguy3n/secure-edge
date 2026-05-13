@@ -164,7 +164,7 @@
     {
       "name": "Azure DevOps PAT",
       "regex": "(?i)(?:azuredevops|ado|devops)[^A-Za-z0-9]{0,12}[a-z2-7]{52}",
-      "prefix": "azuredevops",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -504,7 +504,7 @@
     {
       "name": "Password Assignment",
       "regex": "(?i)(?:password|passwd|pwd)\\s*[:=]\\s*['\"][^\\s'\"]{8,}['\"]",
-      "prefix": "password",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -523,7 +523,7 @@
     {
       "name": "HashiCorp Vault Token",
       "regex": "(?:hvs|hvb)\\.[A-Za-z0-9_\\-]{24,}",
-      "prefix": "hvs.",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -540,7 +540,7 @@
     {
       "name": "Datadog API Key",
       "regex": "(?i)(?:dd_api_key|datadog_api_key)\\s*[:=]\\s*['\"]?[a-f0-9]{32}",
-      "prefix": "dd_api_key",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -1053,7 +1053,7 @@
     {
       "name": "Tauri Signing Private Key",
       "regex": "(?i)(?:tauri\\.signing|TAURI_SIGNING)_?PRIVATE_?KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{60,}",
-      "prefix": "TAURI_SIGNING",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -1070,7 +1070,7 @@
     {
       "name": "Electron Forge Publish Token",
       "regex": "(?i)(?:SNAPCRAFT_TOKEN|ELECTRON_GITHUB_TOKEN|FORGE_PUBLISH_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
-      "prefix": "SNAPCRAFT_TOKEN",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -1087,7 +1087,7 @@
     {
       "name": "Electron Builder Publish Credentials",
       "regex": "(?i)(?:GH_TOKEN|BT_TOKEN|KEYGEN_TOKEN|EP_PRE_RELEASE)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
-      "prefix": "GH_TOKEN",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -1459,7 +1459,7 @@
     {
       "name": "Firebase App Distribution Token",
       "regex": "(?i)(?:FIREBASE_TOKEN|FIREBASE_APP_DISTRIBUTION_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-/.]{30,}",
-      "prefix": "FIREBASE_TOKEN",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -1561,7 +1561,7 @@
     {
       "name": "Flutter Dart Environment Secret",
       "regex": "(?i)(?:flutter_dotenv|String\\.fromEnvironment)[^A-Za-z0-9]{0,32}(?:API_KEY|SECRET|TOKEN|PASSWORD)[^A-Za-z0-9]{0,8}['\\\"]?[A-Za-z0-9_\\-]{16,}",
-      "prefix": "flutter",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -1595,7 +1595,7 @@
     {
       "name": "MSSQL Connection String with Password",
       "regex": "(?i)(?:Server|Data Source)=[^;]+;\\s*(?:Database|Initial Catalog)=[^;]+;[^;]*(?:User\\s*Id|UID)=[^;]+;[^;]*Password=[^;\\s'\\\"]{4,}",
-      "prefix": "Server=",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 2,
       "hotwords": [
@@ -1770,7 +1770,7 @@
     {
       "name": "Cloudflare API Token",
       "regex": "(?i)(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN|cloudflare_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40}",
-      "prefix": "CLOUDFLARE",
+      "prefix": "",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -2012,7 +2012,7 @@
     {
       "name": "Vonage Nexmo API Secret",
       "regex": "(?i)(?:vonage|nexmo)[_\\-]?api[_\\-]?secret\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{16}",
-      "prefix": "vonage",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -2309,7 +2309,7 @@
     {
       "name": "Go Password Literal",
       "regex": "(?i)(?:password|passwd|pwd|secret|apiKey)\\s*:?=\\s*\\\"[^\\\"\\s]{8,}\\\"",
-      "prefix": "password",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -2362,7 +2362,7 @@
     {
       "name": "Dart Password Literal",
       "regex": "(?i)(?:final|const|var)\\s+(?:password|passwd|pwd|secret|apiKey)\\s*=\\s*\\\"[^\\\"\\s]{8,}\\\"",
-      "prefix": "const",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [
@@ -2380,7 +2380,7 @@
     {
       "name": "Python Secret Key Literal",
       "regex": "(?i)(?:SECRET_KEY|PASSWORD|API_KEY|PRIVATE_KEY)\\s*=\\s*\\\"[^\\\"\\s]{12,}\\\"",
-      "prefix": "SECRET_KEY",
+      "prefix": "",
       "severity": "high",
       "score_weight": 1,
       "hotwords": [

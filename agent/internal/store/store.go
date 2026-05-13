@@ -199,6 +199,13 @@ func (s *Store) seedDefaults(ctx context.Context) error {
 		{Category: "Phishing", Action: ActionDeny},
 		{Category: "Social", Action: ActionAllow},
 		{Category: "News", Action: ActionAllow},
+		// Admin override categories produced by rules.OverrideStore.
+		// Without these rows the engine's lookup map falls through to
+		// Deny (see policy/engine.go), so admin-allowed domains would
+		// be silently blocked. Keep these category strings in sync
+		// with rules.OverrideAllowCategory / OverrideBlockCategory.
+		{Category: "allow_admin", Action: ActionAllow},
+		{Category: "block_admin", Action: ActionDeny},
 	}
 	for _, p := range defaults {
 		if _, err := s.db.ExecContext(ctx,

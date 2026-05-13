@@ -42,6 +42,13 @@ type PolicyReloader interface {
 type ApplyOptions struct {
 	PolicyStore PolicyStore
 	Reloader    PolicyReloader
+	// DLPSink, when non-nil, is invoked with the merged DLP snapshot
+	// after it has been written to the store. Callers use this hook
+	// to push the new thresholds and weights into the live DLP
+	// pipeline — without it the persisted values would only take
+	// effect on the next agent restart, silently diverging from
+	// what GET /api/dlp/config and GET /api/profile report.
+	DLPSink func(DLPConfigSnapshot)
 }
 
 // Apply pushes the profile's category actions and DLP thresholds into
@@ -72,6 +79,9 @@ func (p *Profile) Apply(ctx context.Context, opts ApplyOptions) error {
 		merged := mergeDLP(cur, *t)
 		if err := opts.PolicyStore.SetDLPConfig(ctx, merged); err != nil {
 			return fmt.Errorf("profile: write dlp_config: %w", err)
+		}
+		if opts.DLPSink != nil {
+			opts.DLPSink(merged)
 		}
 	}
 	if opts.Reloader != nil {

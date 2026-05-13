@@ -286,3 +286,71 @@ func TestApply(t *testing.T) {
 		t.Fatalf("expected error to propagate")
 	}
 }
+
+// TestApplyDLPSink locks in the propagation contract for the live
+// DLP pipeline: when a profile carries DLP thresholds, Apply must
+// invoke the DLPSink callback with the merged snapshot so the live
+// pipeline stays in sync with what's persisted in SQLite.
+func TestApplyDLPSink(t *testing.T) {
+	t.Run("fires with merged snapshot", func(t *testing.T) {
+		store := newFakePolicyStore()
+		store.dlp = DLPConfigSnapshot{ThresholdCritical: 9, HotwordBoost: 9}
+
+		var got DLPConfigSnapshot
+		var calls int
+		sink := func(c DLPConfigSnapshot) {
+			calls++
+			got = c
+		}
+
+		p := &Profile{
+			DLPThresholds: &DLPThresholds{ThresholdCritical: 1, EntropyBoost: 3},
+		}
+		if err := p.Apply(context.Background(), ApplyOptions{
+			PolicyStore: store, DLPSink: sink,
+		}); err != nil {
+			t.Fatalf("Apply: %v", err)
+		}
+		if calls != 1 {
+			t.Fatalf("expected DLPSink to fire exactly once, got %d", calls)
+		}
+		if got.ThresholdCritical != 1 {
+			t.Fatalf("sink threshold_critical: got %d want 1", got.ThresholdCritical)
+		}
+		if got.HotwordBoost != 9 {
+			t.Fatalf("sink hotword_boost: zero override should preserve existing, got %d want 9", got.HotwordBoost)
+		}
+		if got.EntropyBoost != 3 {
+			t.Fatalf("sink entropy_boost: got %d want 3", got.EntropyBoost)
+		}
+	})
+
+	t.Run("nil sink is a no-op", func(t *testing.T) {
+		store := newFakePolicyStore()
+		p := &Profile{
+			DLPThresholds: &DLPThresholds{ThresholdCritical: 5},
+		}
+		if err := p.Apply(context.Background(), ApplyOptions{
+			PolicyStore: store, // DLPSink intentionally nil
+		}); err != nil {
+			t.Fatalf("Apply: %v", err)
+		}
+	})
+
+	t.Run("no DLP thresholds means sink is not called", func(t *testing.T) {
+		store := newFakePolicyStore()
+		var calls int
+		sink := func(DLPConfigSnapshot) { calls++ }
+		p := &Profile{
+			Categories: map[string]string{"AI Allowed": "allow"},
+		}
+		if err := p.Apply(context.Background(), ApplyOptions{
+			PolicyStore: store, DLPSink: sink,
+		}); err != nil {
+			t.Fatalf("Apply: %v", err)
+		}
+		if calls != 0 {
+			t.Fatalf("sink should not fire when profile carries no DLP thresholds, got %d", calls)
+		}
+	})
+}

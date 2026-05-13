@@ -240,26 +240,53 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "update failed")
 		return
 	}
-	if s.DLP != nil {
-		s.DLP.Threshold().Set(dlp.Thresholds{
-			Critical: body.ThresholdCritical,
-			High:     body.ThresholdHigh,
-			Medium:   body.ThresholdMedium,
-			Low:      body.ThresholdLow,
-		})
-		// Propagate scoring weights to the live pipeline too —
-		// without this, weight fields are persisted to SQLite but
-		// only take effect after an agent restart, silently
-		// diverging from the values returned by GET /api/dlp/config.
-		s.DLP.SetWeights(dlp.ScoreWeights{
-			HotwordBoost:     body.HotwordBoost,
-			EntropyBoost:     body.EntropyBoost,
-			EntropyPenalty:   body.EntropyPenalty,
-			ExclusionPenalty: body.ExclusionPenalty,
-			MultiMatchBoost:  body.MultiMatchBoost,
-		})
-	}
+	s.applyLiveDLP(dlpConfigToSnapshot(body))
 	writeJSON(w, http.StatusOK, body)
+}
+
+// applyLiveDLP propagates the given snapshot's thresholds and
+// scoring weights into the live DLP pipeline. Used by PUT
+// /api/dlp/config, POST /api/profile/import, and the startup
+// profile loader so all three paths stay in sync with what's
+// persisted in SQLite — without this, weight/threshold changes
+// would only take effect after an agent restart, silently
+// diverging from the values returned by GET /api/dlp/config and
+// GET /api/profile. A nil DLP pipeline (Phase 1, no DLP wired)
+// short-circuits to a no-op.
+func (s *Server) applyLiveDLP(c profile.DLPConfigSnapshot) {
+	if s == nil || s.DLP == nil {
+		return
+	}
+	s.DLP.Threshold().Set(dlp.Thresholds{
+		Critical: c.ThresholdCritical,
+		High:     c.ThresholdHigh,
+		Medium:   c.ThresholdMedium,
+		Low:      c.ThresholdLow,
+	})
+	s.DLP.SetWeights(dlp.ScoreWeights{
+		HotwordBoost:     c.HotwordBoost,
+		EntropyBoost:     c.EntropyBoost,
+		EntropyPenalty:   c.EntropyPenalty,
+		ExclusionPenalty: c.ExclusionPenalty,
+		MultiMatchBoost:  c.MultiMatchBoost,
+	})
+}
+
+// dlpConfigToSnapshot mirrors the field-for-field shape between
+// store.DLPConfig and profile.DLPConfigSnapshot. The two types are
+// kept separate to avoid a profile→store import cycle.
+func dlpConfigToSnapshot(c store.DLPConfig) profile.DLPConfigSnapshot {
+	return profile.DLPConfigSnapshot{
+		ThresholdCritical: c.ThresholdCritical,
+		ThresholdHigh:     c.ThresholdHigh,
+		ThresholdMedium:   c.ThresholdMedium,
+		ThresholdLow:      c.ThresholdLow,
+		HotwordBoost:      c.HotwordBoost,
+		EntropyBoost:      c.EntropyBoost,
+		EntropyPenalty:    c.EntropyPenalty,
+		ExclusionPenalty:  c.ExclusionPenalty,
+		MultiMatchBoost:   c.MultiMatchBoost,
+	}
 }
 
 // bumpDLPStats increments dlp_scans_total (+1) and optionally
@@ -478,6 +505,7 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 		if err := p.Apply(r.Context(), profile.ApplyOptions{
 			PolicyStore: s.ProfileApply,
 			Reloader:    s.Policy,
+			DLPSink:     s.applyLiveDLP,
 		}); err != nil {
 			writeError(w, http.StatusInternalServerError, "apply profile: "+err.Error())
 			return

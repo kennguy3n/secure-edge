@@ -92,6 +92,42 @@ func TestEngineReloadPicksUpPolicyChange(t *testing.T) {
 	}
 }
 
+// TestEngineAdminOverrideAllowsDomain locks in the seeding contract
+// for the rules/local/ admin override store: a domain added via the
+// allow-list MUST resolve to Allow through the engine. Before the
+// seed fix this returned Deny, because the engine's category->action
+// lookup map had no row for "allow_admin" and fell through to its
+// default-Deny rule (engine.go:106-113).
+func TestEngineAdminOverrideAllowsDomain(t *testing.T) {
+	s, baseSources := newTestEnv(t)
+
+	overrideDir := t.TempDir()
+	ov, err := rules.NewOverrideStore(overrideDir)
+	if err != nil {
+		t.Fatalf("NewOverrideStore: %v", err)
+	}
+	if err := ov.Add("admin-allowed.example", "allow"); err != nil {
+		t.Fatalf("Add allow: %v", err)
+	}
+	if err := ov.Add("admin-blocked.example", "block"); err != nil {
+		t.Fatalf("Add block: %v", err)
+	}
+
+	sources := append([]rules.RuleSource(nil), baseSources...)
+	sources = append(sources, ov.Sources()...)
+	e, err := New(s, sources)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	if got := e.CheckDomain("admin-allowed.example"); got != Allow {
+		t.Fatalf("admin allow-list: CheckDomain = %q, want %q (Bug 7: missing allow_admin seed)", got, Allow)
+	}
+	if got := e.CheckDomain("admin-blocked.example"); got != Deny {
+		t.Fatalf("admin block-list: CheckDomain = %q, want %q", got, Deny)
+	}
+}
+
 func TestEngineSetSourcesAndReload(t *testing.T) {
 	s, sources := newTestEnv(t)
 	e, err := New(s, sources)

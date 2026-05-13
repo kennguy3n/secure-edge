@@ -887,6 +887,46 @@ func TestProfileImportLocksPolicies(t *testing.T) {
 	}
 }
 
+// TestProfileImportPropagatesDLPToPipeline locks in the contract
+// fixed for Bug 8: when a profile carries DLP thresholds /
+// weights, POST /api/profile/import MUST push them into the live
+// DLP pipeline. Before the fix, p.Apply only wrote SQLite and the
+// pipeline kept its construction-time values until the next
+// restart — silently diverging from GET /api/dlp/config.
+func TestProfileImportPropagatesDLPToPipeline(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	fake := &fakeDLP{thr: thr}
+	srv.SetDLP(fake)
+	srv.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})
+
+	body := bytes.NewBufferString(`{
+		"profile": {
+			"name": "acme",
+			"version": "1",
+			"dlp_thresholds": {
+				"threshold_critical": 11,
+				"threshold_high":     7,
+				"hotword_boost":      42,
+				"entropy_boost":      13
+			}
+		}
+	}`)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/profile/import", body))
+	if w.Code != http.StatusOK {
+		t.Fatalf("import code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	got := thr.Get()
+	if got.Critical != 11 || got.High != 7 {
+		t.Fatalf("live thresholds = %+v, want Critical=11 High=7", got)
+	}
+	if fake.weights.HotwordBoost != 42 || fake.weights.EntropyBoost != 13 {
+		t.Fatalf("live weights = %+v, want HotwordBoost=42 EntropyBoost=13", fake.weights)
+	}
+}
+
 func TestProfileImportRequiresPayload(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	srv.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})

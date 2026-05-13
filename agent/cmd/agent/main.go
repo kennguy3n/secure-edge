@@ -194,7 +194,13 @@ func run(configPath string) error {
 
 	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
 	// is configured. Phase 1 deployments leave both DLP paths blank and
-	// the /api/dlp/* endpoints return 503 service-unavailable.
+	// the /api/dlp/* endpoints return 503 service-unavailable. The
+	// pipeline is hoisted to function scope so the startup profile
+	// loader (below) can push its merged DLP thresholds and weights
+	// straight into the live pipeline — otherwise a profile imported
+	// at boot would persist to SQLite but only take effect after the
+	// next restart, silently diverging from GET /api/dlp/config.
+	var pipeline *dlp.Pipeline
 	if cfg.DLPPatternsPath != "" {
 		dlpCfg, err := s.GetDLPConfig(ctx)
 		if err != nil {
@@ -224,7 +230,7 @@ func run(configPath string) error {
 				return err
 			}
 		}
-		pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+		pipeline = dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
 
@@ -337,7 +343,7 @@ func run(configPath string) error {
 	holder := profile.NewHolder(nil)
 	applyStore := &profileApplyAdapter{store: s}
 	apiServer.SetProfile(holder, applyStore)
-	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine); err != nil {
+	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
 		fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
 	}
 
@@ -698,7 +704,7 @@ func (a tamperAdapter) Status() api.TamperStatus {
 // operator-supplied local file overrides any server-distributed
 // profile. Errors are propagated so the caller can decide whether to
 // fail the boot.
-func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Holder, ps profile.PolicyStore, engine *policy.Engine) error {
+func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Holder, ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) error {
 	var p *profile.Profile
 	var err error
 	switch {
@@ -712,7 +718,29 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 	if err != nil {
 		return err
 	}
-	if err := p.Apply(ctx, profile.ApplyOptions{PolicyStore: ps, Reloader: engine}); err != nil {
+	opts := profile.ApplyOptions{PolicyStore: ps, Reloader: engine}
+	if pipeline != nil {
+		// Push the merged DLP snapshot into the live pipeline so a
+		// profile that ships stricter thresholds takes effect on
+		// the same boot, not the next one. Without this hook the
+		// pipeline keeps the values it was constructed with above.
+		opts.DLPSink = func(c profile.DLPConfigSnapshot) {
+			pipeline.Threshold().Set(dlp.Thresholds{
+				Critical: c.ThresholdCritical,
+				High:     c.ThresholdHigh,
+				Medium:   c.ThresholdMedium,
+				Low:      c.ThresholdLow,
+			})
+			pipeline.SetWeights(dlp.ScoreWeights{
+				HotwordBoost:     c.HotwordBoost,
+				EntropyBoost:     c.EntropyBoost,
+				EntropyPenalty:   c.EntropyPenalty,
+				ExclusionPenalty: c.ExclusionPenalty,
+				MultiMatchBoost:  c.MultiMatchBoost,
+			})
+		}
+	}
+	if err := p.Apply(ctx, opts); err != nil {
 		return err
 	}
 	return h.Set(p)

@@ -28,9 +28,27 @@ jobs:
           cache: true
           cache-dependency-path: agent/go.sum
 
-      - name: go test
+      - name: go test (with coverage)
         working-directory: agent
-        run: make test
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out | tail -1
+
+      - name: enforce DLP package coverage threshold
+        working-directory: agent
+        run: |
+          # Phase 6 Task 26: agent/internal/dlp/ is the privacy-critical
+          # surface. Fail CI if its coverage drops below 80%.
+          pct=$(go tool cover -func=coverage.out | awk '/internal\/dlp\// {sub(/%/,"",$3); sum+=$3; n++} END { if (n==0) print 0; else printf "%.1f", sum/n }')
+          echo "DLP package average coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 80.0) { exit 1 } }'
+
+      - name: upload coverage artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-coverage
+          path: agent/coverage.out
+          if-no-files-found: error
 
       - name: go vet
         working-directory: agent

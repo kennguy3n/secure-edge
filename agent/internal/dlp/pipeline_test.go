@@ -10,7 +10,7 @@ import (
 // patterns and exclusions used in production rules/dlp_patterns.json
 // and rules/dlp_exclusions.json (in miniature form). Keeping these
 // inline rather than reading rules/*.json keeps the test hermetic.
-func testPipeline(t *testing.T) *Pipeline {
+func testPipeline(t testing.TB) *Pipeline {
 	t.Helper()
 	patternsJSON := []byte(`{
 		"patterns": [

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -17,6 +18,11 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
 
+// osStat is a thin indirection so tests can stub the filesystem. The
+// default points at os.Stat; tests can replace it to drive
+// collectRuleFileInfo against an in-memory fixture.
+var osStat = func(name string) (os.FileInfo, error) { return os.Stat(name) }
+
 // maxScanBytes caps the body size accepted by /api/dlp/scan. Pastes
 // well beyond this size are typically not what a user is sending to an
 // AI tool, and an unbounded body is a memory-exhaustion vector.
@@ -25,12 +31,41 @@ const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
 // StatusResponse is the body for GET /api/status.
 // Both `uptime` (human-readable) and `uptime_seconds` (machine-readable)
 // are emitted so the Electron tray and the browser extension don't have
-// to parse the formatted string.
+// to parse the formatted string. The optional `runtime` and `rules`
+// sections were added in Phase 6 (Task 17). All embedded values are
+// non-sensitive operational metadata — no scan content, domains, URLs,
+// IPs, or user identifiers ever appear here.
 type StatusResponse struct {
-	Status        string `json:"status"`
-	Uptime        string `json:"uptime"`
-	UptimeSeconds int64  `json:"uptime_seconds"`
-	Version       string `json:"version"`
+	Status        string         `json:"status"`
+	Uptime        string         `json:"uptime"`
+	UptimeSeconds int64          `json:"uptime_seconds"`
+	Version       string         `json:"version"`
+	Runtime       RuntimeStats   `json:"runtime,omitempty"`
+	Rules         []RuleFileInfo `json:"rules,omitempty"`
+	DLPPatterns   int            `json:"dlp_patterns,omitempty"`
+}
+
+// RuntimeStats captures Go runtime counters surfaced via /api/status.
+// All fields are derived from runtime.MemStats / runtime.NumGoroutine
+// and contain no user-derived data.
+type RuntimeStats struct {
+	GoVersion     string `json:"go_version"`
+	NumGoroutine  int    `json:"num_goroutine"`
+	NumCPU        int    `json:"num_cpu"`
+	HeapAllocKB   uint64 `json:"heap_alloc_kb"`
+	HeapInuseKB   uint64 `json:"heap_inuse_kb"`
+	SysKB         uint64 `json:"sys_kb"`
+	NumGC         uint32 `json:"num_gc"`
+	GoMaxProcs    int    `json:"gomaxprocs"`
+}
+
+// RuleFileInfo carries the modification time and byte size of a rule
+// file. Paths are echoed back unchanged so callers know which file is
+// which.
+type RuleFileInfo struct {
+	Path         string    `json:"path"`
+	SizeBytes    int64     `json:"size_bytes"`
+	LastModified time.Time `json:"last_modified"`
 }
 
 // PolicyUpdate is the request body for PUT /api/policies/:category.
@@ -57,12 +92,54 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if since < 0 {
 		since = 0
 	}
-	writeJSON(w, http.StatusOK, StatusResponse{
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	rt := RuntimeStats{
+		GoVersion:    runtime.Version(),
+		NumGoroutine: runtime.NumGoroutine(),
+		NumCPU:       runtime.NumCPU(),
+		HeapAllocKB:  ms.HeapAlloc / 1024,
+		HeapInuseKB:  ms.HeapInuse / 1024,
+		SysKB:        ms.Sys / 1024,
+		NumGC:        ms.NumGC,
+		GoMaxProcs:   runtime.GOMAXPROCS(0),
+	}
+
+	resp := StatusResponse{
 		Status:        "running",
 		Uptime:        formatUptime(since),
 		UptimeSeconds: int64(since / time.Second),
 		Version:       Version,
-	})
+		Runtime:       rt,
+	}
+	if s.DLP != nil {
+		resp.DLPPatterns = len(s.DLP.Patterns())
+	}
+	if len(s.RuleFiles) > 0 {
+		resp.Rules = collectRuleFileInfo(s.RuleFiles)
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// collectRuleFileInfo gathers mtime + size for each rule file path
+// the agent was started with. Missing files are silently skipped so a
+// partial deployment (e.g. an upcoming rule file not yet present)
+// doesn't break the status endpoint.
+func collectRuleFileInfo(paths []string) []RuleFileInfo {
+	out := make([]RuleFileInfo, 0, len(paths))
+	for _, p := range paths {
+		fi, err := osStat(p)
+		if err != nil {
+			continue
+		}
+		out = append(out, RuleFileInfo{
+			Path:         p,
+			SizeBytes:    fi.Size(),
+			LastModified: fi.ModTime(),
+		})
+	}
+	return out
 }
 
 func formatUptime(d time.Duration) string {
@@ -664,4 +741,48 @@ func (s *Server) handleRuleOverrideItem(w http.ResponseWriter, r *http.Request) 
 	}
 	a, b := s.Rules.List()
 	writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
+}
+
+// handleAgentUpdateCheck reports whether a newer agent release is
+// published on the configured manifest channel. Returns 503 if no
+// updater is wired (builds without a release channel).
+func (s *Server) handleAgentUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.AgentUpdate == nil {
+		writeError(w, http.StatusServiceUnavailable, "agent updater not configured")
+		return
+	}
+	res, err := s.AgentUpdate.CheckLatest(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "update check failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// handleAgentUpdate downloads the latest agent release, verifies its
+// SHA256 + Ed25519 signature, and stages it for restart. Returns 503
+// when no updater is wired.
+func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.AgentUpdate == nil {
+		writeError(w, http.StatusServiceUnavailable, "agent updater not configured")
+		return
+	}
+	if s.Profile != nil && s.Profile.Locked() {
+		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
+		return
+	}
+	staged, err := s.AgentUpdate.DownloadAndStage(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "stage failed: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, staged)
 }

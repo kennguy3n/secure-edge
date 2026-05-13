@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -25,6 +27,7 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 	"github.com/kennguy3n/secure-edge/agent/internal/tamper"
+	"github.com/kennguy3n/secure-edge/agent/internal/updater"
 )
 
 // version is overridable at build time via -ldflags.
@@ -208,6 +211,37 @@ func run(configPath string) error {
 	defer func() { _ = resolver.Shutdown() }()
 
 	apiServer := api.NewServer(s, engine, counter)
+
+	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).
+	// Zero or negative disables the limiter entirely so operators can
+	// opt out for synthetic load tests.
+	if cfg.DLPRateLimitPerSec > 0 {
+		apiServer.SetScanRateLimit(float64(cfg.DLPRateLimitPerSec), cfg.DLPRateLimitPerSec)
+	} else if cfg.DLPRateLimitPerSec < 0 {
+		apiServer.SetScanRateLimit(0, 1)
+	}
+
+	// Expose rule-file mtimes through /api/status (Phase 6 Task 17).
+	// Missing files are tolerated by collectRuleFileInfo on the server
+	// side, so we can pass the configured paths unfiltered.
+	apiServer.SetRuleFiles(ruleFilesForStatus(cfg))
+
+	// Optional self-updater (Phase 6 Task 15). Builds without a
+	// manifest URL or a valid Ed25519 public key omit the updater
+	// entirely, and /api/agent/update* return 503.
+	if cfg.AgentUpdateManifestURL != "" && cfg.AgentUpdatePublicKey != "" {
+		pubBytes, err := hex.DecodeString(cfg.AgentUpdatePublicKey)
+		if err == nil && len(pubBytes) == ed25519.PublicKeySize {
+			self, err := updater.New(updater.Options{
+				ManifestURL: cfg.AgentUpdateManifestURL,
+				Current:     version,
+				PublicKey:   ed25519.PublicKey(pubBytes),
+			})
+			if err == nil {
+				apiServer.SetAgentUpdater(agentUpdaterAdapter{self: self})
+			}
+		}
+	}
 
 	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
 	// is configured. Phase 1 deployments leave both DLP paths blank and
@@ -772,4 +806,49 @@ func splitHostPort(addr string) (string, string) {
 		return addr, ""
 	}
 	return addr[:idx], addr[idx+1:]
+}
+
+// ruleFilesForStatus returns the rule file paths that should be
+// reported through GET /api/status's rules[] section. Best-effort:
+// the API server silently skips missing entries.
+func ruleFilesForStatus(cfg config.Config) []string {
+	paths := append([]string{}, cfg.RulePaths...)
+	if cfg.DLPPatternsPath != "" {
+		paths = append(paths, cfg.DLPPatternsPath)
+	}
+	if cfg.DLPExclusionsPath != "" {
+		paths = append(paths, cfg.DLPExclusionsPath)
+	}
+	return paths
+}
+
+// agentUpdaterAdapter bridges *updater.Self to api.AgentSelfUpdater so
+// the API handlers can return their own wire types without importing
+// the updater package (which would create a cycle if updater ever
+// needed to import api).
+type agentUpdaterAdapter struct{ self *updater.Self }
+
+func (a agentUpdaterAdapter) CheckLatest(ctx context.Context) (api.AgentUpdateCheck, error) {
+	r, err := a.self.CheckLatest(ctx)
+	if err != nil {
+		return api.AgentUpdateCheck{}, err
+	}
+	return api.AgentUpdateCheck{
+		Latest:          r.Latest,
+		Current:         r.Current,
+		UpdateAvailable: r.UpdateAvailable,
+		DownloadURL:     r.DownloadURL,
+	}, nil
+}
+
+func (a agentUpdaterAdapter) DownloadAndStage(ctx context.Context) (api.AgentUpdateStage, error) {
+	r, err := a.self.DownloadAndStage(ctx)
+	if err != nil {
+		return api.AgentUpdateStage{}, err
+	}
+	return api.AgentUpdateStage{
+		Version:   r.Version,
+		StagedAt:  r.StagedAt,
+		BytesSize: r.BytesSize,
+	}, nil
 }

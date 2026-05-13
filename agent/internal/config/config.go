@@ -112,6 +112,18 @@ type Config struct {
 	// (e.g. "pii", "code_secret") that should be ignored when
 	// scanning. Empty by default — all categories are active.
 	DLPDisabledCategories []string `yaml:"dlp_disabled_categories"`
+
+	// AgentUpdateManifestURL is the HTTPS URL of the release
+	// manifest used by /api/agent/update-check. Leave blank to
+	// disable agent self-update entirely (endpoints return 503).
+	AgentUpdateManifestURL string `yaml:"agent_update_manifest_url"`
+
+	// AgentUpdatePublicKey is the hex-encoded Ed25519 public key
+	// used to verify release signatures. Required when
+	// AgentUpdateManifestURL is set; without it the endpoints
+	// remain 503 — an unverified release path would defeat the
+	// entire self-update threat model.
+	AgentUpdatePublicKey string `yaml:"agent_update_public_key"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -243,6 +255,12 @@ func merge(defaults, override Config) Config {
 	}
 	if len(override.DLPDisabledCategories) > 0 {
 		out.DLPDisabledCategories = override.DLPDisabledCategories
+	}
+	if override.AgentUpdateManifestURL != "" {
+		out.AgentUpdateManifestURL = override.AgentUpdateManifestURL
+	}
+	if override.AgentUpdatePublicKey != "" {
+		out.AgentUpdatePublicKey = override.AgentUpdatePublicKey
 	}
 	return out
 }

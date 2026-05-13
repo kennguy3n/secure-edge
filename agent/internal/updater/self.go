@@ -159,6 +159,9 @@ func (s *Self) DownloadAndStage(ctx context.Context) (StageResult, error) {
 		return StageResult{}, errors.New("updater: signature verification failed")
 	}
 
+	if err := validateVersion(manifest.Version); err != nil {
+		return StageResult{}, err
+	}
 	stageDir, err := s.stageDir()
 	if err != nil {
 		return StageResult{}, err
@@ -166,10 +169,25 @@ func (s *Self) DownloadAndStage(ctx context.Context) (StageResult, error) {
 	if err := os.MkdirAll(stageDir, 0o755); err != nil {
 		return StageResult{}, fmt.Errorf("updater: mkdir stage dir: %w", err)
 	}
-	path := filepath.Join(stageDir, "agent-"+manifest.Version)
-	if err := os.WriteFile(path, body, 0o755); err != nil {
+	// Defence in depth: even though validateVersion rejects path
+	// separators, recompute the absolute path and confirm it lives
+	// inside stageDir before writing.
+	absStage, err := filepath.Abs(stageDir)
+	if err != nil {
+		return StageResult{}, fmt.Errorf("updater: resolve stage dir: %w", err)
+	}
+	path := filepath.Join(absStage, "agent-"+manifest.Version)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return StageResult{}, fmt.Errorf("updater: resolve staged path: %w", err)
+	}
+	if rel, err := filepath.Rel(absStage, absPath); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.Contains(rel, string(filepath.Separator)) {
+		return StageResult{}, fmt.Errorf("updater: staged path escapes stage dir: %s", path)
+	}
+	if err := os.WriteFile(absPath, body, 0o755); err != nil {
 		return StageResult{}, fmt.Errorf("updater: write staged binary: %w", err)
 	}
+	path = absPath
 	return StageResult{
 		Version:   manifest.Version,
 		StagedAt:  path,
@@ -186,8 +204,8 @@ func (s *Self) fetchManifest(ctx context.Context) (Manifest, []byte, error) {
 	if err := json.Unmarshal(body, &m); err != nil {
 		return Manifest{}, nil, fmt.Errorf("updater: parse manifest: %w", err)
 	}
-	if m.Version == "" {
-		return Manifest{}, nil, errors.New("updater: manifest missing version")
+	if err := validateVersion(m.Version); err != nil {
+		return Manifest{}, nil, err
 	}
 	return m, body, nil
 }
@@ -223,4 +241,35 @@ func (s *Self) stageDir() (string, error) {
 
 func platformKey() string {
 	return runtime.GOOS + "/" + runtime.GOARCH
+}
+
+// validateVersion rejects manifest version strings that could escape
+// the stage directory or otherwise be used to write outside it. The
+// allowed alphabet is a conservative superset of SemVer: ASCII
+// alphanumerics plus '.', '+', '_', '-'. Leading '.' or '-' are
+// rejected to prevent dotfile or option-injection style names.
+func validateVersion(v string) error {
+	if v == "" {
+		return errors.New("updater: manifest version is empty")
+	}
+	if len(v) > 64 {
+		return fmt.Errorf("updater: manifest version too long (%d > 64)", len(v))
+	}
+	if v == ".." || strings.Contains(v, "/") || strings.Contains(v, "\\") || strings.Contains(v, "..") {
+		return fmt.Errorf("updater: manifest version contains path traversal: %q", v)
+	}
+	if v[0] == '.' || v[0] == '-' {
+		return fmt.Errorf("updater: manifest version has illegal leading character: %q", v)
+	}
+	for _, r := range v {
+		switch {
+		case r >= '0' && r <= '9':
+		case r >= 'A' && r <= 'Z':
+		case r >= 'a' && r <= 'z':
+		case r == '.' || r == '+' || r == '_' || r == '-':
+		default:
+			return fmt.Errorf("updater: manifest version contains illegal character %q in %q", r, v)
+		}
+	}
+	return nil
 }

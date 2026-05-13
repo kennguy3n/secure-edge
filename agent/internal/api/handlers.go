@@ -615,8 +615,16 @@ func (s *Server) handleRuleOverride(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "add override: "+err.Error())
 			return
 		}
+		// Surface reload errors instead of silently 200ing. The
+		// override file has already been persisted; if reload fails
+		// the on-disk state is ahead of the in-memory engine and the
+		// caller needs to know the change isn't live yet. Same
+		// contract as handlePolicyItem above.
 		if s.Policy != nil {
-			_ = s.Policy.Reload(r.Context())
+			if err := s.Policy.Reload(r.Context()); err != nil {
+				writeError(w, http.StatusInternalServerError, "policy reload failed")
+				return
+			}
 		}
 		a, b := s.Rules.List()
 		writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
@@ -645,8 +653,14 @@ func (s *Server) handleRuleOverrideItem(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "remove override: "+err.Error())
 		return
 	}
+	// See handleRuleOverride: a failed reload after a successful
+	// on-disk removal must not return 200, otherwise the caller
+	// thinks the override is gone while DNS still applies it.
 	if s.Policy != nil {
-		_ = s.Policy.Reload(r.Context())
+		if err := s.Policy.Reload(r.Context()); err != nil {
+			writeError(w, http.StatusInternalServerError, "policy reload failed")
+			return
+		}
 	}
 	a, b := s.Rules.List()
 	writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})

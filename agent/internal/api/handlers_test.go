@@ -20,11 +20,14 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
 
-type fakeReloader struct{ calls int64 }
+type fakeReloader struct {
+	calls int64
+	err   error // optional: when set, Reload returns this error
+}
 
 func (f *fakeReloader) Reload(_ context.Context) error {
 	atomic.AddInt64(&f.calls, 1)
-	return nil
+	return f.err
 }
 
 type fakeStatsView struct {
@@ -1050,5 +1053,34 @@ func TestRuleOverrideUnconfigured(t *testing.T) {
 		if w.Code != http.StatusServiceUnavailable {
 			t.Fatalf("%s => 503 expected, got %d", m, w.Code)
 		}
+	}
+}
+
+// Bug 9 regression: when the underlying policy engine fails to
+// reload after a rule-override write, the handler must return 500
+// rather than 200. Returning 200 made callers think the override
+// was live while the in-memory DNS engine still used the old map.
+func TestRuleOverrideAddReloadFailure(t *testing.T) {
+	srv, rel, _ := newTestServer(t)
+	rel.err = errors.New("boom")
+	srv.SetRuleOverride(&fakeRuleOverride{})
+
+	body := bytes.NewBufferString(`{"domain":"foo.example","list":"allow"}`)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/rules/override", body))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("add => 500 expected when reload fails, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestRuleOverrideDeleteReloadFailure(t *testing.T) {
+	srv, rel, _ := newTestServer(t)
+	rel.err = errors.New("boom")
+	srv.SetRuleOverride(&fakeRuleOverride{allow: []string{"foo.example"}})
+
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodDelete, "/api/rules/override/foo.example", nil))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("delete => 500 expected when reload fails, got %d body=%s", w.Code, w.Body.String())
 	}
 }

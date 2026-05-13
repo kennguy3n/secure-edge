@@ -146,6 +146,13 @@ secure-edge/
 │   ├── news.txt              manifest.json
 │   ├── dlp_patterns.json
 │   └── dlp_exclusions.json
+├── docs/                             # Operator + contributor documentation
+│   ├── admin-guide.md
+│   ├── user-guide.md
+│   ├── rule-contribution-guide.md
+│   ├── dlp-pattern-authoring-guide.md
+│   └── accessibility.md
+├── SECURITY_RULES.md                 # Reference table of every shipped DLP pattern
 ├── scripts/                          # Platform install / DNS / proxy scripts
 │   ├── macos/                        # build-pkg.sh, postinstall.sh, uninstall.sh,
 │   │                                 # configure-dns.sh, install-ca.sh,
@@ -272,12 +279,40 @@ merging without corrupting bundled rules. Performance benchmarks
 for the DLP pipeline, DNS resolver, and stats counter live in
 `*_bench_test.go` files — see [BENCHMARKS.md](./BENCHMARKS.md).
 
+## DLP Coverage
+
+Secure Edge ships **139** real-world detection patterns across **20**
+categories: cloud providers (AWS, Azure, GCP, Google Services),
+cloud infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify,
+Supabase, Pulumi, Helm, Terraform, Docker, K8s), version control
+(GitHub, GitLab, Bitbucket), AI/ML platforms (OpenAI, Anthropic,
+HuggingFace, Cohere, Replicate, Pinecone, Mistral, W&B, LangSmith,
+Together, Groq), payment processors (Stripe, PayPal, Square,
+Braintree, Adyen, Plaid, Coinbase), CI/CD (CircleCI, Travis,
+Jenkins), messaging (Slack, Discord, Telegram, Twilio, SendGrid,
+Vonage, Mailchimp), auth/identity (Auth0, Okta, OneLogin, Keycloak,
+Firebase Admin, Supabase JWT, Clerk), language ecosystems (Java,
+Rust, JS/TS, Swift, Kotlin, Dart, Go, Python), mobile (iOS APNs,
+Android signing, Flutter / React Native), databases (Postgres,
+MySQL, MongoDB, Redis, MSSQL, SQLite, Cassandra, Elasticsearch),
+PEM/private keys, JWTs, generic password-in-code, and PII (SSN,
+credit cards, emails, phones).
+
+See [SECURITY_RULES.md](./SECURITY_RULES.md) for the complete per-pattern
+table (name, severity, prefix, hotword requirement).
+
 ## Documentation
 
 - [PROPOSAL.md](./PROPOSAL.md) — scope, privacy model, layered DLP overview
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, DB schema, API, integration
 - [PHASES.md](./PHASES.md) — phased implementation plan
 - [PROGRESS.md](./PROGRESS.md) — per-item progress tracker
+- [SECURITY_RULES.md](./SECURITY_RULES.md) — per-pattern reference table
+- [docs/admin-guide.md](./docs/admin-guide.md) — installation, configuration, profiles, overrides
+- [docs/user-guide.md](./docs/user-guide.md) — what the tray icon means, false-positive reporting, privacy summary
+- [docs/rule-contribution-guide.md](./docs/rule-contribution-guide.md) — how to add domains and categories
+- [docs/dlp-pattern-authoring-guide.md](./docs/dlp-pattern-authoring-guide.md) — DLP schema, scoring, hotwords, entropy, exclusions
+- [docs/accessibility.md](./docs/accessibility.md) — Electron UI accessibility audit + verification steps
 
 ## Contributing
 

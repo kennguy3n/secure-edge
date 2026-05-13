@@ -58,6 +58,9 @@ func CheckExclusion(content string, match Match, xs []Exclusion) ExclusionResult
 				continue
 			}
 			if x.Compiled.FindStringIndex(match.Value) != nil {
+				if x.Suppress {
+					return ExclusionResult{Hit: true, SuppressEntirely: true}
+				}
 				result.Hit = true
 			}
 		}

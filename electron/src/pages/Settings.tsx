@@ -135,9 +135,15 @@ export function Settings() {
         Choose which traffic categories are allowed or blocked at the DNS layer.
       </p>
       {feedback && (
-        <div className={`feedback feedback-${feedback.kind}`}>{feedback.message}</div>
+        <div
+          className={`feedback feedback-${feedback.kind}`}
+          role={feedback.kind === 'error' ? 'alert' : 'status'}
+          aria-live={feedback.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          {feedback.message}
+        </div>
       )}
-      <div className="category-list">
+      <div className="category-list" role="list" aria-label="Traffic categories">
         {policies.map((p) => (
           <CategoryToggle
             key={p.category}
@@ -183,23 +189,41 @@ export function Settings() {
             Overrides live in <code>rules/local/</code> and survive bundled
             rule updates.
           </p>
-          <div className="override-add">
+          <div className="override-add" role="group" aria-label="Add domain override">
+            <label htmlFor="override-domain-input" className="sr-only">
+              Domain to override
+            </label>
             <input
+              id="override-domain-input"
               type="text"
               placeholder="example.com"
               value={overrideDomain}
               onChange={(e) => setOverrideDomain(e.target.value)}
               disabled={locked}
+              aria-label="Domain to override"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void addOverride();
+              }}
             />
+            <label htmlFor="override-list-select" className="sr-only">
+              Override list
+            </label>
             <select
+              id="override-list-select"
               value={overrideList}
               disabled={locked}
               onChange={(e) => setOverrideList(e.target.value as 'allow' | 'block')}
+              aria-label="Add to allow or block list"
             >
               <option value="allow">Allow</option>
               <option value="block">Block</option>
             </select>
-            <button type="button" disabled={locked} onClick={() => void addOverride()}>
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => void addOverride()}
+              aria-label={`Add ${overrideDomain || 'domain'} to ${overrideList} list`}
+            >
               Add
             </button>
           </div>
@@ -215,6 +239,7 @@ export function Settings() {
                       type="button"
                       disabled={locked}
                       onClick={() => void removeOverride(d)}
+                      aria-label={`Remove ${d} from allow list`}
                     >
                       Remove
                     </button>
@@ -232,6 +257,7 @@ export function Settings() {
                       type="button"
                       disabled={locked}
                       onClick={() => void removeOverride(d)}
+                      aria-label={`Remove ${d} from block list`}
                     >
                       Remove
                     </button>

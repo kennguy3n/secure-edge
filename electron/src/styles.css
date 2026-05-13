@@ -195,3 +195,40 @@ body {
   background: rgba(179, 33, 22, 0.1);
   border-left: 3px solid var(--error);
 }
+
+/* Screen-reader-only — visually hidden but read by assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Visible keyboard-focus ring on every interactive element. Browser
+   defaults are inconsistent across Electron's Chromium build, so we
+   set an explicit ring that meets WCAG 2.1 SC 2.4.7 (Focus Visible)
+   and 1.4.11 (Non-text Contrast). */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role="radio"]:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The "currently selected" segmented button uses the accent color as
+   background. Its disabled+selected combination (see .category-controls
+   button:disabled) sets text color to white, but ensure non-selected
+   buttons also have sufficient contrast against the card background. */
+.category-controls button[data-selected="true"] {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}

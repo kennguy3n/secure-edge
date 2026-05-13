@@ -40,9 +40,14 @@ function App() {
 
   return (
     <div className="app">
-      <nav className="topbar">
+      <nav className="topbar" role="tablist" aria-label="Secure Edge sections">
         <button
           type="button"
+          role="tab"
+          id="tab-status"
+          aria-controls="tabpanel-main"
+          aria-selected={view === 'status'}
+          tabIndex={view === 'status' ? 0 : -1}
           className={view === 'status' ? 'active' : ''}
           onClick={() => (window.location.hash = 'status')}
         >
@@ -50,6 +55,11 @@ function App() {
         </button>
         <button
           type="button"
+          role="tab"
+          id="tab-settings"
+          aria-controls="tabpanel-main"
+          aria-selected={view === 'settings'}
+          tabIndex={view === 'settings' ? 0 : -1}
           className={view === 'settings' ? 'active' : ''}
           onClick={() => (window.location.hash = 'settings')}
         >
@@ -57,13 +67,24 @@ function App() {
         </button>
         <button
           type="button"
+          role="tab"
+          id="tab-proxy"
+          aria-controls="tabpanel-main"
+          aria-selected={view === 'proxy'}
+          tabIndex={view === 'proxy' ? 0 : -1}
           className={view === 'proxy' ? 'active' : ''}
           onClick={() => (window.location.hash = 'proxy')}
         >
           Proxy
         </button>
       </nav>
-      {renderView(view)}
+      <div
+        id="tabpanel-main"
+        role="tabpanel"
+        aria-labelledby={`tab-${view}`}
+      >
+        {renderView(view)}
+      </div>
     </div>
   );
 }

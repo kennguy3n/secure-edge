@@ -312,3 +312,74 @@ func (s *Server) handleRulesStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, s.RuleUpdater.Status())
 }
+
+// proxyEnableResponse is the body of POST /api/proxy/enable.
+type proxyEnableResponse struct {
+	CACertPath string `json:"ca_cert_path"`
+}
+
+// proxyDisableRequest is the body of POST /api/proxy/disable. Both
+// fields are optional; empty body is equivalent to remove_ca=false.
+type proxyDisableRequest struct {
+	RemoveCA bool `json:"remove_ca"`
+}
+
+// handleProxyEnable triggers CA generation (if needed) and starts the
+// proxy listener. Returns 503 when no proxy controller is wired.
+func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	caPath, err := s.Proxy.Enable(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "enable proxy: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, proxyEnableResponse{CACertPath: caPath})
+}
+
+// handleProxyDisable stops the proxy listener and optionally removes
+// the on-disk CA when remove_ca=true is set in the body.
+func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	// Always attempt to decode; treat io.EOF (empty body in any
+	// transfer encoding) as a no-op equivalent to remove_ca=false.
+	// Gating on r.ContentLength is unsafe because net/http reports
+	// -1 when no Content-Length header is present (e.g. chunked
+	// transfer encoding or a plain POST without the header).
+	var body proxyDisableRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := s.Proxy.Disable(r.Context(), body.RemoveCA); err != nil {
+		writeError(w, http.StatusInternalServerError, "disable proxy: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Proxy.Status())
+}
+
+// handleProxyStatus returns the current proxy lifecycle snapshot.
+func (s *Server) handleProxyStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Proxy == nil {
+		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Proxy.Status())
+}

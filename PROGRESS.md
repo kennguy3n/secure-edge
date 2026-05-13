@@ -9,7 +9,7 @@
 | Phase 1: DNS Blocking + Electron Tray | Complete | 100% |
 | Phase 2: Browser Extension + Layered DLP Pipeline | Complete | 100% |
 | Phase 3: Rule Updates + Installers | Complete | 100% |
-| Phase 4: MITM Proxy (Optional) | Not Started | 0% |
+| Phase 4: MITM Proxy (Optional) | Complete | 100% |
 | Phase 5: Enterprise Features | Not Started | 0% |
 
 ## Phase 1 Detailed Breakdown
@@ -97,6 +97,7 @@
 - [x] Native Messaging communication with Go agent
 - [x] Ephemeral block notification UI (in-page banner, auto-dismiss, shows pattern name only)
 - [x] Firefox WebExtensions port
+- [x] Safari Web Extension port
 - [x] Extension popup: connection status to Go agent
 
 ### Integration
@@ -142,34 +143,34 @@
 ## Phase 4 Detailed Breakdown
 
 ### MITM Proxy
-- [ ] `elazarl/goproxy` integration on `127.0.0.1:8443`
-- [ ] Per-device Root CA generation (`crypto/x509`, RSA 2048 or ECDSA P-256)
-- [ ] Dynamic certificate generation for Tier 2 domains
-- [ ] CONNECT tunnel passthrough for non-Tier-2 domains (no decryption)
-- [ ] Request body extraction from decrypted HTTPS for DLP pipeline
-- [ ] DLP pipeline integration (same layered pipeline as browser extension path)
-- [ ] Response forwarding after DLP pass
-- [ ] Block response page for DLP failures
+- [x] `elazarl/goproxy` integration on `127.0.0.1:8443`
+- [x] Per-device Root CA generation (`crypto/x509`, ECDSA P-256)
+- [x] Dynamic certificate generation for Tier 2 domains (1 h in-memory cache)
+- [x] CONNECT tunnel passthrough for non-Tier-2 domains (no decryption)
+- [x] Request body extraction from decrypted HTTPS for DLP pipeline
+- [x] DLP pipeline integration (same layered pipeline as browser extension path)
+- [x] Response forwarding after DLP pass
+- [x] Block response page for DLP failures (HTTP 451 + JSON `{blocked, pattern_name}`)
 
 ### CA Trust Installation Scripts
-- [ ] macOS: `security add-trusted-cert` automation
-- [ ] Windows: `certutil -addstore` automation
-- [ ] Linux: copy to `/usr/local/share/ca-certificates/` + `update-ca-certificates`
+- [x] macOS: `security add-trusted-cert` automation
+- [x] Windows: `certutil -addstore` automation
+- [x] Linux: copy to `/usr/local/share/ca-certificates/` + `update-ca-certificates` (also RHEL `update-ca-trust`)
 
 ### System Proxy Configuration Scripts
-- [ ] macOS: `networksetup -setsecurewebproxy` for active interfaces
-- [ ] Windows: Registry `ProxyServer` + `ProxyEnable` keys
-- [ ] Linux: GNOME proxy settings via `gsettings` + KDE via `kwriteconfig5`
-- [ ] Environment variable approach: `HTTP_PROXY`/`HTTPS_PROXY` for CLI tools
+- [x] macOS: `networksetup -setsecurewebproxy` for active interfaces
+- [x] Windows: Registry `ProxyServer` + `ProxyEnable` keys
+- [x] Linux: GNOME proxy settings via `gsettings` + KDE via `kwriteconfig5/6`
+- [x] Environment variable approach: `HTTP_PROXY`/`HTTPS_PROXY` in `/etc/profile.d/secure-edge-proxy.sh`
 
 ### Electron UI
-- [ ] "Advanced DLP" settings section
-- [ ] "Enable Full DLP Protection" wizard (generate CA → install CA → configure proxy)
-- [ ] Proxy status indicator in tray menu
-- [ ] Certificate pinning bypass list management UI
-- [ ] API: `POST /api/proxy/enable` — generate CA, install, configure
-- [ ] API: `POST /api/proxy/disable` — remove proxy config, optionally remove CA
-- [ ] API: `GET /api/proxy/status` — running, CA installed, proxy configured
+- [x] "Advanced DLP" settings section
+- [x] "Enable Full DLP Protection" wizard (generate CA → install CA → configure proxy)
+- [x] Proxy status indicator in tray menu
+- [x] Certificate pinning bypass list management UI
+- [x] API: `POST /api/proxy/enable` — generate CA, install, configure
+- [x] API: `POST /api/proxy/disable` — remove proxy config, optionally remove CA
+- [x] API: `GET /api/proxy/status` — running, CA installed, proxy configured
 
 ## Phase 5 Detailed Breakdown
 
@@ -241,6 +242,8 @@ secure-edge/
 │   │       ├── exclusion.go        # Exclusion rule engine
 │   │       ├── scorer.go           # Multi-signal scoring aggregator
 │   │       └── pipeline.go         # Pipeline orchestrator
+│   │   └── proxy/                  # Phase 4 local MITM proxy (selective TLS
+│   │                                 decryption for Tier-2 hosts only)
 │   ├── go.mod
 │   └── go.sum
 ├── electron/                       # Electron tray app
@@ -259,7 +262,9 @@ secure-edge/
 │   ├── package.json
 │   └── electron-builder.yml
 ├── extension/                      # Browser extension (Phase 2)
-│   ├── manifest.json
+│   ├── manifest.json               # Chrome MV3
+│   ├── manifest.firefox.json       # Firefox MV3
+│   ├── manifest.safari.json        # Safari Web Extension (Xcode wrapper via xcrun)
 │   ├── src/
 │   │   ├── content/                # Content scripts for AI tool pages
 │   │   ├── background/             # Service worker
@@ -301,6 +306,70 @@ secure-edge/
 ```
 
 ## Changelog
+
+### 2026-05-12 (Phase 4 + Safari extension)
+- **Phase 4 local MITM proxy (`agent/internal/proxy/`)**: `proxy.go`
+  wraps `github.com/elazarl/goproxy` on `127.0.0.1:8443`. CONNECT
+  requests for non-Tier-2 hosts are routed through an opaque tunnel
+  (no decryption, no log); Tier-2 hosts (policy =
+  `allow_with_dlp`) are MITM-decrypted and request bodies run
+  through the existing `dlp.Pipeline`. A DLP block returns HTTP 451
+  with JSON `{blocked, pattern_name}`. `ca.go` generates a
+  per-device ECDSA P-256 Root CA at first run (default
+  `~/.secure-edge/ca.{crt,key}`), then signs short-lived leaf certs
+  on demand and caches them for one hour. `controller.go` owns the
+  Enable/Disable/Status lifecycle and reports anonymous
+  `dlp_scans_total` / `dlp_blocks_total` counters via the existing
+  aggregate-stats path. `proxy_test.go`, `ca_test.go`,
+  `controller_test.go`, and a new `integration_test.go` cover both
+  paths end-to-end and assert that nothing the user typed (body,
+  URL, Host header) ever reaches stdout/stderr.
+- **Proxy API**: new endpoints in `agent/internal/api/server.go` —
+  `POST /api/proxy/enable` (generates CA, starts listener, returns
+  CA cert path for trust install), `POST /api/proxy/disable`
+  (stops listener, optional `remove_ca`), and
+  `GET /api/proxy/status` (`{running, ca_installed, listen_addr,
+  dlp_scans_total, dlp_blocks_total}`). The controller is wired
+  through `proxyAdapter` in `cmd/agent/main.go` so the listener
+  shares the policy engine + DLP pipeline with the extension path.
+- **CA trust + system proxy scripts** (`scripts/{macos,windows,linux}/`):
+  `install-ca.sh` / `install-ca.ps1` add the CA to the platform
+  trust store (`security add-trusted-cert`, `certutil -addstore`,
+  `update-ca-certificates`/`update-ca-trust`) and the matching
+  remove subcommands undo it. `configure-proxy.sh` /
+  `configure-proxy.ps1` flip the system HTTPS proxy to
+  `127.0.0.1:8443` via `networksetup`, the IE registry hive (GNOME
+  `gsettings`, KDE `kwriteconfig5/6`, and `/etc/profile.d` for
+  POSIX env-var consumers), with `restore` subcommands.
+- **Electron Proxy page (`electron/src/pages/ProxySettings.tsx`)**:
+  "Advanced DLP (Local Proxy)" wizard that calls `POST
+  /api/proxy/enable`, shows the platform-appropriate install
+  command for the CA + the matching `configure-proxy` command, and
+  polls `GET /api/proxy/status` every 5 s. Tray now carries
+  "Proxy: Active / Inactive" alongside the existing health check,
+  and the main process polls the proxy status on the same 10 s
+  cadence.
+- **Safari Web Extension port (`extension/manifest.safari.json` +
+  `extension/scripts/build-safari.mjs`)**: MV3 manifest with
+  Safari-specific `browser_specific_settings` and a build script
+  that copies `dist/` to `dist-safari/`, swaps in the Safari
+  manifest, and wraps the result with `xcrun
+  safari-web-extension-converter`. Safari has no Native Messaging,
+  so the extension exclusively uses the existing
+  `127.0.0.1:8080/api/dlp/scan` HTTP fallback; the agent's CORS
+  allowlist now also accepts `safari-web-extension://<UUID>` and
+  `moz-extension://<UUID>` origins
+  (`agent/internal/api/server.go`).
+- **Tests added**: `agent/internal/proxy/{proxy,ca,controller,integration}_test.go`
+  cover CONNECT passthrough, Tier-2 MITM + DLP block, counter
+  increments, lifecycle idempotency, and the "no content ever
+  leaks to stdout/stderr" privacy invariant;
+  `agent/internal/api/handlers_test.go` adds the proxy
+  enable/disable/status cases plus the new `safari-web-extension://`
+  + `moz-extension://` CORS cases;
+  `extension/src/background/__tests__/safari-fallback.test.ts`
+  verifies the scan client falls through to HTTP when
+  `chrome.runtime.connectNative` is undefined.
 
 ### 2026-05-12
 - Repository initialized with MIT license

@@ -6,9 +6,12 @@
 **Open-source, privacy-first AI Data Leakage Prevention for desktop.**
 
 Secure Edge is a cross-platform desktop agent (Windows, macOS, Linux) that blocks unauthorized
-AI tools at the DNS level and (in later phases) inspects content sent to approved AI tools via
-a layered on-device DLP pipeline. It runs as a minimal system-tray app, consumes negligible
-CPU and memory, and **logs nothing** about user access — only running aggregate counters.
+AI tools at the DNS level and inspects content sent to approved AI tools via a layered
+on-device DLP pipeline. Content reaches the pipeline through a Chrome/Firefox/Safari
+browser extension or, for non-browser traffic, an optional local MITM proxy that decrypts
+only Tier-2 domains and tunnels everything else opaquely. It runs as a minimal system-tray
+app, consumes negligible CPU and memory, and **logs nothing** about user access — only
+running aggregate counters.
 
 ## Privacy First
 
@@ -79,6 +82,15 @@ dlp_exclusions: rules/dlp_exclusions.json # optional
 rule_update_url: ""                       # e.g. https://example.com/manifest.json
 rule_update_interval: 6h                  # cadence; default 6h
 rules_dir: rules                          # output dir for downloaded rule files
+
+# Phase 4 local MITM proxy. proxy_enabled=false (default) leaves the
+# listener stopped — /api/proxy/enable can start it at runtime.
+proxy_listen: "127.0.0.1:8443"
+proxy_enabled: false
+ca_cert_path: ""                          # default ~/.secure-edge/ca.crt
+ca_key_path: ""                           # default ~/.secure-edge/ca.key
+proxy_pinning_bypass: []                  # hostnames to tunnel even if Tier-2
+                                          # (e.g. apps that pin a specific CA)
 ```
 
 Leaving `dlp_patterns` blank disables the DLP pipeline and returns `503` from
@@ -115,12 +127,13 @@ secure-edge/
 │   │   └── api/agent.ts              # HTTP client for the Go agent
 │   ├── package.json
 │   └── electron-builder.yml
-├── extension/                        # Chrome / Firefox Manifest V3 companion
+├── extension/                        # Chrome / Firefox / Safari Manifest V3 companion
 │   ├── manifest.json                 # Chrome MV3
 │   ├── manifest.firefox.json         # Firefox MV3 (browser_specific_settings)
+│   ├── manifest.safari.json          # Safari Web Extension (wrapped via xcrun)
 │   ├── native-messaging/             # Native Messaging host manifest + installers
 │   ├── src/{background,content,popup}/
-│   ├── scripts/build-firefox.mjs
+│   ├── scripts/{build-firefox,build-safari}.mjs
 │   ├── package.json
 │   └── tsconfig.json
 ├── rules/                            # Bundled domain lists + DLP rules
@@ -129,15 +142,19 @@ secure-edge/
 │   ├── news.txt              manifest.json
 │   ├── dlp_patterns.json
 │   └── dlp_exclusions.json
-├── scripts/                          # Platform install / DNS scripts
+├── scripts/                          # Platform install / DNS / proxy scripts
 │   ├── macos/                        # build-pkg.sh, postinstall.sh, uninstall.sh,
-│   │                                 # configure-dns.sh, com.secureedge.agent.plist
+│   │                                 # configure-dns.sh, install-ca.sh,
+│   │                                 # configure-proxy.sh,
+│   │                                 # com.secureedge.agent.plist
 │   ├── windows/                      # secure-edge.wxs, build-msi.ps1,
 │   │                                 # postinstall.ps1, uninstall.ps1,
-│   │                                 # configure-dns.ps1, register-service.ps1
+│   │                                 # configure-dns.ps1, register-service.ps1,
+│   │                                 # install-ca.ps1, configure-proxy.ps1
 │   └── linux/                        # build-packages.sh, postinstall.sh,
 │                                     # preremove.sh, uninstall.sh,
-│                                     # configure-dns.sh, secure-edge.service
+│                                     # configure-dns.sh, install-ca.sh,
+│                                     # configure-proxy.sh, secure-edge.service
 └── .github/workflows/
     ├── ci.yml                        # Go + Electron + extension typecheck + tests
     └── release.yml                   # multi-arch builds + GitHub Release on tags
@@ -159,24 +176,32 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 | PUT    | `/api/dlp/config`          | Update DLP scoring weights and thresholds |
 | POST   | `/api/rules/update`        | Trigger an immediate rule-manifest check; returns `{updated, version, files_downloaded}` |
 | GET    | `/api/rules/status`        | Current rule version + last/next check time + manifest URL |
+| POST   | `/api/proxy/enable`        | Generate the per-device CA if missing and start the local MITM proxy; returns `{ca_cert_path}` for OS trust install |
+| POST   | `/api/proxy/disable`       | Stop the local MITM proxy; pass `{"remove_ca": true}` to also delete the CA files |
+| GET    | `/api/proxy/status`        | `{running, ca_installed, listen_addr, dlp_scans_total, dlp_blocks_total}` |
 
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
 
 The DLP endpoints return `503 Service Unavailable` when the agent is started
 without a `dlp_patterns` config entry (Phase 1 deployments). The `/api/rules/*`
-endpoints return `503` when `rule_update_url` is blank.
+endpoints return `503` when `rule_update_url` is blank. The `/api/proxy/*`
+endpoints return `503` when the proxy controller has not been configured (e.g.
+agents built without `proxy_listen`).
 
 The extension prefers to reach the agent through Chrome Native Messaging
 (no CORS, survives air-gapped networks) and falls back to direct HTTP to
 `127.0.0.1:8080` when the native host is unavailable. Install the host
 manifest with `extension/native-messaging/install.sh` (macOS/Linux) or
-`install.ps1` (Windows).
+`install.ps1` (Windows). Safari Web Extensions have no Native Messaging,
+so the Safari port uses the HTTP fallback exclusively; the agent's CORS
+allowlist accepts `chrome-extension://`, `moz-extension://`, and
+`safari-web-extension://` origins.
 
 ## Testing
 
 ```bash
 cd agent
-make test                 # runs `go test -race ./...`, includes DLP unit + integration tests
+make test                 # runs `go test -race ./...`, includes DLP + proxy unit + integration tests
 make lint                 # runs `go vet ./...`
 
 cd ../electron
@@ -185,6 +210,8 @@ npm run typecheck         # TypeScript strict mode against renderer + main
 cd ../extension
 npm install && npm run typecheck   # browser-extension Manifest V3 typecheck
 npm test                            # node --test on content + background scripts
+npm run build:firefox               # Firefox bundle in dist-firefox/
+npm run build:safari                # Safari Web Extension (macOS-only; uses xcrun)
 ```
 
 DLP coverage includes one `*_test.go` per pipeline component

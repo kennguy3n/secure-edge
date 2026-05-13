@@ -35,7 +35,10 @@ try {
   chromium = null;
 }
 
-const EXT_DIST = path.resolve(__dirname, '..', '..', 'dist');
+// The loadable extension root is the `extension/` directory — that
+// is where `manifest.json` lives. `extension/dist/` only contains
+// compiled JS referenced by the manifest's relative paths.
+const EXT_ROOT = path.resolve(__dirname, '..', '..');
 const FIXTURE = `file://${path.resolve(__dirname, 'fixture.html')}`;
 // A real, well-known sentinel string that matches an example AWS key
 // pattern. Split into two halves so the literal never appears in
@@ -51,8 +54,8 @@ test('block toast fires when a fake AWS key is pasted', async (t) => {
   const ctx = await chromium.launchPersistentContext('', {
     headless: false,
     args: [
-      `--disable-extensions-except=${EXT_DIST}`,
-      `--load-extension=${EXT_DIST}`,
+      `--disable-extensions-except=${EXT_ROOT}`,
+      `--load-extension=${EXT_ROOT}`,
     ],
   });
   t.after(async () => { await ctx.close(); });

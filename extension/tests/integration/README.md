@@ -9,7 +9,15 @@ running agent.
 
 ## Prerequisites
 
-- The extension is built (`npm run build` writes `extension/dist/`).
+- The extension is built. Running `npm run build` from `extension/`
+  compiles the TypeScript sources to `extension/dist/`. The
+  loadable extension root, however, is the `extension/` directory
+  itself — that is where `manifest.json` lives. The manifest
+  references its compiled scripts via `dist/...` relative paths, so
+  Chromium needs to be pointed at `extension/`, **not**
+  `extension/dist/`. Pointing Chromium at `extension/dist/` makes
+  Chrome show a *"Manifest file is missing or unreadable"* error
+  dialog because `dist/` is just the compiled-JS output directory.
 - The Secure Edge agent is running on `http://127.0.0.1:8080` with
   DLP enabled.
 - Playwright is installed *out of band* — it is not pinned in
@@ -30,6 +38,19 @@ node --import tsx tests/integration/block-toast.test.ts
 The script is a vanilla Node test, not a Jest/Vitest suite — it uses
 the same `node --test` runner the rest of the extension already uses
 in `package.json`.
+
+### Manual smoke test in a regular Chromium
+
+The same flow can be verified by hand without Playwright:
+
+```sh
+chromium \
+  --disable-extensions-except="$PWD/extension" \
+  --load-extension="$PWD/extension" \
+  "file://$PWD/extension/tests/integration/fixture.html"
+```
+
+Again: pass the `extension/` directory, not `extension/dist/`.
 
 ## What it covers
 

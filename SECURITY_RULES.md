@@ -8,7 +8,8 @@ detector behaves.
 For details on the schema and how to author or modify patterns, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
 
-Total patterns: **139** across **20** categories.
+Total patterns: **163** across the **13** JSON categories in `rules/dlp_patterns.json`.
+The sub-sections below group patterns by family for readability.
 
 Columns:
 
@@ -265,6 +266,39 @@ Columns:
 | Internal URLs | high | `_(none)_` | no |
 | npm Token | critical | `npm_` | no |
 | PyPI API Token | critical | `pypi-` | no |
+
+## Phase 6 Additions (24)
+
+These patterns were added in Phase 6. They appear under their
+respective JSON categories in `rules/dlp_patterns.json` but are
+listed together here so reviewers can see what changed at a glance.
+
+| Pattern | Severity | Prefix | Hotword required |
+| --- | --- | --- | --- |
+| Terraform Cloud API Token | critical | `.atlasv1.` | no |
+| Spacelift API Key | critical | `SPACELIFT_API_KEY` | no |
+| env0 API Key | critical | `ENV0_API_KEY` | no |
+| Scalr API Token | critical | `SCALR_TOKEN` | no |
+| Harbor Robot Token | critical | `robot$` | no |
+| Quay.io Encrypted Password | critical | `QUAY_` | no |
+| AWS ECR Login Token | critical | `ECR_` | no |
+| GCR JSON Key Paste | critical | `service_account` | no |
+| AWS Secrets Manager SecretString Paste | critical | `"SecretString"` | yes |
+| Azure Key Vault GetSecret Paste | critical | `vault.azure.net/secrets/` | no |
+| GCP Secret Manager Payload Paste | critical | `"payload"` | yes |
+| OAuth2 Refresh Token Assignment | high | `refresh_token` | yes |
+| OIDC ID Token Assignment | high | `id_token` | yes |
+| Auth0 Management API Token | critical | `AUTH0_` | yes |
+| Keycloak Admin Token | critical | `KEYCLOAK_` | yes |
+| Ansible Vault Block | critical | `$ANSIBLE_VAULT` | no |
+| Puppet Hiera eyaml Block | critical | `ENC[PKCS7` | no |
+| Chef Encrypted Data Bag | critical | `"cipher"` | yes |
+| RubyGems API Key | critical | `rubygems_` | no |
+| Composer Packagist Token | high | `packagist` | yes |
+| NuGet API Key | critical | `oy2` | no |
+| Hex.pm API Key | high | `HEX_` | yes |
+| Pub.dev OAuth Refresh Token | high | `PUB_DEV_TOKEN` | yes |
+| CocoaPods Trunk Session Cookie | high | `_pods_session` | no |
 
 ---
 

@@ -1,7 +1,8 @@
 # ShieldNet Secure Edge
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Build](https://img.shields.io/badge/build-pending-lightgrey)](#)
+[![CI](https://github.com/kennguy3n/secure-edge/actions/workflows/ci.yml/badge.svg)](https://github.com/kennguy3n/secure-edge/actions/workflows/ci.yml)
+[![Coverage: agent/internal/dlp ≥ 80%](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen)](./.github/workflows/ci.yml)
 
 **Open-source, privacy-first AI Data Leakage Prevention for desktop.**
 
@@ -197,6 +198,8 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 | GET    | `/api/rules/override`      | List the admin allow/block override sets |
 | POST   | `/api/rules/override`      | Add `{domain, list:"allow"\|"block"}` to the override store; moves between lists if needed |
 | DELETE | `/api/rules/override/:domain` | Remove an override regardless of list |
+| GET    | `/api/agent/update-check`  | Check whether a newer agent release is published on the configured manifest channel. Returns 503 when no updater is wired. |
+| POST   | `/api/agent/update`        | Download the latest agent release, verify its SHA-256 + Ed25519 signature, and stage it for restart. |
 
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
 
@@ -307,6 +310,10 @@ table (name, severity, prefix, hotword requirement).
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, DB schema, API, integration
 - [PHASES.md](./PHASES.md) — phased implementation plan
 - [PROGRESS.md](./PROGRESS.md) — per-item progress tracker
+- [CHANGELOG.md](./CHANGELOG.md) — release-by-release summary
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — development setup, PR process, coding standards
+- [SECURITY.md](./SECURITY.md) — responsible-disclosure policy
+- [BENCHMARKS.md](./BENCHMARKS.md) — DLP pipeline, DNS resolver, and stats counter benchmarks
 - [SECURITY_RULES.md](./SECURITY_RULES.md) — per-pattern reference table
 - [docs/admin-guide.md](./docs/admin-guide.md) — installation, configuration, profiles, overrides
 - [docs/user-guide.md](./docs/user-guide.md) — what the tray icon means, false-positive reporting, privacy summary
@@ -316,16 +323,19 @@ table (name, severity, prefix, hotword requirement).
 
 ## Contributing
 
-Contributions are welcome under the MIT license. Good first contributions:
+Contributions are welcome under the MIT license. See [CONTRIBUTING.md](./CONTRIBUTING.md)
+for development setup, the PR process, coding standards, and test requirements.
+
+Good first contributions:
 
 - **Rule lists** — add domains (one per line, leading `.` for "include subdomains") to
   `rules/*.txt`.
-- **DLP patterns / exclusions** (Phase 2) — `rules/dlp_patterns.json`,
-  `rules/dlp_exclusions.json`.
-- **Bug reports** — please use GitHub Issues.
+- **DLP patterns / exclusions** — `rules/dlp_patterns.json`, `rules/dlp_exclusions.json`.
+- **Bug reports** — use the GitHub Issues template at
+  [`.github/ISSUE_TEMPLATE/bug_report.md`](./.github/ISSUE_TEMPLATE/bug_report.md).
 
-Please run `make test` and `make lint` in `agent/` before submitting Go changes, and
-`npm run typecheck` in `electron/` before submitting renderer changes.
+Report security vulnerabilities via the process in [SECURITY.md](./SECURITY.md) — please
+do not file public issues for security reports.
 
 ## License
 

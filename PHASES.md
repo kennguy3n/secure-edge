@@ -163,6 +163,58 @@ total" but cannot see WHAT was blocked or WHAT content triggered DLP.
 
 ---
 
+## Phase 6: Hardening, Ecosystem Expansion & Community
+
+**Covers:** Pattern coverage, engine performance, browser-extension UX, platform
+hardening, accessibility, test rigor, and the community files an open-source
+project needs.
+
+### DLP pattern expansion
+- [x] Terraform provider credentials (Terraform Cloud, Spacelift, env0, Scalr)
+- [x] Container registry credentials (Harbor, Quay, ECR, GCR)
+- [x] Secret-manager response detection (AWS Secrets Manager, Azure Key Vault, GCP)
+- [x] OAuth2 / OIDC token patterns (Auth0, Keycloak, Okta)
+- [x] IaC hardcoded secrets (Ansible vault, Puppet eyaml, Chef data bags)
+- [x] Package manager tokens (RubyGems, Composer, NuGet, Hex.pm, Pub.dev, CocoaPods)
+
+### Engine and performance
+- [x] Content-size adaptive scanning (`large_content_threshold` config)
+- [x] Pattern category grouping (`category` field, disable-by-category)
+- [x] Short-lived scan-result LRU cache (5s TTL, content-hash keyed, never persisted)
+- [x] Concurrent regex evaluation for >10 KiB payloads, with a `pipeline_bench_test.go` benchmark
+
+### Browser extension
+- [x] Drag-and-drop interceptor for AI-tool textareas
+- [x] Dynamic content-script registration so Tier-2 host updates apply without an extension reload
+- [x] Extension options page (status, rule version, verbose-toast toggle)
+- [x] Optional clipboard scanning, off by default, per-host toggle
+
+### Platform hardening
+- [x] Agent self-update via GitHub Releases with SHA-256 + Ed25519 signature verification
+- [x] Graceful shutdown that waits for in-flight DNS queries and DLP scans
+- [x] `/api/status` enriched with Go runtime stats, goroutine count, rule mtimes, and pattern count
+- [x] Configurable token-bucket rate limit on `/api/dlp/scan`
+
+### Electron UI
+- [x] Dark mode tuned for WCAG 2.1 AA contrast against the dark surface palette
+- [x] Read-only Rules page surfacing rule version, pattern count, and on-disk mtimes
+- [x] First-run setup wizard
+- [x] In-memory recent-blocks list on the Status page (last 10, never persisted)
+
+### Testing and quality
+- [x] End-to-end DNS test that drives the real resolver with a stock client
+- [x] Playwright-based extension integration harness (out-of-band install)
+- [x] Go native fuzzing of `Pipeline.Scan`
+- [x] CI coverage profile + 80% floor on `agent/internal/dlp/`
+
+### Documentation and community
+- [x] `CONTRIBUTING.md`
+- [x] `CHANGELOG.md` following Keep a Changelog
+- [x] `.github/ISSUE_TEMPLATE/` and `PULL_REQUEST_TEMPLATE.md`
+- [x] `SECURITY.md` with responsible disclosure process
+
+---
+
 ## Difficulty Assessment
 
 | Component | Difficulty | Notes |

@@ -897,7 +897,8 @@
     {
       "applies_to": "*",
       "type": "regex",
-      "pattern": "\\$\\{\\{\\s*secrets\\.[A-Z0-9_]+\\s*\\}\\}"
+      "pattern": "\\$\\{\\{\\s*secrets\\.[A-Z0-9_]+\\s*\\}\\}",
+      "suppress": true
     },
     {
       "applies_to": "Discord Bot Token",
@@ -1171,12 +1172,6 @@
       "applies_to": "Google API Key",
       "type": "regex",
       "pattern": "AIza[A-Za-z0-9_\\-]*(?:EXAMPL|XXX|TEST|DEMO|TUTORIAL|FAKE|DummyKey|0{20,})",
-      "suppress": true
-    },
-    {
-      "applies_to": "Firebase Web Config apiKey",
-      "type": "regex",
-      "pattern": "AIza[A-Za-z0-9_\\-]*(?:EXAMPL|XXX|TEST|DEMO|DummyKey|0{20,})",
       "suppress": true
     }
   ]

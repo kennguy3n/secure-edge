@@ -63,6 +63,31 @@ type Config struct {
 	// classify them as Tier 2 — used as an escape hatch for apps
 	// that pin certificates and break under MITM.
 	ProxyPinningBypass []string `yaml:"proxy_pinning_bypass"`
+
+	// ProfilePath is the path to a local enterprise profile JSON
+	// file. Optional — leave blank to skip local profile loading.
+	ProfilePath string `yaml:"profile_path"`
+
+	// ProfileURL is the URL of an enterprise profile JSON document.
+	// When set, the agent fetches the profile on startup. ProfilePath
+	// takes precedence over ProfileURL when both are set.
+	ProfileURL string `yaml:"profile_url"`
+
+	// HeartbeatURL is the URL the agent POSTs an aggregate heartbeat
+	// to. Empty (default) disables the heartbeat. The payload is
+	// strictly {agent_version, os_type, os_arch, aggregate_counters}
+	// — no access data ever leaves the device.
+	HeartbeatURL string `yaml:"heartbeat_url"`
+
+	// HeartbeatInterval is the cadence at which heartbeats are sent
+	// when HeartbeatURL is non-empty. Defaults to 1h.
+	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
+
+	// LocalRulesDir is the override directory for admin-managed
+	// allow/block lists and DLP overrides. Defaults to RulesDir/local
+	// when blank. Files in this directory are merged on top of the
+	// bundled rules without modifying them.
+	LocalRulesDir string `yaml:"local_rules_dir"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -78,6 +103,7 @@ func Default() Config {
 		RuleUpdateInterval: 6 * time.Hour,
 		ProxyListen:        "127.0.0.1:8443",
 		ProxyEnabled:       false,
+		HeartbeatInterval:  time.Hour,
 	}
 }
 
@@ -160,6 +186,21 @@ func merge(defaults, override Config) Config {
 	if len(override.ProxyPinningBypass) > 0 {
 		out.ProxyPinningBypass = override.ProxyPinningBypass
 	}
+	if override.ProfilePath != "" {
+		out.ProfilePath = override.ProfilePath
+	}
+	if override.ProfileURL != "" {
+		out.ProfileURL = override.ProfileURL
+	}
+	if override.HeartbeatURL != "" {
+		out.HeartbeatURL = override.HeartbeatURL
+	}
+	if override.HeartbeatInterval != 0 {
+		out.HeartbeatInterval = override.HeartbeatInterval
+	}
+	if override.LocalRulesDir != "" {
+		out.LocalRulesDir = override.LocalRulesDir
+	}
 	return out
 }
 
@@ -181,6 +222,9 @@ func (c Config) validate() error {
 	}
 	if c.RuleUpdateInterval < 0 {
 		return errors.New("rule_update_interval must not be negative")
+	}
+	if c.HeartbeatInterval < 0 {
+		return errors.New("heartbeat_interval must not be negative")
 	}
 	if c.ProxyListen == "" {
 		return errors.New("proxy_listen must not be empty")

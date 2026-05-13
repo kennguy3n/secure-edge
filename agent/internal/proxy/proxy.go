@@ -4,15 +4,15 @@
 // system proxy settings (or a process-level env var) point HTTPS at
 // it. Behaviour per CONNECT target:
 //
-//	* Tier 2 hosts                  decrypt TLS, inspect request body
-//	                                with the same DLP pipeline the
-//	                                extension uses, return HTTP 451
-//	                                {"blocked":true,"pattern_name":...}
-//	                                if the pipeline blocks, otherwise
-//	                                forward upstream untouched.
-//	* All other hosts               pass-through CONNECT tunnel; bytes
-//	                                are forwarded verbatim and TLS is
-//	                                never terminated locally.
+//   - Tier 2 hosts                  decrypt TLS, inspect request body
+//     with the same DLP pipeline the
+//     extension uses, return HTTP 451
+//     {"blocked":true,"pattern_name":...}
+//     if the pipeline blocks, otherwise
+//     forward upstream untouched.
+//   - All other hosts               pass-through CONNECT tunnel; bytes
+//     are forwarded verbatim and TLS is
+//     never terminated locally.
 //
 // Privacy invariant: this package must never log request bodies,
 // URLs, hostnames, IP addresses, or matched DLP content. Only the

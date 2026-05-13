@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	_ "modernc.org/sqlite" // SQLite driver (pure Go, no CGO).
@@ -46,10 +47,11 @@ type CategoryPolicy struct {
 
 // AggregateStats is the singleton row in aggregate_stats.
 type AggregateStats struct {
-	DNSQueriesTotal int64 `json:"dns_queries_total"`
-	DNSBlocksTotal  int64 `json:"dns_blocks_total"`
-	DLPScansTotal   int64 `json:"dlp_scans_total"`
-	DLPBlocksTotal  int64 `json:"dlp_blocks_total"`
+	DNSQueriesTotal       int64 `json:"dns_queries_total"`
+	DNSBlocksTotal        int64 `json:"dns_blocks_total"`
+	DLPScansTotal         int64 `json:"dlp_scans_total"`
+	DLPBlocksTotal        int64 `json:"dlp_blocks_total"`
+	TamperDetectionsTotal int64 `json:"tamper_detections_total"`
 }
 
 // Store is the persistence handle. Methods are safe for concurrent use.
@@ -125,12 +127,13 @@ func (s *Store) migrate(ctx context.Context) error {
 			updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS aggregate_stats (
-			id                  INTEGER PRIMARY KEY CHECK (id = 1),
-			dns_queries_total   INTEGER NOT NULL DEFAULT 0,
-			dns_blocks_total    INTEGER NOT NULL DEFAULT 0,
-			dlp_scans_total     INTEGER NOT NULL DEFAULT 0,
-			dlp_blocks_total    INTEGER NOT NULL DEFAULT 0,
-			last_reset_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+			id                       INTEGER PRIMARY KEY CHECK (id = 1),
+			dns_queries_total        INTEGER NOT NULL DEFAULT 0,
+			dns_blocks_total         INTEGER NOT NULL DEFAULT 0,
+			dlp_scans_total          INTEGER NOT NULL DEFAULT 0,
+			dlp_blocks_total         INTEGER NOT NULL DEFAULT 0,
+			tamper_detections_total  INTEGER NOT NULL DEFAULT 0,
+			last_reset_at            DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS rule_versions (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,6 +157,16 @@ func (s *Store) migrate(ctx context.Context) error {
 	for _, q := range stmts {
 		if _, err := s.db.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("migrate: %w (stmt=%s)", err, q[:30])
+		}
+	}
+
+	// Additive migration: tamper_detections_total was introduced in
+	// Phase 5. Older installs don't have the column; ADD COLUMN is
+	// idempotent enough via the SQLite error sniff below.
+	if _, err := s.db.ExecContext(ctx,
+		`ALTER TABLE aggregate_stats ADD COLUMN tamper_detections_total INTEGER NOT NULL DEFAULT 0`); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("migrate: add tamper_detections_total: %w", err)
 		}
 	}
 	if _, err := s.db.ExecContext(ctx,
@@ -186,6 +199,13 @@ func (s *Store) seedDefaults(ctx context.Context) error {
 		{Category: "Phishing", Action: ActionDeny},
 		{Category: "Social", Action: ActionAllow},
 		{Category: "News", Action: ActionAllow},
+		// Admin override categories produced by rules.OverrideStore.
+		// Without these rows the engine's lookup map falls through to
+		// Deny (see policy/engine.go), so admin-allowed domains would
+		// be silently blocked. Keep these category strings in sync
+		// with rules.OverrideAllowCategory / OverrideBlockCategory.
+		{Category: "allow_admin", Action: ActionAllow},
+		{Category: "block_admin", Action: ActionDeny},
 	}
 	for _, p := range defaults {
 		if _, err := s.db.ExecContext(ctx,
@@ -242,9 +262,9 @@ func (s *Store) SetPolicy(ctx context.Context, category, action string) error {
 func (s *Store) GetStats(ctx context.Context) (AggregateStats, error) {
 	var st AggregateStats
 	err := s.db.QueryRowContext(ctx, `
-		SELECT dns_queries_total, dns_blocks_total, dlp_scans_total, dlp_blocks_total
+		SELECT dns_queries_total, dns_blocks_total, dlp_scans_total, dlp_blocks_total, tamper_detections_total
 		FROM aggregate_stats WHERE id = 1
-	`).Scan(&st.DNSQueriesTotal, &st.DNSBlocksTotal, &st.DLPScansTotal, &st.DLPBlocksTotal)
+	`).Scan(&st.DNSQueriesTotal, &st.DNSBlocksTotal, &st.DLPScansTotal, &st.DLPBlocksTotal, &st.TamperDetectionsTotal)
 	if err != nil {
 		return AggregateStats{}, fmt.Errorf("get stats: %w", err)
 	}
@@ -257,12 +277,13 @@ func (s *Store) AddStats(ctx context.Context, delta AggregateStats) error {
 	defer s.mu.Unlock()
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE aggregate_stats SET
-			dns_queries_total = dns_queries_total + ?,
-			dns_blocks_total  = dns_blocks_total  + ?,
-			dlp_scans_total   = dlp_scans_total   + ?,
-			dlp_blocks_total  = dlp_blocks_total  + ?
+			dns_queries_total        = dns_queries_total        + ?,
+			dns_blocks_total         = dns_blocks_total         + ?,
+			dlp_scans_total          = dlp_scans_total          + ?,
+			dlp_blocks_total         = dlp_blocks_total         + ?,
+			tamper_detections_total  = tamper_detections_total  + ?
 		WHERE id = 1
-	`, delta.DNSQueriesTotal, delta.DNSBlocksTotal, delta.DLPScansTotal, delta.DLPBlocksTotal)
+	`, delta.DNSQueriesTotal, delta.DNSBlocksTotal, delta.DLPScansTotal, delta.DLPBlocksTotal, delta.TamperDetectionsTotal)
 	if err != nil {
 		return fmt.Errorf("add stats: %w", err)
 	}
@@ -333,11 +354,12 @@ func (s *Store) SetDLPConfig(ctx context.Context, c DLPConfig) error {
 func (s *Store) ResetStats(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE aggregate_stats SET
-			dns_queries_total = 0,
-			dns_blocks_total  = 0,
-			dlp_scans_total   = 0,
-			dlp_blocks_total  = 0,
-			last_reset_at     = CURRENT_TIMESTAMP
+			dns_queries_total        = 0,
+			dns_blocks_total         = 0,
+			dlp_scans_total          = 0,
+			dlp_blocks_total         = 0,
+			tamper_detections_total  = 0,
+			last_reset_at            = CURRENT_TIMESTAMP
 		WHERE id = 1
 	`)
 	if err != nil {

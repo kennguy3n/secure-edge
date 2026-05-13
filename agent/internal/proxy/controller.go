@@ -3,8 +3,8 @@
 // /api/proxy/* endpoints depend on.
 //
 // The controller owns:
-//   * the on-disk CA paths (so it can generate / remove them)
-//   * the proxy.Server (started lazily on first Enable)
+//   - the on-disk CA paths (so it can generate / remove them)
+//   - the proxy.Server (started lazily on first Enable)
 //
 // It is safe for concurrent use; the mutex guards lifecycle state
 // transitions (Enable / Disable) only, not per-request hot paths.

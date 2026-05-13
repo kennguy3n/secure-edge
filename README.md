@@ -110,10 +110,14 @@ secure-edge/
 │   │   ├── config/                   # YAML configuration loader
 │   │   ├── dlp/                      # Layered DLP pipeline (Phase 2)
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
+│   │   ├── heartbeat/                # Optional outbound heartbeat (Phase 5)
 │   │   ├── policy/                   # Policy engine
-│   │   ├── rules/                    # Rule-file parser + lookup + updater (Phase 3)
+│   │   ├── profile/                  # Enterprise profile loader + lock (Phase 5)
+│   │   ├── proxy/                    # Selective MITM proxy (Phase 4)
+│   │   ├── rules/                    # Rule-file parser + lookup + updater + admin override (Phase 3/5)
 │   │   ├── stats/                    # Anonymous aggregate counters
-│   │   └── store/                    # SQLite (modernc.org/sqlite, WAL)
+│   │   ├── store/                    # SQLite (modernc.org/sqlite, WAL)
+│   │   └── tamper/                   # OS DNS/proxy tamper detector (Phase 5)
 │   ├── nfpm.yaml                     # .deb packaging
 │   ├── scripts/{post,pre}*.sh
 │   ├── go.mod / go.sum
@@ -179,6 +183,13 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 | POST   | `/api/proxy/enable`        | Generate the per-device CA if missing and start the local MITM proxy; returns `{ca_cert_path}` for OS trust install |
 | POST   | `/api/proxy/disable`       | Stop the local MITM proxy; pass `{"remove_ca": true}` to also delete the CA files |
 | GET    | `/api/proxy/status`        | `{running, ca_installed, listen_addr, dlp_scans_total, dlp_blocks_total}` |
+| GET    | `/api/profile`             | Current enterprise profile, or 404 if none is loaded |
+| POST   | `/api/profile/import`      | Import a profile from `{url}` or `{profile}` body and apply it; locks local policy edits when `managed=true` |
+| GET    | `/api/tamper/status`       | `{dns_ok, proxy_ok, last_check, detections_total}` from the tamper detector |
+| GET    | `/api/stats/export`        | Downloadable JSON envelope `{agent_version, os_type, os_arch, exported_at, stats}` |
+| GET    | `/api/rules/override`      | List the admin allow/block override sets |
+| POST   | `/api/rules/override`      | Add `{domain, list:"allow"\|"block"}` to the override store; moves between lists if needed |
+| DELETE | `/api/rules/override/:domain` | Remove an override regardless of list |
 
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
 
@@ -196,6 +207,37 @@ manifest with `extension/native-messaging/install.sh` (macOS/Linux) or
 so the Safari port uses the HTTP fallback exclusively; the agent's CORS
 allowlist accepts `chrome-extension://`, `moz-extension://`, and
 `safari-web-extension://` origins.
+
+## Enterprise Features (Phase 5)
+
+Optional features for managed deployments — every one of them
+honours the same privacy invariant as the base agent.
+
+- **Configuration profiles.** Set `profile_path` or `profile_url` in
+  `config.yaml`; the JSON profile (`name`, `version`, `managed`,
+  `categories`, `dlp`) is applied on startup. When `managed=true`,
+  `PUT /api/policies/:category` and `PUT /api/dlp/config` return
+  `403 Forbidden` and the Electron settings UI disables every input.
+- **Tamper detection.** Background goroutine (default 60s) checks
+  that OS DNS still points at the agent and, when the local MITM
+  proxy is enabled, that the system proxy still points at
+  `127.0.0.1:8443`. Transitions bump `tamper_detections_total` in
+  the existing `aggregate_stats` row; the tray surfaces an
+  ephemeral balloon — *no* per-event log on disk.
+- **Optional heartbeat.** Set `heartbeat_url` to enable. Payload is
+  exactly `{agent_version, os_type, os_arch, aggregate_counters}`
+  — no URL, domain, IP, or DLP-match data is ever serialised. Tests
+  in `agent/internal/heartbeat/heartbeat_test.go` assert this on
+  the JSON wire format.
+- **Admin overrides.** Drop files into `rules/local/` (allow.txt,
+  block.txt, dlp_patterns_override.json, dlp_exclusions_override.json)
+  to add company-specific rules without touching bundled files. The
+  Electron Settings page has an allow/block UI that writes through
+  `POST /api/rules/override` and DLP threshold sliders that hit
+  `PUT /api/dlp/config`.
+- **Stats export.** `GET /api/stats/export` returns the counter
+  snapshot with a `Content-Disposition: attachment` envelope —
+  counters only, no access data.
 
 ## Testing
 
@@ -220,6 +262,15 @@ DLP coverage includes one `*_test.go` per pipeline component
 real AWS keys with hotword context (block), the AWS docs example key
 `AKIAIOSFODNN7EXAMPLE` (exclude), benign prose (allow), empty content, and
 large content embedding a real-looking key.
+
+Phase 5 tests live alongside the new packages: `profile/`, `tamper/`,
+`heartbeat/`, and `rules/override_test.go` / `dlp/override_test.go`
+verify the loader-lock interaction, platform-isolated tamper probes
+(via build tags), the heartbeat payload shape (assertion: no access /
+domain / IP / DLP-match fields ever leak), and admin override
+merging without corrupting bundled rules. Performance benchmarks
+for the DLP pipeline, DNS resolver, and stats counter live in
+`*_bench_test.go` files — see [BENCHMARKS.md](./BENCHMARKS.md).
 
 ## Documentation
 

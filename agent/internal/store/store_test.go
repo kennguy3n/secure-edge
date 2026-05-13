@@ -64,6 +64,31 @@ func TestOpen_SchemaAndSeeds(t *testing.T) {
 	if len(pols) == 0 {
 		t.Fatal("expected default policies")
 	}
+
+	// Bug regression: rules/local/ admin overrides assign domains
+	// to the "allow_admin" and "block_admin" categories. Without
+	// matching category_policies rows the policy engine falls
+	// through to Deny, silently blocking admin-allowed domains.
+	// Keep these category strings in sync with
+	// rules.OverrideAllowCategory / OverrideBlockCategory.
+	wantCats := map[string]string{
+		"allow_admin": ActionAllow,
+		"block_admin": ActionDeny,
+	}
+	got := map[string]string{}
+	for _, p := range pols {
+		got[p.Category] = p.Action
+	}
+	for cat, wantAct := range wantCats {
+		gotAct, ok := got[cat]
+		if !ok {
+			t.Errorf("expected seeded admin category %q in category_policies", cat)
+			continue
+		}
+		if gotAct != wantAct {
+			t.Errorf("category %q action = %q, want %q", cat, gotAct, wantAct)
+		}
+	}
 }
 
 func TestSetPolicy(t *testing.T) {

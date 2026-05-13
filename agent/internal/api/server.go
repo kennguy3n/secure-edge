@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
@@ -114,13 +115,13 @@ type RuleUpdater interface {
 
 // ProxyStatus is the snapshot returned by GET /api/proxy/status.
 type ProxyStatus struct {
-	Running          bool   `json:"running"`
-	CAInstalled      bool   `json:"ca_installed"`
-	ProxyConfigured  bool   `json:"proxy_configured"`
-	ListenAddr       string `json:"listen_addr"`
-	CACertPath       string `json:"ca_cert_path,omitempty"`
-	DLPScansTotal    int64  `json:"dlp_scans_total"`
-	DLPBlocksTotal   int64  `json:"dlp_blocks_total"`
+	Running         bool   `json:"running"`
+	CAInstalled     bool   `json:"ca_installed"`
+	ProxyConfigured bool   `json:"proxy_configured"`
+	ListenAddr      string `json:"listen_addr"`
+	CACertPath      string `json:"ca_cert_path,omitempty"`
+	DLPScansTotal   int64  `json:"dlp_scans_total"`
+	DLPBlocksTotal  int64  `json:"dlp_blocks_total"`
 }
 
 // ProxyController is the subset of proxy.Server (and CA management)
@@ -132,16 +133,46 @@ type ProxyController interface {
 	Status() ProxyStatus
 }
 
+// TamperStatus is the body returned by GET /api/tamper/status. It
+// mirrors tamper.Status field-for-field so the wire format stays in
+// sync with the producer.
+type TamperStatus struct {
+	DNSOK           bool      `json:"dns_ok"`
+	ProxyOK         bool      `json:"proxy_ok"`
+	LastCheck       time.Time `json:"last_check"`
+	DetectionsTotal int64     `json:"detections_total"`
+}
+
+// TamperReporter is the subset of tamper.Detector the API needs.
+// Wired in SetTamperReporter; nil means the /api/tamper/* endpoints
+// return 503.
+type TamperReporter interface {
+	Status() TamperStatus
+}
+
+// RuleOverride is the subset of rules.OverrideStore the API needs.
+// Wired in SetRuleOverride; nil means the override endpoints return
+// 503.
+type RuleOverride interface {
+	Add(domain, list string) error
+	Remove(domain string) error
+	List() (allow, block []string)
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store       *store.Store
-	Policy      PolicyEngine
-	Stats       StatsView
-	DLP         DLPScanner
-	RuleUpdater RuleUpdater
-	Proxy       ProxyController
-	startedAt   time.Time
-	once        sync.Once
+	Store        *store.Store
+	Policy       PolicyEngine
+	Stats        StatsView
+	DLP          DLPScanner
+	RuleUpdater  RuleUpdater
+	Proxy        ProxyController
+	Profile      *profile.Holder
+	ProfileApply profile.PolicyStore
+	Tamper       TamperReporter
+	Rules        RuleOverride
+	startedAt    time.Time
+	once         sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -161,6 +192,22 @@ func (s *Server) SetRuleUpdater(u RuleUpdater) { s.RuleUpdater = u }
 // Phase 4 only; when nil the /api/proxy/* endpoints return 503.
 func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
 
+// SetProfile wires a profile holder into the server. When the
+// holder's current profile reports Managed=true, policy mutation
+// endpoints (PUT /api/policies/:category, PUT /api/dlp/config) return
+// 403 — the central deployment owns those knobs.
+func (s *Server) SetProfile(h *profile.Holder, ps profile.PolicyStore) {
+	s.Profile = h
+	s.ProfileApply = ps
+}
+
+// SetTamperReporter wires the tamper detector into the server.
+func (s *Server) SetTamperReporter(t TamperReporter) { s.Tamper = t }
+
+// SetRuleOverride wires the admin allow/block override store into
+// the server.
+func (s *Server) SetRuleOverride(o RuleOverride) { s.Rules = o }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -176,6 +223,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/proxy/enable", s.handleProxyEnable)
 	mux.HandleFunc("/api/proxy/disable", s.handleProxyDisable)
 	mux.HandleFunc("/api/proxy/status", s.handleProxyStatus)
+	mux.HandleFunc("/api/profile", s.handleProfileGet)
+	mux.HandleFunc("/api/profile/import", s.handleProfileImport)
+	mux.HandleFunc("/api/tamper/status", s.handleTamperStatus)
+	mux.HandleFunc("/api/stats/export", s.handleStatsExport)
+	mux.HandleFunc("/api/rules/override", s.handleRuleOverride)
+	mux.HandleFunc("/api/rules/override/", s.handleRuleOverrideItem)
 	return withCORS(mux)
 }
 
@@ -225,7 +278,7 @@ func withCORS(h http.Handler) http.Handler {
 			}
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		}
 

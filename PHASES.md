@@ -140,15 +140,15 @@ mechanism without requiring an agent binary update.
 **Covers:** Features for managed deployments.
 
 ### Deliverables
-- [ ] Configuration profiles: JSON-based policy profiles downloadable from server
-- [ ] Tamper detection: alert if DNS settings or proxy are changed externally (ephemeral notification only)
-- [ ] Agent health heartbeat to optional central server (sends ONLY: "agent alive, version X" — no access data)
-- [ ] Export aggregate stats as JSON (counters only, no access data)
-- [ ] Custom rule file support (admin adds company-specific domains)
-- [ ] Custom DLP patterns and exclusions via local override files
-- [ ] DLP scoring threshold tuning UI in Electron settings
-- [ ] Allowlist/blocklist override UI
-- [ ] Performance profiling and optimization pass
+- [x] Configuration profiles: JSON-based policy profiles downloadable from server
+- [x] Tamper detection: alert if DNS settings or proxy are changed externally (ephemeral notification only)
+- [x] Agent health heartbeat to optional central server (sends ONLY: "agent alive, version X" — no access data)
+- [x] Export aggregate stats as JSON (counters only, no access data)
+- [x] Custom rule file support (admin adds company-specific domains)
+- [x] Custom DLP patterns and exclusions via local override files
+- [x] DLP scoring threshold tuning UI in Electron settings
+- [x] Allowlist/blocklist override UI
+- [x] Performance profiling and optimization pass
 - [ ] Documentation: admin guide, user guide, rule contribution guide, DLP pattern authoring guide
 - [ ] Privacy audit: third-party review of zero-logging guarantees
 - [ ] DLP accuracy audit: measure false positive/negative rates against test corpus

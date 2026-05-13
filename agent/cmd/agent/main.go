@@ -17,11 +17,14 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/config"
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/dns"
+	"github.com/kennguy3n/secure-edge/agent/internal/heartbeat"
 	"github.com/kennguy3n/secure-edge/agent/internal/policy"
+	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/proxy"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
+	"github.com/kennguy3n/secure-edge/agent/internal/tamper"
 )
 
 // version is overridable at build time via -ldflags.
@@ -86,6 +89,7 @@ func runNativeMessaging(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	resolveLocalRulesDir(&cfg)
 	if cfg.DLPPatternsPath == "" {
 		return fmt.Errorf("native messaging requires dlp_patterns in config")
 	}
@@ -127,13 +131,13 @@ func runNativeMessaging(configPath string) error {
 		statsStore = s
 	}
 
-	patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+	patterns, err := dlp.MergePatternsFromDir(cfg.DLPPatternsPath, cfg.LocalRulesDir)
 	if err != nil {
 		return err
 	}
 	var exclusions []dlp.Exclusion
 	if cfg.DLPExclusionsPath != "" {
-		exclusions, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+		exclusions, err = dlp.MergeExclusionsFromDir(cfg.DLPExclusionsPath, cfg.LocalRulesDir)
 		if err != nil {
 			return err
 		}
@@ -149,6 +153,7 @@ func run(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	resolveLocalRulesDir(&cfg)
 
 	s, err := store.Open(cfg.DBPath)
 	if err != nil {
@@ -189,7 +194,13 @@ func run(configPath string) error {
 
 	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
 	// is configured. Phase 1 deployments leave both DLP paths blank and
-	// the /api/dlp/* endpoints return 503 service-unavailable.
+	// the /api/dlp/* endpoints return 503 service-unavailable. The
+	// pipeline is hoisted to function scope so the startup profile
+	// loader (below) can push its merged DLP thresholds and weights
+	// straight into the live pipeline — otherwise a profile imported
+	// at boot would persist to SQLite but only take effect after the
+	// next restart, silently diverging from GET /api/dlp/config.
+	var pipeline *dlp.Pipeline
 	if cfg.DLPPatternsPath != "" {
 		dlpCfg, err := s.GetDLPConfig(ctx)
 		if err != nil {
@@ -208,18 +219,18 @@ func run(configPath string) error {
 			ExclusionPenalty: dlpCfg.ExclusionPenalty,
 			MultiMatchBoost:  dlpCfg.MultiMatchBoost,
 		}
-		patterns, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+		patterns, err := dlp.MergePatternsFromDir(cfg.DLPPatternsPath, cfg.LocalRulesDir)
 		if err != nil {
 			return err
 		}
 		var exclusions []dlp.Exclusion
 		if cfg.DLPExclusionsPath != "" {
-			exclusions, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+			exclusions, err = dlp.MergeExclusionsFromDir(cfg.DLPExclusionsPath, cfg.LocalRulesDir)
 			if err != nil {
 				return err
 			}
 		}
-		pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+		pipeline = dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
 
@@ -285,13 +296,13 @@ func run(configPath string) error {
 					if err := engine.Reload(ctx); err != nil {
 						return err
 					}
-					p, err := dlp.LoadPatterns(cfg.DLPPatternsPath)
+					p, err := dlp.MergePatternsFromDir(cfg.DLPPatternsPath, cfg.LocalRulesDir)
 					if err != nil {
 						return err
 					}
 					var ex []dlp.Exclusion
 					if cfg.DLPExclusionsPath != "" {
-						ex, err = dlp.LoadExclusions(cfg.DLPExclusionsPath)
+						ex, err = dlp.MergeExclusionsFromDir(cfg.DLPExclusionsPath, cfg.LocalRulesDir)
 						if err != nil {
 							return err
 						}
@@ -306,6 +317,71 @@ func run(configPath string) error {
 			apiServer.SetRuleUpdater(updater)
 			go updater.Start(ctx)
 		}
+	}
+
+	// Phase 5: admin rule override store. An empty
+	// local_rules_dir disables overrides; otherwise the store always
+	// exposes both override files (empty placeholders are created
+	// on first run), and we register them with the policy engine
+	// here so a later POST/DELETE /api/rules/override Reload picks
+	// them up without requiring a restart.
+	overrideStore, err := rules.NewOverrideStore(cfg.LocalRulesDir)
+	if err != nil {
+		return fmt.Errorf("init override store: %w", err)
+	}
+	apiServer.SetRuleOverride(overrideStore)
+	if overrides := overrideStore.Sources(); len(overrides) > 0 {
+		engine.SetSources(append(append([]rules.RuleSource(nil), sources...), overrides...))
+		if err := engine.Reload(ctx); err != nil {
+			return fmt.Errorf("reload with overrides: %w", err)
+		}
+	}
+
+	// Phase 5: enterprise profile holder. Profiles arrive
+	// via /api/profile/import or are loaded eagerly from
+	// cfg.ProfilePath / cfg.ProfileURL on startup.
+	holder := profile.NewHolder(nil)
+	applyStore := &profileApplyAdapter{store: s}
+	apiServer.SetProfile(holder, applyStore)
+	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
+		fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
+	}
+
+	// Phase 5: tamper detector goroutine.
+	if cfg.DNSListen != "" {
+		expectedDNS, _ := splitHostPort(cfg.DNSListen)
+		// Only assert the system proxy is wired through us when the MITM
+		// proxy is actually enabled. Otherwise the detector would
+		// transition from its initialised ProxyOK=true to false on the
+		// first tick and increment tamper_detections_total on every
+		// agent startup that doesn't enable the proxy.
+		expectedProxy := ""
+		if cfg.ProxyEnabled {
+			expectedProxy = cfg.ProxyListen
+		}
+		detector := tamper.New(tamper.Options{
+			ExpectedDNSServer: expectedDNS,
+			ExpectedProxyAddr: expectedProxy,
+			Reporter:          counter,
+		})
+		apiServer.SetTamperReporter(tamperAdapter{detector: detector})
+		go detector.Start(ctx)
+	}
+
+	// Phase 5: optional heartbeat. URL=="" disables it.
+	hb, err := heartbeat.New(heartbeat.Options{
+		URL:          cfg.HeartbeatURL,
+		AgentVersion: version,
+		Interval:     cfg.HeartbeatInterval,
+		Stats:        counter,
+	})
+	if err != nil {
+		return fmt.Errorf("init heartbeat: %w", err)
+	}
+	if hb != nil {
+		go hb.Start(ctx, func(format string, args ...interface{}) {
+			fmt.Fprintf(os.Stderr, "agent: "+format+"\n", args...)
+		})
 	}
 
 	httpServer, err := apiServer.ListenAndServe(cfg.APIListen)
@@ -377,6 +453,24 @@ func validateRulesAlignment(rulesDir string, rulePaths []string, dlpPatternsPath
 	return nil
 }
 
+// resolveLocalRulesDir applies the documented "RulesDir/local"
+// fallback when local_rules_dir is blank, mirroring how callers
+// resolve RulesDir at use-site. Without this the override store
+// would receive an empty path and silently reject every Add/Remove
+// with "store disabled (no directory configured)", so the admin
+// override UI and POST /api/rules/override would 500 unless the
+// user had explicitly set local_rules_dir in config.yaml.
+func resolveLocalRulesDir(cfg *config.Config) {
+	if cfg.LocalRulesDir != "" {
+		return
+	}
+	base := cfg.RulesDir
+	if base == "" {
+		base = defaultRulesDir(cfg.RulePaths)
+	}
+	cfg.LocalRulesDir = filepath.Join(base, "local")
+}
+
 // defaultRulesDir derives the directory rule files live in when the
 // caller did not set RulesDir explicitly. Each RulePaths entry is
 // typically RulesDir/<category>.txt, so the parent of the first entry
@@ -437,19 +531,21 @@ func (a storeAdapter) GetStats(ctx context.Context) (stats.Snapshot, error) {
 		return stats.Snapshot{}, err
 	}
 	return stats.Snapshot{
-		DNSQueriesTotal: v.DNSQueriesTotal,
-		DNSBlocksTotal:  v.DNSBlocksTotal,
-		DLPScansTotal:   v.DLPScansTotal,
-		DLPBlocksTotal:  v.DLPBlocksTotal,
+		DNSQueriesTotal:       v.DNSQueriesTotal,
+		DNSBlocksTotal:        v.DNSBlocksTotal,
+		DLPScansTotal:         v.DLPScansTotal,
+		DLPBlocksTotal:        v.DLPBlocksTotal,
+		TamperDetectionsTotal: v.TamperDetectionsTotal,
 	}, nil
 }
 
 func (a storeAdapter) AddStats(ctx context.Context, delta stats.Snapshot) error {
 	return a.s.AddStats(ctx, store.AggregateStats{
-		DNSQueriesTotal: delta.DNSQueriesTotal,
-		DNSBlocksTotal:  delta.DNSBlocksTotal,
-		DLPScansTotal:   delta.DLPScansTotal,
-		DLPBlocksTotal:  delta.DLPBlocksTotal,
+		DNSQueriesTotal:       delta.DNSQueriesTotal,
+		DNSBlocksTotal:        delta.DNSBlocksTotal,
+		DLPScansTotal:         delta.DLPScansTotal,
+		DLPBlocksTotal:        delta.DLPBlocksTotal,
+		TamperDetectionsTotal: delta.TamperDetectionsTotal,
 	})
 }
 
@@ -545,3 +641,117 @@ func buildPinningSet(hosts []string) map[string]struct{} {
 }
 
 func (a storeAdapter) ResetStats(ctx context.Context) error { return a.s.ResetStats(ctx) }
+
+// profileApplyAdapter adapts *store.Store to profile.PolicyStore.
+// The interface uses profile.DLPConfigSnapshot for layering reasons —
+// profile/ cannot import store/ without an import cycle once the
+// store consumes the profile package.
+type profileApplyAdapter struct{ store *store.Store }
+
+func (a *profileApplyAdapter) SetPolicy(ctx context.Context, category, action string) error {
+	return a.store.SetPolicy(ctx, category, action)
+}
+
+func (a *profileApplyAdapter) GetDLPConfig(ctx context.Context) (profile.DLPConfigSnapshot, error) {
+	cfg, err := a.store.GetDLPConfig(ctx)
+	if err != nil {
+		return profile.DLPConfigSnapshot{}, err
+	}
+	return profile.DLPConfigSnapshot{
+		ThresholdCritical: cfg.ThresholdCritical,
+		ThresholdHigh:     cfg.ThresholdHigh,
+		ThresholdMedium:   cfg.ThresholdMedium,
+		ThresholdLow:      cfg.ThresholdLow,
+		HotwordBoost:      cfg.HotwordBoost,
+		EntropyBoost:      cfg.EntropyBoost,
+		EntropyPenalty:    cfg.EntropyPenalty,
+		ExclusionPenalty:  cfg.ExclusionPenalty,
+		MultiMatchBoost:   cfg.MultiMatchBoost,
+	}, nil
+}
+
+func (a *profileApplyAdapter) SetDLPConfig(ctx context.Context, c profile.DLPConfigSnapshot) error {
+	return a.store.SetDLPConfig(ctx, store.DLPConfig{
+		ThresholdCritical: c.ThresholdCritical,
+		ThresholdHigh:     c.ThresholdHigh,
+		ThresholdMedium:   c.ThresholdMedium,
+		ThresholdLow:      c.ThresholdLow,
+		HotwordBoost:      c.HotwordBoost,
+		EntropyBoost:      c.EntropyBoost,
+		EntropyPenalty:    c.EntropyPenalty,
+		ExclusionPenalty:  c.ExclusionPenalty,
+		MultiMatchBoost:   c.MultiMatchBoost,
+	})
+}
+
+// tamperAdapter bridges the *tamper.Detector to the api.TamperReporter
+// interface, mapping tamper.Status field-for-field to api.TamperStatus.
+type tamperAdapter struct{ detector *tamper.Detector }
+
+func (a tamperAdapter) Status() api.TamperStatus {
+	st := a.detector.Status()
+	return api.TamperStatus{
+		DNSOK:           st.DNSOK,
+		ProxyOK:         st.ProxyOK,
+		LastCheck:       st.LastCheck,
+		DetectionsTotal: st.DetectionsTotal,
+	}
+}
+
+// loadProfileOnStartup applies cfg.ProfilePath or cfg.ProfileURL if
+// either is set. ProfilePath takes precedence over ProfileURL when
+// both are configured (per the config.Config doc comment) — an
+// operator-supplied local file overrides any server-distributed
+// profile. Errors are propagated so the caller can decide whether to
+// fail the boot.
+func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Holder, ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) error {
+	var p *profile.Profile
+	var err error
+	switch {
+	case cfg.ProfilePath != "":
+		p, err = profile.LoadFromFile(cfg.ProfilePath)
+	case cfg.ProfileURL != "":
+		p, err = profile.LoadFromURL(ctx, nil, cfg.ProfileURL)
+	default:
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	opts := profile.ApplyOptions{PolicyStore: ps, Reloader: engine}
+	if pipeline != nil {
+		// Push the merged DLP snapshot into the live pipeline so a
+		// profile that ships stricter thresholds takes effect on
+		// the same boot, not the next one. Without this hook the
+		// pipeline keeps the values it was constructed with above.
+		opts.DLPSink = func(c profile.DLPConfigSnapshot) {
+			pipeline.Threshold().Set(dlp.Thresholds{
+				Critical: c.ThresholdCritical,
+				High:     c.ThresholdHigh,
+				Medium:   c.ThresholdMedium,
+				Low:      c.ThresholdLow,
+			})
+			pipeline.SetWeights(dlp.ScoreWeights{
+				HotwordBoost:     c.HotwordBoost,
+				EntropyBoost:     c.EntropyBoost,
+				EntropyPenalty:   c.EntropyPenalty,
+				ExclusionPenalty: c.ExclusionPenalty,
+				MultiMatchBoost:  c.MultiMatchBoost,
+			})
+		}
+	}
+	if err := p.Apply(ctx, opts); err != nil {
+		return err
+	}
+	return h.Set(p)
+}
+
+// splitHostPort returns the host portion of an addr like "127.0.0.1:53".
+// Falls back to addr unchanged when no port is present.
+func splitHostPort(addr string) (string, string) {
+	idx := strings.LastIndex(addr, ":")
+	if idx < 0 {
+		return addr, ""
+	}
+	return addr[:idx], addr[idx+1:]
+}

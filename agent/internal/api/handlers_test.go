@@ -324,6 +324,7 @@ func (f *fakeDLP) Scan(_ context.Context, _ string) dlp.ScanResult {
 }
 func (f *fakeDLP) Threshold() *dlp.ThresholdEngine { return f.thr }
 func (f *fakeDLP) SetWeights(w dlp.ScoreWeights)   { f.weights = w }
+func (f *fakeDLP) Patterns() []*dlp.Pattern        { return nil }
 
 func TestDLPScan_WithoutPipelineReturns503(t *testing.T) {
 	srv, _, _ := newTestServer(t)

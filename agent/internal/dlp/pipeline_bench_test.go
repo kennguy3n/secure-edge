@@ -85,3 +85,42 @@ func BenchmarkEntropy(b *testing.B) {
 		_ = ShannonEntropy(sample)
 	}
 }
+
+// BenchmarkPipelineScanLargeConcurrentEval mirrors
+// BenchmarkPipelineScanLarge but uses a content size that crosses the
+// ConcurrentEvalThreshold, so the worker-pool evaluator (Phase 6 Task
+// 10) is exercised. Compare against BenchmarkPipelineScanLarge to see
+// the speed-up of concurrent regex revalidation.
+func BenchmarkPipelineScanLargeConcurrentEval(b *testing.B) {
+	p := benchPipeline(b)
+	ctx := context.Background()
+	body := strings.Repeat("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ", 1900)
+	// Mix three pattern groups so the worker pool has work to fan out.
+	body += " key=AKIAIOSFODNN7EXAMPLE"
+	body += " token=sk_test_00BENCHFIXTURE00BENCHFIXTURE00"
+	body += " jwt=" + "eyJ" + "abcdEFGH.eyJabcdEFGH.SignatureTail0123"
+	body += " hash=" + strings.Repeat("a", 32)
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.SetBytes(int64(len(body)))
+	for i := 0; i < b.N; i++ {
+		_ = p.Scan(ctx, body)
+	}
+}
+
+// BenchmarkScanCache_Hit measures the fast path: identical content
+// already seen, so the cache returns immediately without re-running
+// the pipeline. Compare against BenchmarkPipelineScan to see the
+// per-paste cost saved on duplicate scans.
+func BenchmarkScanCache_Hit(b *testing.B) {
+	p := benchPipeline(b)
+	cache := NewScanCache(64, ScanCacheTTL)
+	p.EnableCache(cache)
+	ctx := context.Background()
+	_ = p.Scan(ctx, smallBenchContent) // warm
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = p.Scan(ctx, smallBenchContent)
+	}
+}

@@ -18,6 +18,17 @@ import {
     StatusResponse,
 } from "../shared.js";
 import { scanViaNativeMessaging } from "./native-messaging.js";
+import { startDynamicHostUpdater } from "./dynamic-hosts.js";
+
+// Boot the dynamic Tier-2 host updater. Polls /api/rules/status and
+// registers content scripts for any custom hosts the agent's rule
+// file adds at runtime — no extension reload needed (Phase 6 Task 12).
+try {
+    startDynamicHostUpdater();
+} catch {
+    // chrome.scripting may be unavailable in the test harness; the
+    // catch keeps service-worker boot quiet in that environment.
+}
 
 type IncomingMessage = PopupRequest | ScanRequest;
 type OutgoingReply = PopupReply | ScanReply;

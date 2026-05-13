@@ -17,7 +17,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "AWS Secret Access Key",
@@ -34,7 +35,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "cloud"
     },
     {
       "name": "AWS Session Token",
@@ -51,7 +53,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "cloud"
     },
     {
       "name": "AWS ARN",
@@ -69,7 +72,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "cloud"
     },
     {
       "name": "AWS MWS Key",
@@ -86,7 +90,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "cloud"
     },
     {
       "name": "Azure Storage Account Key",
@@ -106,7 +111,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 4.5
+      "entropy_min": 4.5,
+      "category": "cloud"
     },
     {
       "name": "Azure AD Client Secret",
@@ -126,7 +132,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Azure SAS Token",
@@ -147,7 +154,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Azure Connection String",
@@ -159,7 +167,8 @@
       "hotword_window": 0,
       "hotword_boost": 0,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "cloud"
     },
     {
       "name": "Azure DevOps PAT",
@@ -178,7 +187,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "cloud"
     },
     {
       "name": "Azure Subscription ID",
@@ -196,7 +206,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "cloud"
     },
     {
       "name": "GCP Service Account Key",
@@ -214,7 +225,8 @@
       "hotword_window": 500,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "cloud"
     },
     {
       "name": "GCP OAuth Client Secret",
@@ -232,7 +244,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Google API Key",
@@ -251,7 +264,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Firebase Cloud Messaging Server Key",
@@ -269,7 +283,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "cloud"
     },
     {
       "name": "GitHub Personal Access Token",
@@ -286,7 +301,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ci_cd"
     },
     {
       "name": "GitLab Personal Access Token",
@@ -303,7 +319,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ci_cd"
     },
     {
       "name": "Stripe Live Secret Key",
@@ -321,7 +338,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "database_registry"
     },
     {
       "name": "Stripe Restricted Key",
@@ -338,7 +356,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "payments"
     },
     {
       "name": "Twilio Account SID",
@@ -355,7 +374,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "messaging"
     },
     {
       "name": "Twilio API Key",
@@ -373,7 +393,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "messaging"
     },
     {
       "name": "SendGrid API Key",
@@ -391,7 +412,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "messaging"
     },
     {
       "name": "Mailchimp API Key",
@@ -409,7 +431,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "messaging"
     },
     {
       "name": "npm Token",
@@ -427,7 +450,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "package_manager"
     },
     {
       "name": "PyPI API Token",
@@ -444,7 +468,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "package_manager"
     },
     {
       "name": "Heroku API Key",
@@ -462,7 +487,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "infra_secret"
     },
     {
       "name": "JWT Token",
@@ -480,7 +506,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "auth"
     },
     {
       "name": "Database Connection String",
@@ -499,7 +526,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "Password Assignment",
@@ -518,7 +546,8 @@
       "hotword_window": 50,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "infra_secret"
     },
     {
       "name": "HashiCorp Vault Token",
@@ -535,7 +564,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "infra_secret"
     },
     {
       "name": "Datadog API Key",
@@ -552,7 +582,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "infra_secret"
     },
     {
       "name": "Slack Token",
@@ -569,7 +600,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "messaging"
     },
     {
       "name": "Private Key Block",
@@ -581,7 +613,8 @@
       "hotword_window": 0,
       "hotword_boost": 0,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "infra_secret"
     },
     {
       "name": "Generic API Key",
@@ -598,7 +631,8 @@
       "hotword_window": 50,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "infra_secret"
     },
     {
       "name": "Email Addresses (bulk)",
@@ -617,7 +651,8 @@
       "hotword_window": 500,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "pii"
     },
     {
       "name": "Phone Numbers (bulk, US)",
@@ -636,7 +671,8 @@
       "hotword_window": 500,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "pii"
     },
     {
       "name": "US Social Security Number",
@@ -654,7 +690,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "pii"
     },
     {
       "name": "Credit Card Number",
@@ -674,7 +711,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "pii"
     },
     {
       "name": "Source Code Imports",
@@ -692,7 +730,8 @@
       "hotword_window": 500,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "code_secret"
     },
     {
       "name": "Internal URLs",
@@ -712,7 +751,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "infra_secret"
     },
     {
       "name": "Maven Settings Password",
@@ -732,7 +772,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "package_manager"
     },
     {
       "name": "Gradle Repository Credentials",
@@ -751,7 +792,8 @@
       "hotword_window": 500,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "package_manager"
     },
     {
       "name": "JDBC PostgreSQL URL with Password",
@@ -769,7 +811,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "JDBC MySQL URL with Password",
@@ -787,7 +830,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "JDBC Oracle URL with Password",
@@ -804,7 +848,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "JDBC SQL Server URL with Password",
@@ -821,7 +866,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "Spring Datasource Password",
@@ -839,7 +885,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "code_secret"
     },
     {
       "name": "Spring OAuth2 Client Secret",
@@ -856,7 +903,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Java Keystore Password",
@@ -876,7 +924,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "code_secret"
     },
     {
       "name": "AWS Java SDK BasicAWSCredentials",
@@ -893,7 +942,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Cargo Registry Token",
@@ -910,7 +960,8 @@
       "hotword_window": 800,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "package_manager"
     },
     {
       "name": "Crates.io API Token",
@@ -928,7 +979,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "package_manager"
     },
     {
       "name": "Rocket.toml Secret Key",
@@ -945,7 +997,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "database_registry"
     },
     {
       "name": "Firebase Web Config apiKey",
@@ -964,7 +1017,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "React App Environment Secret",
@@ -981,7 +1035,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Next.js Public Environment Secret",
@@ -999,7 +1054,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Vite Environment Secret",
@@ -1016,7 +1072,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Angular Environment Secret",
@@ -1032,7 +1089,8 @@
       "hotword_window": 500,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Webpack DefinePlugin Secret",
@@ -1048,7 +1106,8 @@
       "hotword_window": 600,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Tauri Signing Private Key",
@@ -1065,7 +1124,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Electron Forge Publish Token",
@@ -1082,7 +1142,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Electron Builder Publish Credentials",
@@ -1099,7 +1160,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "OpenAI Project API Key",
@@ -1116,7 +1178,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "OpenAI Service Account Key",
@@ -1132,7 +1195,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "OpenAI User API Key",
@@ -1149,7 +1213,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Anthropic API Key",
@@ -1165,7 +1230,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "HuggingFace Access Token",
@@ -1182,7 +1248,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Cohere API Key",
@@ -1197,7 +1264,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Replicate API Token",
@@ -1213,7 +1281,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Pinecone API Key",
@@ -1230,7 +1299,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "ai_ml"
     },
     {
       "name": "Mistral API Key",
@@ -1246,7 +1316,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Weights and Biases API Key",
@@ -1264,7 +1335,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ai_ml"
     },
     {
       "name": "LangSmith API Key",
@@ -1280,7 +1352,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Together AI API Key",
@@ -1296,7 +1369,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ai_ml"
     },
     {
       "name": "Groq API Key",
@@ -1311,7 +1385,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "ai_ml"
     },
     {
       "name": "Apple App Store Connect API Key ID",
@@ -1330,7 +1405,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Apple Developer Team ID",
@@ -1349,7 +1425,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Cocoapods Trunk Token",
@@ -1366,7 +1443,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Xcode Cloud Secret",
@@ -1383,7 +1461,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Apple APNs Auth Key Filename",
@@ -1401,7 +1480,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Google Services JSON API Key",
@@ -1419,7 +1499,8 @@
       "hotword_window": 500,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Android Signing Store Password",
@@ -1437,7 +1518,8 @@
       "hotword_window": 400,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Play Console Service Account JSON",
@@ -1454,7 +1536,8 @@
       "hotword_window": 1000,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Firebase App Distribution Token",
@@ -1471,7 +1554,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Android Maps API Key in local.properties",
@@ -1488,7 +1572,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Expo Access Token",
@@ -1505,7 +1590,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "React Native CodePush Deployment Key",
@@ -1522,7 +1608,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "Fastlane Match Password",
@@ -1539,7 +1626,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "mobile_desktop"
     },
     {
       "name": "EAS Build Secret",
@@ -1556,7 +1644,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
     },
     {
       "name": "Flutter Dart Environment Secret",
@@ -1573,7 +1662,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "mobile_desktop"
     },
     {
       "name": "MongoDB Atlas SRV Connection",
@@ -1590,7 +1680,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "MSSQL Connection String with Password",
@@ -1607,7 +1698,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "Redis URL with Password",
@@ -1625,7 +1717,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "database_registry"
     },
     {
       "name": "SQLite PRAGMA Encryption Key",
@@ -1642,7 +1735,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "database_registry"
     },
     {
       "name": "Cassandra Auth Provider Credentials",
@@ -1659,7 +1753,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "database_registry"
     },
     {
       "name": "Elasticsearch URL with Credentials",
@@ -1677,7 +1772,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "database_registry"
     },
     {
       "name": "Terraform State Sensitive Value",
@@ -1694,7 +1790,8 @@
       "hotword_window": 500,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "cloud"
     },
     {
       "name": "Kubernetes Secret YAML",
@@ -1713,7 +1810,8 @@
       "hotword_window": 1000,
       "hotword_boost": 1,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Docker Registry Auth",
@@ -1731,7 +1829,8 @@
       "hotword_window": 500,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Helm Values Password",
@@ -1748,7 +1847,8 @@
       "hotword_window": 400,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 2.5
+      "entropy_min": 2.5,
+      "category": "database_registry"
     },
     {
       "name": "Pulumi Stack Config Secret",
@@ -1765,7 +1865,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "cloud"
     },
     {
       "name": "Cloudflare API Token",
@@ -1782,7 +1883,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "DigitalOcean Personal Access Token",
@@ -1799,7 +1901,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "DigitalOcean OAuth Token",
@@ -1814,7 +1917,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Vercel Token",
@@ -1831,7 +1935,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "cloud"
     },
     {
       "name": "Netlify Personal Access Token",
@@ -1847,7 +1952,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "Supabase Service Role Key",
@@ -1863,7 +1969,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "cloud"
     },
     {
       "name": "CircleCI Personal Token",
@@ -1879,7 +1986,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "ci_cd"
     },
     {
       "name": "Travis CI Token",
@@ -1895,7 +2003,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ci_cd"
     },
     {
       "name": "Bitbucket App Password",
@@ -1911,7 +2020,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "ci_cd"
     },
     {
       "name": "Bitbucket Server Token (BBDC)",
@@ -1927,7 +2037,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ci_cd"
     },
     {
       "name": "Jenkins API Token",
@@ -1943,7 +2054,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "ci_cd"
     },
     {
       "name": "GitLab CI Pipeline Trigger Token",
@@ -1959,7 +2071,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "ci_cd"
     },
     {
       "name": "Discord Bot Token",
@@ -1975,7 +2088,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "messaging"
     },
     {
       "name": "Discord Webhook URL",
@@ -1990,7 +2104,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "messaging"
     },
     {
       "name": "Telegram Bot Token",
@@ -2007,7 +2122,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "messaging"
     },
     {
       "name": "Vonage Nexmo API Secret",
@@ -2023,7 +2139,8 @@
       "hotword_window": 200,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "PayPal Client Secret",
@@ -2040,7 +2157,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "database_registry"
     },
     {
       "name": "Square Access Token",
@@ -2056,7 +2174,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "payments"
     },
     {
       "name": "Square OAuth Secret",
@@ -2072,7 +2191,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "database_registry"
     },
     {
       "name": "Braintree Access Token",
@@ -2087,7 +2207,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "payments"
     },
     {
       "name": "Adyen API Key",
@@ -2103,7 +2224,8 @@
       "hotword_window": 400,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "payments"
     },
     {
       "name": "Plaid Client Secret",
@@ -2120,7 +2242,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "database_registry"
     },
     {
       "name": "Coinbase Commerce API Key",
@@ -2136,7 +2259,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "payments"
     },
     {
       "name": "Auth0 Client Secret",
@@ -2152,7 +2276,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "database_registry"
     },
     {
       "name": "Okta API Token",
@@ -2170,7 +2295,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "auth"
     },
     {
       "name": "OneLogin API Credentials",
@@ -2186,7 +2312,8 @@
       "hotword_window": 300,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "auth"
     },
     {
       "name": "Keycloak Client Secret",
@@ -2203,7 +2330,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": false,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "database_registry"
     },
     {
       "name": "Firebase Admin SDK Private Key",
@@ -2219,7 +2347,8 @@
       "hotword_window": 1000,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 0
+      "entropy_min": 0,
+      "category": "cloud"
     },
     {
       "name": "Supabase JWT Secret",
@@ -2235,7 +2364,8 @@
       "hotword_window": 200,
       "hotword_boost": 1,
       "require_hotword": false,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "cloud"
     },
     {
       "name": "Clerk Secret Key",
@@ -2251,7 +2381,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "database_registry"
     },
     {
       "name": "Clerk Publishable Key",
@@ -2267,7 +2398,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 4.0
+      "entropy_min": 4.0,
+      "category": "auth"
     },
     {
       "name": "Java Password Literal",
@@ -2285,7 +2417,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Rust Password Literal",
@@ -2304,7 +2437,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Go Password Literal",
@@ -2321,7 +2455,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Swift Password Literal",
@@ -2339,7 +2474,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Kotlin Password Literal",
@@ -2357,7 +2493,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Dart Password Literal",
@@ -2375,7 +2512,8 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.0
+      "entropy_min": 3.0,
+      "category": "code_secret"
     },
     {
       "name": "Python Secret Key Literal",
@@ -2394,7 +2532,447 @@
       "hotword_window": 300,
       "hotword_boost": 2,
       "require_hotword": true,
-      "entropy_min": 3.5
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Terraform Cloud API Token",
+      "regex": "(?i)[A-Za-z0-9]{12,32}\\.atlasv1\\.[A-Za-z0-9]{40,}",
+      "prefix": ".atlasv1.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "terraform",
+        "tfe",
+        "atlas",
+        "tfc",
+        "TFE_TOKEN",
+        "TF_TOKEN",
+        "TF_CLI_CONFIG",
+        "credentials"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Spacelift API Key",
+      "regex": "(?i)SPACELIFT_API_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{40,}",
+      "prefix": "SPACELIFT_API_KEY",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "spacelift",
+        "stack",
+        "SPACELIFT_API_KEY_ID",
+        "SPACELIFT_API_KEY_ENDPOINT"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "env0 API Key",
+      "regex": "(?i)ENV0_API_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{32,}",
+      "prefix": "ENV0_API_KEY",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "env0",
+        "ENV0_API_KEY_ID",
+        "environment",
+        "deployment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Scalr API Token",
+      "regex": "(?i)(?:SCALR_TOKEN|scalr_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{40,}",
+      "prefix": "SCALR_TOKEN",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "scalr",
+        "workspace",
+        "environment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Harbor Robot Token",
+      "regex": "(?i)robot\\$[A-Za-z0-9_+\\-.]{3,64}\\s*[:=]\\s*['\\\"]?[A-Za-z0-9./_\\-]{30,}",
+      "prefix": "robot$",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "harbor",
+        "registry",
+        "docker",
+        "goharbor"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "Quay.io Encrypted Password",
+      "regex": "(?i)(?:QUAY_TOKEN|QUAY_PASSWORD|QUAY_DOCKER_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{30,}",
+      "prefix": "QUAY_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "quay",
+        "quay.io",
+        "registry",
+        "docker",
+        "redhat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "database_registry"
+    },
+    {
+      "name": "AWS ECR Login Token",
+      "regex": "(?i)(?:ECR_PASSWORD|ECR_LOGIN_PASSWORD|ecr_get_login_password)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{200,}",
+      "prefix": "ECR_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ecr",
+        "aws",
+        "docker",
+        "dkr.ecr",
+        "amazonaws.com"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "database_registry"
+    },
+    {
+      "name": "GCR JSON Key Paste",
+      "regex": "(?s)\\\"type\\\"\\s*:\\s*\\\"service_account\\\".{0,1000}\\\"(?:gcr\\.io|pkg\\.dev)\\\"",
+      "prefix": "service_account",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gcr",
+        "gcr.io",
+        "pkg.dev",
+        "google",
+        "docker"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "database_registry"
+    },
+    {
+      "name": "AWS Secrets Manager SecretString Paste",
+      "regex": "(?s)\"SecretString\"\\s*:\\s*\"(?:\\\\.|[^\"])*[A-Za-z0-9+/=._\\-]{16,}",
+      "prefix": "\"SecretString\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "secretsmanager",
+        "GetSecretValue",
+        "aws",
+        "SecretId",
+        "VersionId"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure Key Vault GetSecret Paste",
+      "regex": "(?i)\\\"id\\\"\\s*:\\s*\\\"https://[a-z0-9\\-]+\\.vault\\.azure\\.net/secrets/[A-Za-z0-9\\-]+/[a-f0-9]{32}\\\"",
+      "prefix": "vault.azure.net/secrets/",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "keyvault",
+        "azure",
+        "vault",
+        "GetSecret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "cloud"
+    },
+    {
+      "name": "GCP Secret Manager Payload Paste",
+      "regex": "(?s)\\\"payload\\\"\\s*:\\s*\\{\\s*\\\"data\\\"\\s*:\\s*\\\"[A-Za-z0-9+/=]{16,}\\\"",
+      "prefix": "\"payload\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "secretmanager",
+        "google",
+        "gcloud",
+        "AccessSecretVersion",
+        "projects/"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "OAuth2 Refresh Token Assignment",
+      "regex": "(?i)refresh_token\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-/+=]{40,}",
+      "prefix": "refresh_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oauth",
+        "oidc",
+        "token",
+        "grant_type"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "auth"
+    },
+    {
+      "name": "OIDC ID Token Assignment",
+      "regex": "(?i)id_token\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "id_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oidc",
+        "openid",
+        "iss",
+        "aud",
+        "sub"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Auth0 Management API Token",
+      "regex": "(?i)(?:AUTH0_MGMT_TOKEN|AUTH0_MANAGEMENT_TOKEN|management_api_token)\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "AUTH0_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "auth0",
+        "management",
+        "AUTH0_DOMAIN",
+        "audience"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Keycloak Admin Token",
+      "regex": "(?i)(?:KEYCLOAK_TOKEN|KC_TOKEN|admin_cli_token)\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "KEYCLOAK_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "keycloak",
+        "admin-cli",
+        "realm",
+        "openid-connect"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "auth"
+    },
+    {
+      "name": "Ansible Vault Block",
+      "regex": "\\$ANSIBLE_VAULT;[0-9.]+;AES256",
+      "prefix": "$ANSIBLE_VAULT",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ansible",
+        "vault",
+        "playbook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0,
+      "category": "iac"
+    },
+    {
+      "name": "Puppet Hiera eyaml Block",
+      "regex": "ENC\\[PKCS7,[A-Za-z0-9+/=\\s]{40,}\\]",
+      "prefix": "ENC[PKCS7",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "puppet",
+        "hiera",
+        "eyaml",
+        "pkcs7"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "iac"
+    },
+    {
+      "name": "Chef Encrypted Data Bag",
+      "regex": "(?s)\\\"cipher\\\"\\s*:\\s*\\\"aes-256-cbc\\\".{0,200}\\\"encrypted_data\\\"\\s*:\\s*\\\"[A-Za-z0-9+/=]{40,}",
+      "prefix": "\"cipher\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "chef",
+        "data_bag",
+        "encrypted_data",
+        "aes-256-cbc",
+        "iv"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "iac"
+    },
+    {
+      "name": "RubyGems API Key",
+      "regex": "rubygems_[a-f0-9]{48}",
+      "prefix": "rubygems_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rubygems",
+        "gem",
+        "credentials"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "Composer Packagist Token",
+      "regex": "(?i)(?:packagist[._-]?token|composer[._-]?auth[._-]?token)[\"\\']?\\s*[:=]\\s*[\"\\']?[A-Za-z0-9]{40,}",
+      "prefix": "packagist",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "composer",
+        "packagist",
+        "auth.json",
+        "http-basic"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "NuGet API Key",
+      "regex": "oy2[a-z2-7]{43}",
+      "prefix": "oy2",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "nuget",
+        "nuget.org",
+        "dotnet",
+        "apikey"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "package_manager"
+    },
+    {
+      "name": "Hex.pm API Key",
+      "regex": "(?i)(?:HEX_API_KEY|HEX_AUTH_KEY|hex[._-]?api[._-]?key)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{40,}",
+      "prefix": "HEX_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hex.pm",
+        "elixir",
+        "erlang",
+        "mix"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "package_manager"
+    },
+    {
+      "name": "Pub.dev OAuth Refresh Token",
+      "regex": "(?i)(?:PUB_DEV_TOKEN|pub-credentials|pub\\.dev[._-]?token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-/+=]{40,}",
+      "prefix": "PUB_DEV_TOKEN",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pub.dev",
+        "dart",
+        "flutter",
+        "pubspec"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "package_manager"
+    },
+    {
+      "name": "CocoaPods Trunk Session Cookie",
+      "regex": "(?i)_pods_session\\s*=\\s*[A-Za-z0-9._%\\-+/=]{20,}",
+      "prefix": "_pods_session",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cocoapods",
+        "trunk",
+        "pod"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "package_manager"
     }
   ]
 }

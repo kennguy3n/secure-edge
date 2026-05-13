@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { agent, AgentStatus, Stats } from '../api/agent';
 import { StatsCard } from '../components/StatsCard';
 
@@ -9,11 +9,25 @@ interface Snapshot {
   error?: string;
 }
 
+// NotificationEntry is the in-memory block-notification record.
+// Kept ephemeral on purpose (Phase 6 Task 22): nothing persists,
+// nothing reaches localStorage / SQLite, and the list is cleared the
+// moment the renderer process exits.
+interface NotificationEntry {
+  id: number;
+  at: string; // ISO timestamp, formatted for display only
+  delta: number; // dlp_blocks_total increment observed in this poll
+}
+
 const empty: Snapshot = { status: null, stats: null, reachable: false };
+const NOTIFICATION_CAP = 10;
 
 export function Status() {
   const [snap, setSnap] = useState<Snapshot>(empty);
   const [resetting, setResetting] = useState(false);
+  const [notifs, setNotifs] = useState<NotificationEntry[]>([]);
+  const seqRef = useRef(0);
+  const lastBlocksRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -21,6 +35,24 @@ export function Status() {
         agent.getStatus(),
         agent.getStats(),
       ]);
+      // Diff the DLP block counter against the last observation so a
+      // bump becomes a single in-memory notification entry. We use
+      // a Ref instead of derived state so concurrent polls don't
+      // accidentally double-count.
+      const current = stats.dlp_blocks_total;
+      const previous = lastBlocksRef.current;
+      lastBlocksRef.current = current;
+      if (previous !== null && current > previous) {
+        const delta = current - previous;
+        setNotifs((prev) => {
+          const next: NotificationEntry = {
+            id: ++seqRef.current,
+            at: new Date().toLocaleTimeString(),
+            delta,
+          };
+          return [next, ...prev].slice(0, NOTIFICATION_CAP);
+        });
+      }
       setSnap({ status, stats, reachable: true });
     } catch (err) {
       setSnap((prev) => ({ ...prev, reachable: false, error: String(err) }));
@@ -75,6 +107,27 @@ export function Status() {
       >
         {resetting ? 'Resetting…' : 'Reset Counters'}
       </button>
+
+      <h3 style={{ marginTop: 24 }}>Recent blocks</h3>
+      <p className="page-hint">
+        Last {NOTIFICATION_CAP} DLP blocks observed in this session. The list is held
+        in memory only — it disappears when this window closes and is
+        never written to disk.
+      </p>
+      {notifs.length === 0 ? (
+        <p className="page-hint">No blocks observed since the app started.</p>
+      ) : (
+        <ul className="category-list" aria-label="Recent DLP block events">
+          {notifs.map((n) => (
+            <li key={n.id} className="category-row">
+              <span className="category-name">
+                {n.delta} block{n.delta === 1 ? '' : 's'}
+              </span>
+              <span className="page-hint">{n.at}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

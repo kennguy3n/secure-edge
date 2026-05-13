@@ -466,6 +466,46 @@ file + rename writes so a crash mid-write cannot corrupt the list.
 Bundled rule files are never mutated; the merge happens in memory at
 load time.
 
+### 3f. Agent Self-Update (Phase 6)
+
+```
+agent/internal/updater/self.go      # Self.CheckLatest, Self.DownloadAndStage
+agent/internal/updater/self_test.go # SHA-256 + Ed25519 verification under httptest
+```
+
+The self-updater is opt-in: it remains inert unless both
+`agent_update_manifest_url` and `agent_update_public_key` (a
+hex-encoded Ed25519 public key) are set in `config.yaml`. When wired,
+the updater polls a release manifest, verifies the SHA-256 hash of
+the downloaded binary, then verifies the Ed25519 signature over the
+hash, and only then stages the binary for the next agent restart. A
+verification failure aborts the update; no partial binary is ever
+written to the live install path.
+
+### 3g. Rate Limiter (Phase 6)
+
+```
+agent/internal/api/ratelimit.go        # token-bucket middleware
+```
+
+A token-bucket middleware sits in front of `/api/dlp/scan`. Defaults
+are 100 req/s with a burst of 100, configurable via
+`dlp_rate_limit_per_sec` in `config.yaml`. The bucket is shared
+across all callers — the goal is to protect the agent from a
+misbehaving extension, not to enforce per-tab fairness.
+
+### 3h. Scan-Result Cache (Phase 6)
+
+```
+agent/internal/dlp/cache.go        # ScanCache: TTL-bounded LRU
+```
+
+A short-lived (5 s by default) LRU cache deduplicates identical
+content hashes inside `Pipeline.Scan`. The cache keys on a SHA-256
+of the content and stores only the resulting `ScanResult`. Raw
+content is *never* held in the cache. The cache is bounded by entry
+count and TTL; it does not persist to disk.
+
 ### 4. Electron Tray Application
 
 Minimal Electron shell for system tray presence and settings UI.

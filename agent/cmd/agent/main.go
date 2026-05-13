@@ -4,8 +4,11 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -25,6 +28,7 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 	"github.com/kennguy3n/secure-edge/agent/internal/tamper"
+	"github.com/kennguy3n/secure-edge/agent/internal/updater"
 )
 
 // version is overridable at build time via -ldflags.
@@ -143,9 +147,38 @@ func runNativeMessaging(configPath string) error {
 		}
 	}
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+	applyDLPRuntimeConfig(pipeline, cfg)
 	pipeline.Rebuild(patterns, exclusions)
 
 	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+}
+
+// applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
+// loaded YAML config into the pipeline. Called from both daemon and
+// native-messaging paths so each transport observes the same defaults.
+//
+// The four DLP int fields all distinguish "omitted" (keep default)
+// from "explicit 0" (disable / opt out) at the config layer; we
+// preserve that distinction here so the documented semantics hold
+// end-to-end.
+func applyDLPRuntimeConfig(p *dlp.Pipeline, cfg config.Config) {
+	switch {
+	case cfg.LargeContentThreshold > 0:
+		p.SetLargeContentThreshold(cfg.LargeContentThreshold)
+	case cfg.LargeContentThreshold == 0:
+		// Explicit 0 → disable adaptive scanning. The pipeline
+		// has no native "never trigger" flag, so pass a ceiling
+		// that no realistic payload will exceed.
+		p.SetLargeContentThreshold(math.MaxInt)
+	}
+	if len(cfg.DLPDisabledCategories) > 0 {
+		p.SetDisabledCategories(cfg.DLPDisabledCategories)
+	}
+	if cfg.DLPCacheTTLSeconds > 0 {
+		ttl := time.Duration(cfg.DLPCacheTTLSeconds) * time.Second
+		p.EnableCache(dlp.NewScanCache(cfg.DLPCacheCapacity, ttl))
+	}
+	// cfg.DLPCacheTTLSeconds == 0 → leave the pipeline cacheless.
 }
 
 func run(configPath string) error {
@@ -192,6 +225,38 @@ func run(configPath string) error {
 
 	apiServer := api.NewServer(s, engine, counter)
 
+	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).
+	// Explicit 0 disables the limiter entirely so operators can opt
+	// out for synthetic load tests; the config loader already
+	// rejects negative values.
+	if cfg.DLPRateLimitPerSec > 0 {
+		apiServer.SetScanRateLimit(float64(cfg.DLPRateLimitPerSec), cfg.DLPRateLimitPerSec)
+	} else {
+		apiServer.SetScanRateLimit(0, 1)
+	}
+
+	// Expose rule-file mtimes through /api/status (Phase 6 Task 17).
+	// Missing files are tolerated by collectRuleFileInfo on the server
+	// side, so we can pass the configured paths unfiltered.
+	apiServer.SetRuleFiles(ruleFilesForStatus(cfg))
+
+	// Optional self-updater (Phase 6 Task 15). Builds without a
+	// manifest URL or a valid Ed25519 public key omit the updater
+	// entirely, and /api/agent/update* return 503.
+	if cfg.AgentUpdateManifestURL != "" && cfg.AgentUpdatePublicKey != "" {
+		pubBytes, err := hex.DecodeString(cfg.AgentUpdatePublicKey)
+		if err == nil && len(pubBytes) == ed25519.PublicKeySize {
+			self, err := updater.New(updater.Options{
+				ManifestURL: cfg.AgentUpdateManifestURL,
+				Current:     version,
+				PublicKey:   ed25519.PublicKey(pubBytes),
+			})
+			if err == nil {
+				apiServer.SetAgentUpdater(agentUpdaterAdapter{self: self})
+			}
+		}
+	}
+
 	// Optional DLP pipeline: only stand it up when rules/dlp_patterns.json
 	// is configured. Phase 1 deployments leave both DLP paths blank and
 	// the /api/dlp/* endpoints return 503 service-unavailable. The
@@ -231,6 +296,7 @@ func run(configPath string) error {
 			}
 		}
 		pipeline = dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+		applyDLPRuntimeConfig(pipeline, cfg)
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
 
@@ -754,4 +820,49 @@ func splitHostPort(addr string) (string, string) {
 		return addr, ""
 	}
 	return addr[:idx], addr[idx+1:]
+}
+
+// ruleFilesForStatus returns the rule file paths that should be
+// reported through GET /api/status's rules[] section. Best-effort:
+// the API server silently skips missing entries.
+func ruleFilesForStatus(cfg config.Config) []string {
+	paths := append([]string{}, cfg.RulePaths...)
+	if cfg.DLPPatternsPath != "" {
+		paths = append(paths, cfg.DLPPatternsPath)
+	}
+	if cfg.DLPExclusionsPath != "" {
+		paths = append(paths, cfg.DLPExclusionsPath)
+	}
+	return paths
+}
+
+// agentUpdaterAdapter bridges *updater.Self to api.AgentSelfUpdater so
+// the API handlers can return their own wire types without importing
+// the updater package (which would create a cycle if updater ever
+// needed to import api).
+type agentUpdaterAdapter struct{ self *updater.Self }
+
+func (a agentUpdaterAdapter) CheckLatest(ctx context.Context) (api.AgentUpdateCheck, error) {
+	r, err := a.self.CheckLatest(ctx)
+	if err != nil {
+		return api.AgentUpdateCheck{}, err
+	}
+	return api.AgentUpdateCheck{
+		Latest:          r.Latest,
+		Current:         r.Current,
+		UpdateAvailable: r.UpdateAvailable,
+		DownloadURL:     r.DownloadURL,
+	}, nil
+}
+
+func (a agentUpdaterAdapter) DownloadAndStage(ctx context.Context) (api.AgentUpdateStage, error) {
+	r, err := a.self.DownloadAndStage(ctx)
+	if err != nil {
+		return api.AgentUpdateStage{}, err
+	}
+	return api.AgentUpdateStage{
+		Version:   r.Version,
+		StagedAt:  r.StagedAt,
+		BytesSize: r.BytesSize,
+	}, nil
 }

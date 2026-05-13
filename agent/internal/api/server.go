@@ -103,6 +103,7 @@ type DLPScanner interface {
 	Scan(ctx context.Context, content string) dlp.ScanResult
 	Threshold() *dlp.ThresholdEngine
 	SetWeights(w dlp.ScoreWeights)
+	Patterns() []*dlp.Pattern
 }
 
 // RuleUpdater is the subset of rules.Updater the API needs. Wired in
@@ -159,6 +160,32 @@ type RuleOverride interface {
 	List() (allow, block []string)
 }
 
+// AgentUpdateCheck is the wire shape returned by the agent-update
+// check endpoint. Mirrors updater.CheckResult so a separate import is
+// not required from this package.
+type AgentUpdateCheck struct {
+	Latest          string `json:"latest"`
+	Current         string `json:"current"`
+	UpdateAvailable bool   `json:"update_available"`
+	DownloadURL     string `json:"download_url,omitempty"`
+}
+
+// AgentUpdateStage is the wire shape returned by the agent-update
+// download endpoint.
+type AgentUpdateStage struct {
+	Version   string `json:"version"`
+	StagedAt  string `json:"staged_at"`
+	BytesSize int64  `json:"bytes_size"`
+}
+
+// AgentSelfUpdater is the subset of updater.Self the API needs. Wired
+// in SetAgentUpdater; nil means /api/agent/update* endpoints return
+// 503.
+type AgentSelfUpdater interface {
+	CheckLatest(ctx context.Context) (AgentUpdateCheck, error)
+	DownloadAndStage(ctx context.Context) (AgentUpdateStage, error)
+}
+
 // Server is the API server (handlers and dependencies).
 type Server struct {
 	Store        *store.Store
@@ -171,13 +198,39 @@ type Server struct {
 	ProfileApply profile.PolicyStore
 	Tamper       TamperReporter
 	Rules        RuleOverride
+	AgentUpdate  AgentSelfUpdater
+	RuleFiles    []string // optional paths whose mtimes feed /api/status
 	startedAt    time.Time
+	scanLimiter  *rateLimiter
 	once         sync.Once
 }
 
 // NewServer returns an API server with its start time set to now.
+// The scan rate limiter is initialised with a permissive default that
+// can be tightened post-construction via SetScanRateLimit.
 func NewServer(s *store.Store, p PolicyEngine, st StatsView) *Server {
-	return &Server{Store: s, Policy: p, Stats: st, startedAt: time.Now()}
+	return &Server{
+		Store:       s,
+		Policy:      p,
+		Stats:       st,
+		startedAt:   time.Now(),
+		scanLimiter: newRateLimiter(100, 100),
+	}
+}
+
+// SetScanRateLimit replaces the per-process rate limiter applied to
+// POST /api/dlp/scan. rate is in tokens per second; burst caps the
+// in-flight allowance. A rate <= 0 disables limiting entirely (the
+// limiter still exists, just always returns Allow()=true).
+func (s *Server) SetScanRateLimit(rate float64, burst int) {
+	s.scanLimiter = newRateLimiter(rate, burst)
+}
+
+// SetRuleFiles records the on-disk paths whose mtimes are reported
+// through GET /api/status. Best-effort: missing or unreadable files
+// are simply omitted from the response.
+func (s *Server) SetRuleFiles(paths []string) {
+	s.RuleFiles = append(s.RuleFiles[:0], paths...)
 }
 
 // SetDLP wires a DLP scanner into the server after construction.
@@ -208,6 +261,12 @@ func (s *Server) SetTamperReporter(t TamperReporter) { s.Tamper = t }
 // the server.
 func (s *Server) SetRuleOverride(o RuleOverride) { s.Rules = o }
 
+// SetAgentUpdater wires the agent self-updater (Phase 6 Task 15) into
+// the server. When nil, /api/agent/update-check and /api/agent/update
+// return 503 so the Electron UI can hide the "Check for updates"
+// button on builds without a release channel.
+func (s *Server) SetAgentUpdater(u AgentSelfUpdater) { s.AgentUpdate = u }
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -216,7 +275,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/policies/", s.handlePolicyItem)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/stats/reset", s.handleStatsReset)
-	mux.HandleFunc("/api/dlp/scan", s.handleDLPScan)
+	mux.Handle("/api/dlp/scan", rateLimitMiddleware(func() *rateLimiter { return s.scanLimiter }, http.HandlerFunc(s.handleDLPScan)))
 	mux.HandleFunc("/api/dlp/config", s.handleDLPConfig)
 	mux.HandleFunc("/api/rules/update", s.handleRulesUpdate)
 	mux.HandleFunc("/api/rules/status", s.handleRulesStatus)
@@ -229,6 +288,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/stats/export", s.handleStatsExport)
 	mux.HandleFunc("/api/rules/override", s.handleRuleOverride)
 	mux.HandleFunc("/api/rules/override/", s.handleRuleOverrideItem)
+	mux.HandleFunc("/api/agent/update-check", s.handleAgentUpdateCheck)
+	mux.HandleFunc("/api/agent/update", s.handleAgentUpdate)
 	return withCORS(mux)
 }
 

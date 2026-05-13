@@ -97,3 +97,48 @@
 - Add an accessible visualization for the DLP scoring sliders' current value (we expose the value via the sibling `<span>` and via the slider's native value, but a `aria-valuetext` describing whether the score is "stricter" or "looser" would be friendlier).
 - Add `prefers-contrast: more` overrides to bump up border weights for high-contrast mode users.
 - Run `axe-core` automatically as part of CI once the Electron renderer is testable in a JSDOM environment.
+
+## Phase 6 manual verification checklist
+
+The targets remain WCAG 2.1 AA. Re-run this checklist any time the
+renderer styles change.
+
+### Dark-mode verification (Task 19)
+
+The `prefers-color-scheme: dark` block in `styles.css` now overrides
+`--accent`, `--success`, and `--error` so all status colours have
+sufficient contrast against the dark `--bg` / `--card` surfaces.
+
+1. Open DevTools → Rendering → Emulate CSS media feature
+   `prefers-color-scheme: dark`.
+2. For each page (Status, Rules, Settings, Proxy), confirm:
+   - Body text passes 4.5:1 contrast (axe DevTools or manual check).
+   - Status banner left-border colours (success / error) are visible.
+   - The active tab background is distinct from inactive tabs.
+   - Focus-visible outline is visible on every interactive element.
+
+### Rules page (Task 20)
+
+1. With the agent running, open the Rules tab.
+2. Confirm the page surfaces:
+   - The current rule manifest version (or "n/a" if no updater is
+     configured).
+   - The DLP pattern count.
+   - The rule file paths with size + last-modified timestamps.
+3. Confirm pattern bodies are **not** displayed anywhere on the page.
+
+### Setup wizard (Task 21)
+
+1. Clear the `secureEdge.setup.completed` key from localStorage.
+2. Re-open the renderer — the wizard should appear.
+3. Tab through each step; verify focus order matches visual order.
+4. Click "Finish setup" on step 3 — the regular tab view should
+   render and persist after reload.
+
+### Recent blocks (Task 22)
+
+1. With the agent reachable, trigger a few DLP blocks (paste a token
+   into an inspected page).
+2. Confirm the Status page shows the most recent blocks in a list.
+3. Confirm the list disappears after closing and re-opening the
+   window — it must never persist to disk.

@@ -91,7 +91,12 @@ func (a *Automaton) Scan(content string) []Candidate {
 	var out []Candidate
 
 	if a.matcher != nil {
-		hits := a.matcher.Match([]byte(lower))
+		// MatchThreadSafe is required because the agent serves
+		// concurrent scan requests (HTTP and Native Messaging) and
+		// the pipeline now fans large payloads out across a worker
+		// pool. The non-thread-safe Match mutates per-node generation
+		// counters and can drop hits under racy access.
+		hits := a.matcher.MatchThreadSafe([]byte(lower))
 		for _, idx := range hits {
 			if idx < 0 || idx >= len(a.dict) {
 				continue

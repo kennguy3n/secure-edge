@@ -25,6 +25,7 @@ func (f *fakeScanner) Scan(_ context.Context, content string) dlp.ScanResult {
 }
 func (f *fakeScanner) Threshold() *dlp.ThresholdEngine { return nil }
 func (f *fakeScanner) SetWeights(_ dlp.ScoreWeights)   {}
+func (f *fakeScanner) Patterns() []*dlp.Pattern        { return nil }
 
 func frame(t *testing.T, msg any) []byte {
 	t.Helper()

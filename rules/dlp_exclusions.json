@@ -1173,6 +1173,73 @@
       "type": "regex",
       "pattern": "AIza[A-Za-z0-9_\\-]*(?:EXAMPL|XXX|TEST|DEMO|TUTORIAL|FAKE|DummyKey|0{20,})",
       "suppress": true
+    },
+    {
+      "applies_to": "Terraform Cloud API Token",
+      "type": "dictionary",
+      "words": [
+        "yourtokenhere.atlasv1.example",
+        "EXAMPLE.atlasv1.EXAMPLE"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Spacelift API Key",
+      "type": "dictionary",
+      "words": [
+        "your-spacelift-secret",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "env0 API Key",
+      "type": "dictionary",
+      "words": [
+        "your-env0-secret",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Scalr API Token",
+      "type": "dictionary",
+      "words": [
+        "your-scalr-token",
+        "REPLACE_ME"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Harbor Robot Token",
+      "type": "dictionary",
+      "words": [
+        "robot$example",
+        "robot$placeholder"
+      ],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "RubyGems API Key",
+      "type": "dictionary",
+      "words": [
+        "rubygems_0000000000000000000000000000000000000000000000"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "NuGet API Key",
+      "type": "dictionary",
+      "words": [
+        "oy2example",
+        "oy2placeholder"
+      ],
+      "window": 80,
+      "match_type": "proximity"
     }
   ]
 }

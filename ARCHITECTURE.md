@@ -90,6 +90,9 @@ The core of the agent. A single statically-compiled Go binary providing:
 | Rule Updater | `net/http` (stdlib) | Polls `manifest.json` for rule version, downloads changed files |
 | MITM Proxy | `github.com/elazarl/goproxy` | Optional. Local proxy for Tier 2 non-browser inspection |
 | CA Generator | `crypto/x509` (stdlib) | Optional. Generates per-device Root CA for MITM proxy |
+| Self-Updater | `crypto/ed25519`, `net/http` | Optional. Polls release manifest, verifies SHA-256 + Ed25519 signature, stages binary |
+| Rate Limiter | In-process token bucket | Configurable req/s limit on `/api/dlp/scan` |
+| Scan Cache | In-process LRU | Short-lived (5s) dedup cache keyed on content SHA-256; never persists |
 
 **Memory profile:** ~15 MB RSS at idle + ~200 KB for DLP automaton and exclusion sets. DNS server is event-driven (goroutine-per-request, no pre-allocated pools). SQLite WAL mode for minimal lock contention.
 
@@ -516,8 +519,11 @@ electron/
 ├── preload.ts           # Secure bridge to renderer
 ├── src/
 │   ├── pages/
-│   │   ├── Settings.tsx       # Policy toggles
-│   │   └── Status.tsx         # Agent health + anonymous aggregate stats
+│   │   ├── Settings.tsx       # Policy toggles + DLP config + admin overrides
+│   │   ├── Status.tsx         # Agent health + anonymous aggregate stats + recent blocks
+│   │   ├── ProxySettings.tsx  # Phase 4 MITM proxy wizard
+│   │   ├── Rules.tsx          # Phase 6 read-only rule viewer
+│   │   └── Setup.tsx          # Phase 6 first-run wizard
 │   ├── components/
 │   │   ├── CategoryToggle.tsx # Three-state: Allow / Allow+Inspect / Block
 │   │   └── StatsCard.tsx      # Display aggregate counters
@@ -554,12 +560,20 @@ accepts `chrome-extension://`, `moz-extension://`, and
 `safari-web-extension://<UUID>` origins.
 
 **Capabilities:**
-- Three content scripts injected on the 10 Tier 2 AI tool domains:
+- Five content scripts injected on the Tier 2 AI tool domains:
   - `paste-interceptor.ts` — captures `paste` events
   - `form-interceptor.ts`  — captures `<form>` `submit` events; concatenates
     textarea + text-input values before scanning
   - `network-interceptor.ts` — monkey-patches `window.fetch` and
     `XMLHttpRequest.prototype.send` to scan outbound bodies > 50 bytes
+  - `drag-interceptor.ts` — captures `drop` events, routes text through scan-client
+  - `clipboard-monitor.ts` — optional, pre-scans clipboard on tab focus (off by default)
+- Background `dynamic-hosts.ts` polls `/api/rules/status` and dynamically
+  registers content scripts for custom Tier-2 hosts surfaced by the admin
+  override mechanism, so newly admin-added domains light up without an
+  extension reinstall.
+- `src/options/` ships the extension options page exposing agent connection
+  status, the verbose-toast toggle, and the clipboard-monitor toggle.
 - Content scripts route DLP scans through the background service worker.
   The service worker prefers Chrome Native Messaging
   (`chrome.runtime.connectNative('com.secureedge.agent')`) and falls back to

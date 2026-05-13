@@ -92,6 +92,17 @@ ca_cert_path: ""                          # default ~/.secure-edge/ca.crt
 ca_key_path: ""                           # default ~/.secure-edge/ca.key
 proxy_pinning_bypass: []                  # hostnames to tunnel even if Tier-2
                                           # (e.g. apps that pin a specific CA)
+
+# Phase 6 DLP engine tuning. Omitting a field keeps the built-in default.
+# large_content_threshold: 51200   # bytes; skip low/medium patterns above this
+# dlp_cache_ttl_seconds: 5         # 0 disables the scan-result cache
+# dlp_cache_capacity: 256          # max cache entries
+# dlp_rate_limit_per_sec: 100      # 0 disables the /api/dlp/scan rate limiter
+# dlp_disabled_categories: []      # e.g. ["PII"] to disable a category
+
+# Agent self-update. Both fields required to enable.
+# agent_update_manifest_url: ""    # e.g. https://github.com/.../manifest.json
+# agent_update_public_key: ""      # hex-encoded Ed25519 public key
 ```
 
 Leaving `dlp_patterns` blank disables the DLP pipeline and returns `503` from
@@ -103,13 +114,14 @@ working. Likewise, leaving `rule_update_url` blank returns `503` from
 
 ```
 secure-edge/
-├── README.md            PROPOSAL.md  ARCHITECTURE.md  PHASES.md  PROGRESS.md  LICENSE
+├── README.md            PROPOSAL.md  ARCHITECTURE.md  PHASES.md  PROGRESS.md
+├── CONTRIBUTING.md      CHANGELOG.md  SECURITY.md  SECURITY_RULES.md  LICENSE
 ├── agent/                            # Go backend (single static binary)
 │   ├── cmd/agent/main.go
 │   ├── internal/
-│   │   ├── api/                      # HTTP API server + handlers
+│   │   ├── api/                      # HTTP API server + handlers + ratelimit.go (Phase 6 token bucket)
 │   │   ├── config/                   # YAML configuration loader
-│   │   ├── dlp/                      # Layered DLP pipeline (Phase 2)
+│   │   ├── dlp/                      # Layered DLP pipeline (Phase 2) + cache.go (Phase 6 LRU)
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
 │   │   ├── heartbeat/                # Optional outbound heartbeat (Phase 5)
 │   │   ├── policy/                   # Policy engine
@@ -118,7 +130,8 @@ secure-edge/
 │   │   ├── rules/                    # Rule-file parser + lookup + updater + admin override (Phase 3/5)
 │   │   ├── stats/                    # Anonymous aggregate counters
 │   │   ├── store/                    # SQLite (modernc.org/sqlite, WAL)
-│   │   └── tamper/                   # OS DNS/proxy tamper detector (Phase 5)
+│   │   ├── tamper/                   # OS DNS/proxy tamper detector (Phase 5)
+│   │   └── updater/                  # Agent self-update (Phase 6)
 │   ├── nfpm.yaml                     # .deb packaging
 │   ├── scripts/{post,pre}*.sh
 │   ├── go.mod / go.sum
@@ -127,7 +140,7 @@ secure-edge/
 │   ├── main.ts                       # Tray icon, health polling, BrowserWindow
 │   ├── preload.ts                    # Secure contextBridge
 │   ├── src/
-│   │   ├── pages/{Settings,Status}.tsx
+│   │   ├── pages/{Settings,Status,ProxySettings,Rules,Setup}.tsx
 │   │   ├── components/{CategoryToggle,StatsCard}.tsx
 │   │   └── api/agent.ts              # HTTP client for the Go agent
 │   ├── package.json
@@ -137,7 +150,12 @@ secure-edge/
 │   ├── manifest.firefox.json         # Firefox MV3 (browser_specific_settings)
 │   ├── manifest.safari.json          # Safari Web Extension (wrapped via xcrun)
 │   ├── native-messaging/             # Native Messaging host manifest + installers
-│   ├── src/{background,content,popup}/
+│   ├── src/
+│   │   ├── background/               # service-worker.ts, native-messaging.ts, dynamic-hosts.ts
+│   │   ├── content/                  # paste-, form-, network-, drag-, clipboard-* interceptors + scan-client.ts + toast.ts
+│   │   ├── options/                  # Extension options page
+│   │   └── popup/                    # Toolbar popup status UI
+│   ├── tests/integration/            # Playwright smoke tests
 │   ├── scripts/{build-firefox,build-safari}.mjs
 │   ├── package.json
 │   └── tsconfig.json
@@ -153,7 +171,6 @@ secure-edge/
 │   ├── rule-contribution-guide.md
 │   ├── dlp-pattern-authoring-guide.md
 │   └── accessibility.md
-├── SECURITY_RULES.md                 # Reference table of every shipped DLP pattern
 ├── scripts/                          # Platform install / DNS / proxy scripts
 │   ├── macos/                        # build-pkg.sh, postinstall.sh, uninstall.sh,
 │   │                                 # configure-dns.sh, install-ca.sh,
@@ -167,9 +184,12 @@ secure-edge/
 │                                     # preremove.sh, uninstall.sh,
 │                                     # configure-dns.sh, install-ca.sh,
 │                                     # configure-proxy.sh, secure-edge.service
-└── .github/workflows/
-    ├── ci.yml                        # Go + Electron + extension typecheck + tests
-    └── release.yml                   # multi-arch builds + GitHub Release on tags
+└── .github/
+    ├── ISSUE_TEMPLATE/               # bug_report.md + feature_request.md
+    ├── PULL_REQUEST_TEMPLATE.md
+    └── workflows/
+        ├── ci.yml                    # Go + Electron + extension typecheck + tests
+        └── release.yml               # multi-arch builds + GitHub Release on tags
 ```
 
 ## API
@@ -178,7 +198,7 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 
 | Method | Path                       | Description |
 |--------|----------------------------|-------------|
-| GET    | `/api/status`              | Agent status + uptime + version |
+| GET    | `/api/status`              | Agent status, uptime, version, Go runtime stats, DLP pattern count, rule file mtimes |
 | GET    | `/api/policies`            | List `[category, action]` rows |
 | PUT    | `/api/policies/:category`  | Update an action; triggers policy reload |
 | GET    | `/api/stats`               | Aggregate counters (integers only) |

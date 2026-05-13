@@ -545,7 +545,12 @@ content: "// auth0 management api bearer\n" +
 "AUTH0_MGMT_TOKEN=" + "eyJ" +
 "hbGciOiJSUzI1NiIsImtpZCI6Im1nbXQta2lkIn0" +
 "." + "eyJ" + "pc3MiOiJodHRwczovL2FjbWUuYXV0aDAuY29tLyIsImF1ZCI6Im1ndC5hcGkifQ.tailpartXYZ0123456789",
-allowedPatterns: []string{"Auth0 Management API Token"},
+allowedPatterns: []string{
+"Auth0 Management API Token",
+// Generic JWT pattern may legitimately win on score when the
+// token shape is a vanilla JWS. Accept either.
+"JWT Token",
+},
 },
 {
 label: "Keycloak admin-cli token",

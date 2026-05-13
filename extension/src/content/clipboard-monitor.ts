@@ -22,8 +22,9 @@ const STORAGE_KEY = "secureEdge:clipboardMonitor";
 const SCAN_INTERVAL_MS = 1500;
 
 /** Tracks the digest of the last scanned clipboard text so we don't
- *  re-scan the same secret on every focus event. Stored as a length
- *  + first/last char fingerprint — not the original text. */
+ *  re-scan the same secret on every focus event. Stored as a
+ *  FNV-1a 32-bit hash over the full content (privacy: irreversible,
+ *  never the original text). */
 let lastFingerprint = "";
 let lastScanAt = 0;
 
@@ -70,14 +71,23 @@ export async function maybeScanClipboard(): Promise<void> {
 /**
  * fingerprint produces a deterministic short string that lets us
  * cheaply detect "same clipboard content as last time" without
- * storing the original text. It is intentionally not a secure hash —
- * we don't need crypto guarantees, just a stable identifier.
+ * storing the original text. It is a FNV-1a 32-bit rolling hash over
+ * every code unit of the input, prefixed with the string length so
+ * distinct-length inputs cannot collide. FNV-1a is not a cryptographic
+ * hash, but its avalanche behaviour is strong enough that two
+ * different secrets are exceedingly unlikely to produce the same
+ * fingerprint and be silently skipped by the scan cache.
  */
 function fingerprint(s: string): string {
     if (s.length === 0) return "0";
-    const first = s.charCodeAt(0).toString(16);
-    const last = s.charCodeAt(s.length - 1).toString(16);
-    return `${s.length}:${first}:${last}`;
+    // FNV-1a 32-bit. Operate in unsigned 32-bit space via `>>> 0`.
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        // Equivalent to `h *= 0x01000193` but stays inside 32 bits.
+        h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return `${s.length}:${h.toString(16)}`;
 }
 
 async function readEnabledFlag(): Promise<boolean> {

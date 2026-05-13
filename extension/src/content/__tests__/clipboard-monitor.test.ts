@@ -49,6 +49,26 @@ test("fingerprint is stable on identical strings and varies otherwise", () => {
     assert.notEqual(fingerprint("hello"), fingerprint("hellp"));
 });
 
+test("fingerprint distinguishes secrets with the same length and first/last chars", () => {
+    // Two synthetic AWS-style keys that share length, prefix and
+    // suffix characters. The old length+first+last fingerprint
+    // collided on these; FNV-1a does not.
+    const a = "AKIAIOSFODNN7EXAMPLEF";
+    const b = "AKIAJOTHERKEYNN7XAMPF";
+    assert.equal(a.length, b.length);
+    assert.equal(a[0], b[0]);
+    assert.equal(a[a.length - 1], b[b.length - 1]);
+    assert.notEqual(fingerprint(a), fingerprint(b));
+
+    // A middle-byte difference must also change the fingerprint.
+    const c = "abcdefghijklmnopqrstuvwxyz";
+    const d = "abcdefghijklXnopqrstuvwxyz";
+    assert.equal(c.length, d.length);
+    assert.equal(c[0], d[0]);
+    assert.equal(c[c.length - 1], d[d.length - 1]);
+    assert.notEqual(fingerprint(c), fingerprint(d));
+});
+
 test("maybeScanClipboard is a no-op when the opt-in flag is off", async () => {
     setOptIn(false);
     let clipboardReads = 0;

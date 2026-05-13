@@ -45,6 +45,9 @@ func ParsePatterns(raw []byte) ([]*Pattern, error) {
 			return nil, fmt.Errorf("dlp: compile %q: %w", p.Name, err)
 		}
 		p.Compiled = re
+		if p.Category == "" {
+			p.Category = CategoryUncategorized
+		}
 	}
 	return body.Patterns, nil
 }

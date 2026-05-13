@@ -143,9 +143,26 @@ func runNativeMessaging(configPath string) error {
 		}
 	}
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+	applyDLPRuntimeConfig(pipeline, cfg)
 	pipeline.Rebuild(patterns, exclusions)
 
 	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+}
+
+// applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
+// loaded YAML config into the pipeline. Called from both daemon and
+// native-messaging paths so each transport observes the same defaults.
+func applyDLPRuntimeConfig(p *dlp.Pipeline, cfg config.Config) {
+	if cfg.LargeContentThreshold > 0 {
+		p.SetLargeContentThreshold(cfg.LargeContentThreshold)
+	}
+	if len(cfg.DLPDisabledCategories) > 0 {
+		p.SetDisabledCategories(cfg.DLPDisabledCategories)
+	}
+	if cfg.DLPCacheTTLSeconds > 0 {
+		ttl := time.Duration(cfg.DLPCacheTTLSeconds) * time.Second
+		p.EnableCache(dlp.NewScanCache(cfg.DLPCacheCapacity, ttl))
+	}
 }
 
 func run(configPath string) error {
@@ -231,6 +248,7 @@ func run(configPath string) error {
 			}
 		}
 		pipeline = dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
+		applyDLPRuntimeConfig(pipeline, cfg)
 		pipeline.Rebuild(patterns, exclusions)
 		apiServer.SetDLP(pipeline)
 

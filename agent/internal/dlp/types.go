@@ -56,9 +56,20 @@ type Pattern struct {
 	RequireHotword bool     `json:"require_hotword"`
 	EntropyMin     float64  `json:"entropy_min"`
 
+	// Category groups patterns for selective enable/disable
+	// ("PII", "cloud", "auth", …). Patterns loaded without a
+	// category default to CategoryUncategorized so the toggle UI
+	// still sees them.
+	Category string `json:"category,omitempty"`
+
 	// Compiled is populated by LoadPatterns; nil until compiled.
 	Compiled *regexp.Regexp `json:"-"`
 }
+
+// CategoryUncategorized is the fallback category for patterns that
+// did not declare one in dlp_patterns.json. It is exposed so callers
+// (UI, tests) can refer to it without a magic string.
+const CategoryUncategorized = "uncategorized"
 
 // Candidate is a (offset, pattern) pair emitted by the Aho-Corasick
 // scanner. Offsets are byte offsets into the scanned content.

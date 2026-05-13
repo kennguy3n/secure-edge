@@ -88,6 +88,30 @@ type Config struct {
 	// when blank. Files in this directory are merged on top of the
 	// bundled rules without modifying them.
 	LocalRulesDir string `yaml:"local_rules_dir"`
+
+	// LargeContentThreshold is the byte size above which the DLP
+	// pipeline drops low/medium-severity patterns and only runs
+	// critical/high. Defaults to 51200 (50 KiB). Set 0 to disable
+	// the optimisation.
+	LargeContentThreshold int `yaml:"large_content_threshold"`
+
+	// DLPCacheTTLSeconds is the lifetime of the in-memory scan
+	// result cache. Zero disables caching entirely. Defaults to 5s.
+	DLPCacheTTLSeconds int `yaml:"dlp_cache_ttl_seconds"`
+
+	// DLPCacheCapacity is the maximum number of entries the scan
+	// cache holds. Defaults to 1024.
+	DLPCacheCapacity int `yaml:"dlp_cache_capacity"`
+
+	// DLPRateLimitPerSec is the per-process rate limit applied to
+	// POST /api/dlp/scan. Defaults to 100 requests per second.
+	// Zero disables the limiter entirely.
+	DLPRateLimitPerSec int `yaml:"dlp_rate_limit_per_sec"`
+
+	// DLPDisabledCategories is the list of pattern categories
+	// (e.g. "pii", "code_secret") that should be ignored when
+	// scanning. Empty by default — all categories are active.
+	DLPDisabledCategories []string `yaml:"dlp_disabled_categories"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -104,6 +128,10 @@ func Default() Config {
 		ProxyListen:        "127.0.0.1:8443",
 		ProxyEnabled:       false,
 		HeartbeatInterval:  time.Hour,
+		LargeContentThreshold: 50 * 1024,
+		DLPCacheTTLSeconds:    5,
+		DLPCacheCapacity:      1024,
+		DLPRateLimitPerSec:    100,
 	}
 }
 
@@ -200,6 +228,21 @@ func merge(defaults, override Config) Config {
 	}
 	if override.LocalRulesDir != "" {
 		out.LocalRulesDir = override.LocalRulesDir
+	}
+	if override.LargeContentThreshold != 0 {
+		out.LargeContentThreshold = override.LargeContentThreshold
+	}
+	if override.DLPCacheTTLSeconds != 0 {
+		out.DLPCacheTTLSeconds = override.DLPCacheTTLSeconds
+	}
+	if override.DLPCacheCapacity != 0 {
+		out.DLPCacheCapacity = override.DLPCacheCapacity
+	}
+	if override.DLPRateLimitPerSec != 0 {
+		out.DLPRateLimitPerSec = override.DLPRateLimitPerSec
+	}
+	if len(override.DLPDisabledCategories) > 0 {
+		out.DLPDisabledCategories = override.DLPDisabledCategories
 	}
 	return out
 }

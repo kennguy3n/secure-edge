@@ -408,6 +408,237 @@ allowedPatterns: []string{
 "Password Assignment",
 },
 },
+
+// -- Phase 6 Task 1: Terraform provider credentials -----------
+{
+label: "Terraform Cloud user token",
+content: "# .terraformrc credentials block for HCP Terraform\n" +
+"credentials \"app.terraform.io\" {\n" +
+"  token = \"7v4Xw9k2pQz3" + ".atlasv1." +
+"ABcdEFghIJklMNopQRstUVwxYZ0123456789AbCdEfGhIjKlMnOpQrStUvWxYz\"\n}",
+allowedPatterns: []string{"Terraform Cloud API Token"},
+},
+{
+label: "Spacelift API key secret",
+content: "# CI env for Spacelift stack runs\n" +
+"export SPACELIFT_API_KEY_ID=01HG2K9P2QRMZNL5CVXBT4YJHF\n" +
+"export SPACELIFT_API_KEY_SECRET=\"WoEi" + "UaJdGxRYTUNL_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789\"",
+allowedPatterns: []string{"Spacelift API Key"},
+},
+{
+label: "env0 API key secret",
+content: "# env0 CLI auth via API key\n" +
+"export ENV0_API_KEY_ID=11111111-2222-3333-4444-555566667777\n" +
+"export ENV0_API_KEY_SECRET=\"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU\"",
+allowedPatterns: []string{
+"env0 API Key",
+// The generic Heroku API Key pattern matches
+// hex/uuid-shaped secrets too; either winning is
+// fine for a hard block decision.
+"Heroku API Key",
+},
+},
+{
+label: "Scalr API token assignment",
+content: "# Scalr provider config\n" +
+"SCALR_TOKEN=\"abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH_-IJKL\"",
+allowedPatterns: []string{"Scalr API Token"},
+},
+
+// -- Phase 6 Task 2: Container registry credentials -----------
+{
+label: "Harbor robot account secret",
+content: "# Harbor robot account for the platform project\n" +
+"robot$platform+ci-deploy=K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTUNL/+aBcDe",
+allowedPatterns: []string{"Harbor Robot Token"},
+},
+{
+label: "Quay.io encrypted password",
+content: "# .docker/config.json for Quay\n" +
+"QUAY_PASSWORD=\"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU\"",
+allowedPatterns: []string{"Quay.io Encrypted Password"},
+},
+{
+label: "AWS ECR get-login-password output",
+content: "# docker login --password-stdin for *.dkr.ecr.us-east-1.amazonaws.com\n" +
+"ECR_PASSWORD=" +
+"eyJwYXlsb2FkIjoiQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5" +
+"YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXowMTIzNDU2Nzg5QUJDREVGR0hJSktM" +
+"TU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4" +
+"eXowMTIzNDU2Nzg5QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5" +
+"YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXowMTIzNDU2Nzg5MA==",
+allowedPatterns: []string{"AWS ECR Login Token"},
+},
+{
+label: "GCR JSON service account paste",
+content: "// docker login -u _json_key for gcr.io\n" +
+"{\n  \"type\": \"service_account\",\n" +
+"  \"project_id\": \"my-app\",\n" +
+"  \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nABCDEF\\n-----END PRIVATE KEY-----\\n\",\n" +
+"  \"client_email\": \"gcr-pusher@my-app.iam.gserviceaccount.com\",\n" +
+"  \"audience\": \"gcr.io\"\n}",
+allowedPatterns: []string{
+"GCR JSON Key Paste",
+// The pre-existing GCP service account / Firebase
+// patterns also fire on this content; any of them
+// blocking is correct behaviour.
+"GCP Service Account Key",
+"Firebase Admin SDK Private Key",
+"Private Key Block",
+},
+},
+
+// -- Phase 6 Task 3: Secret-manager response pastes -----------
+{
+label: "AWS Secrets Manager GetSecretValue paste",
+content: "# aws secretsmanager get-secret-value output\n" +
+"{\n  \"ARN\": \"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db-AbCdEf\",\n" +
+"  \"VersionId\": \"AbC123\",\n" +
+"  \"SecretId\": \"prod/db\",\n" +
+"  \"SecretString\": \"{\\\"username\\\":\\\"svc\\\",\\\"password\\\":\\\"K9p2qRmZnL5cVxBT4YjHfWoEi\\\"}\"\n}",
+allowedPatterns: []string{
+"AWS Secrets Manager SecretString Paste",
+"Password Assignment",
+},
+},
+{
+label: "Azure Key Vault GetSecret response",
+content: "# az keyvault secret show response\n" +
+"{\n  \"id\": \"https://prod-kv.vault.azure.net/secrets/db-password/0123456789abcdef0123456789abcdef\",\n" +
+"  \"value\": \"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU\"\n}",
+allowedPatterns: []string{"Azure Key Vault GetSecret Paste"},
+},
+{
+label: "GCP Secret Manager AccessSecretVersion response",
+content: "// gcloud secrets versions access response for projects/123/secrets/api-key/versions/1\n" +
+"{\n  \"name\": \"projects/123/secrets/api-key/versions/1\",\n" +
+"  \"payload\": {\"data\": \"S2RuTGxXMzZacEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFla\"}\n}",
+allowedPatterns: []string{"GCP Secret Manager Payload Paste"},
+},
+
+// -- Phase 6 Task 4: OAuth2 / OIDC tokens ---------------------
+{
+label: "OAuth2 refresh token",
+content: "// oauth2 token exchange response\n" +
+"grant_type=refresh_token\n" +
+"refresh_token=" +
+"1//09K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU0pqAbCdEfGhIjKlMnOpQrStUvWxYz_-.0123",
+allowedPatterns: []string{"OAuth2 Refresh Token Assignment"},
+},
+{
+label: "OIDC ID token assignment",
+content: "// openid-connect id_token from /token endpoint\n" +
+"id_token=" + "eyJ" +
+"hbGciOiJSUzI1NiIsImtpZCI6IjB1WnpQTVA0In0" + "." +
+"eyJ" + "pc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoiYWJjIiwiYXVkIjoibXktY2xpZW50In0" + "." +
+"abc123signaturetailpartXYZ0123",
+allowedPatterns: []string{
+"OIDC ID Token Assignment",
+// Generic JWT pattern may win on the eyJ shape.
+"JWT Token",
+},
+},
+{
+label: "Auth0 management API token",
+content: "// auth0 management api bearer\n" +
+"AUTH0_DOMAIN=acme.auth0.com\n" +
+"AUTH0_MGMT_TOKEN=" + "eyJ" +
+"hbGciOiJSUzI1NiIsImtpZCI6Im1nbXQta2lkIn0" +
+"." + "eyJ" + "pc3MiOiJodHRwczovL2FjbWUuYXV0aDAuY29tLyIsImF1ZCI6Im1ndC5hcGkifQ.tailpartXYZ0123456789",
+allowedPatterns: []string{"Auth0 Management API Token"},
+},
+{
+label: "Keycloak admin-cli token",
+content: "// kcadm.sh token\n" +
+"KEYCLOAK_TOKEN=" + "eyJ" +
+"hbGciOiJSUzI1NiIsImtpZCI6ImFkbWluLWtpZCJ9" +
+"." + "eyJ" + "pc3MiOiJodHRwczovL2tjLmV4YW1wbGUiLCJyZWFsbSI6Im1hc3RlciJ9.tailpartXYZ0123456789",
+allowedPatterns: []string{
+"Keycloak Admin Token",
+// Generic JWT token may also fire; both are acceptable.
+"JWT Token",
+},
+},
+
+// -- Phase 6 Task 5: IaC hardcoded secrets --------------------
+{
+label: "Ansible vault block",
+content: "# group_vars/prod/secrets.yml ansible playbook\n" +
+"db_password: !vault |\n" +
+"  $ANSIBLE_VAULT;1.1;AES256\n" +
+"  6162636465666768696a6b6c6d6e6f70\n" +
+"  7172737475767778797a30313233343536373839",
+allowedPatterns: []string{"Ansible Vault Block"},
+},
+{
+label: "Puppet Hiera eyaml block",
+content: "# hiera.yaml puppet secrets\n" +
+"db_password: ENC[PKCS7,MIIBmQYJKoZIhvcNAQcDoIIBijCCAYYCAQAxggE/MIIBOwIBADAjMA8x" +
+"DTALBgNVBAMMBHRlc3QCEHcLOmTYRTRMK1tnXKbU2y8wDQYJKoZIhvcNAQEBBQAEggEAYbCdEfGhIjKl]",
+allowedPatterns: []string{"Puppet Hiera eyaml Block"},
+},
+{
+label: "Chef encrypted data bag",
+content: "# data_bag/credentials/prod.json chef encrypted_data\n" +
+"{\n" +
+"  \"id\": \"prod\",\n" +
+"  \"cipher\": \"aes-256-cbc\",\n" +
+"  \"iv\": \"abcdEFghIJklMNop==\",\n" +
+"  \"encrypted_data\": \"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU0pqAbCdEfGhIj=\"\n" +
+"}",
+allowedPatterns: []string{"Chef Encrypted Data Bag"},
+},
+
+// -- Phase 6 Task 6: Package manager tokens -------------------
+{
+label: "RubyGems API key",
+content: "# ~/.gem/credentials rubygems push\n" +
+"---\n:rubygems_api_key: " +
+"rubygems_" + "b3e7e9c4a1d052f9c0b7a91e" + "2c4f5a8b9d2e3f4a5b6c7d8e",
+allowedPatterns: []string{"RubyGems API Key"},
+},
+{
+label: "Composer Packagist token",
+content: "// auth.json for composer install on packagist\n" +
+"{\"http-basic\":{\"repo.packagist.com\":{\"username\":\"acme\",\"password\":\"\"}}, " +
+"\"packagist-token\":\"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTUab12cd\"}",
+allowedPatterns: []string{"Composer Packagist Token"},
+},
+{
+label: "NuGet API key",
+content: "# dotnet nuget push key\n" +
+"NUGET_API_KEY=oy2abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnp",
+allowedPatterns: []string{
+"NuGet API Key",
+// Generic API key fallback also fires; either winning
+// is fine for a hard block decision.
+"Generic API Key",
+},
+},
+{
+label: "Hex.pm API key",
+content: "# mix hex.config api_key\n" +
+"HEX_API_KEY=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH",
+allowedPatterns: []string{
+"Hex.pm API Key",
+// Generic API key fallback also fires on long
+// alphanumeric runs.
+"Generic API Key",
+},
+},
+{
+label: "Pub.dev publish token",
+content: "// dart pub token add\n" +
+"PUB_DEV_TOKEN=\"K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU.AbCdEfGhIjKlMnOpQ\"",
+allowedPatterns: []string{"Pub.dev OAuth Refresh Token"},
+},
+{
+label: "CocoaPods Trunk session cookie",
+content: "# ~/.netrc for pod trunk\n" +
+"machine trunk.cocoapods.org\n" +
+"  _pods_session=K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTU0pq%3D",
+allowedPatterns: []string{"CocoaPods Trunk Session Cookie"},
+},
 }
 
 for _, tc := range cases {

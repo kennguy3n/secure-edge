@@ -253,3 +253,97 @@ func TestPipelineRebuild_ResetsCache(t *testing.T) {
 		t.Fatalf("expected cache cleared on rebuild, got %+v", stats)
 	}
 }
+
+// primeCache populates the pipeline's scan cache with a single entry
+// so the setter-invalidation tests can confirm Reset was called.
+func primeCache(t *testing.T, p *Pipeline) *ScanCache {
+	t.Helper()
+	cache := NewScanCache(8, time.Minute)
+	p.EnableCache(cache)
+	if got := p.Scan(context.Background(), "leak: CRIT-AAAAAAAAAA0000000000ZZZ"); !got.Blocked {
+		t.Fatalf("expected initial block, got %+v", got)
+	}
+	if cache.Stats().Size == 0 {
+		t.Fatalf("cache empty after priming scan")
+	}
+	return cache
+}
+
+// TestSetWeights_ResetsCache locks in the fix for the cache-staleness
+// bug surfaced in PR review: PUT /api/dlp/config calls SetWeights at
+// runtime, and any cached verdicts produced under the previous
+// weights would otherwise survive for the full 5s TTL.
+func TestSetWeights_ResetsCache(t *testing.T) {
+	p := enginePipeline(t)
+	cache := primeCache(t, p)
+
+	p.SetWeights(ScoreWeights{HotwordBoost: 99})
+	if got := cache.Stats().Size; got != 0 {
+		t.Fatalf("expected cache cleared after SetWeights, got size=%d", got)
+	}
+}
+
+// TestSetDisabledCategories_ResetsCache covers the live category
+// toggle path (PUT /api/dlp/config and the Electron Rules page). Old
+// "blocked" verdicts must not survive a category being switched off
+// or back on.
+func TestSetDisabledCategories_ResetsCache(t *testing.T) {
+	p := enginePipeline(t)
+	cache := primeCache(t, p)
+
+	p.SetDisabledCategories([]string{"pii"})
+	if got := cache.Stats().Size; got != 0 {
+		t.Fatalf("expected cache cleared after disabling category, got size=%d", got)
+	}
+
+	// Re-enabling must also reset, otherwise a verdict that
+	// benefited from a now-disabled category would linger.
+	cache = primeCache(t, p)
+	p.SetDisabledCategories(nil)
+	if got := cache.Stats().Size; got != 0 {
+		t.Fatalf("expected cache cleared after re-enabling categories, got size=%d", got)
+	}
+}
+
+// TestSetLargeContentThreshold_ResetsCache mirrors the other two
+// setter tests for the adaptive-scanning threshold. Cached verdicts
+// produced under the old threshold could otherwise contradict the
+// new policy until the TTL expires.
+func TestSetLargeContentThreshold_ResetsCache(t *testing.T) {
+	p := enginePipeline(t)
+	cache := primeCache(t, p)
+
+	p.SetLargeContentThreshold(1024)
+	if got := cache.Stats().Size; got != 0 {
+		t.Fatalf("expected cache cleared after SetLargeContentThreshold, got size=%d", got)
+	}
+}
+
+// TestResetCache_PublicAPI confirms the public ResetCache helper
+// works when callers mutate state outside the dedicated setters —
+// notably Threshold().Set() on the ThresholdEngine which lives
+// alongside the pipeline rather than inside it.
+func TestResetCache_PublicAPI(t *testing.T) {
+	p := enginePipeline(t)
+	cache := primeCache(t, p)
+	p.Threshold().Set(Thresholds{Critical: 1, High: 1, Medium: 1, Low: 1})
+	p.ResetCache()
+	if got := cache.Stats().Size; got != 0 {
+		t.Fatalf("expected cache cleared after ResetCache, got size=%d", got)
+	}
+}
+
+// TestResetCache_NilCacheIsNoOp confirms the public helper is safe to
+// call on pipelines that never had a cache attached. The setters
+// themselves call cache.Reset() unconditionally and rely on the
+// ScanCache.Reset() nil-receiver guard; this test pins down the
+// public surface so a regression in either would fail loudly.
+func TestResetCache_NilCacheIsNoOp(t *testing.T) {
+	p := enginePipeline(t)
+	// EnableCache(nil) leaves p.cache nil. ResetCache must not panic.
+	p.EnableCache(nil)
+	p.ResetCache()
+	p.SetWeights(ScoreWeights{})
+	p.SetDisabledCategories(nil)
+	p.SetLargeContentThreshold(0)
+}

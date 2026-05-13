@@ -330,6 +330,11 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 // diverging from the values returned by GET /api/dlp/config and
 // GET /api/profile. A nil DLP pipeline (Phase 1, no DLP wired)
 // short-circuits to a no-op.
+//
+// Threshold is set first and the weights setter is invoked last on
+// purpose: SetWeights resets the pipeline's scan-result cache, so a
+// PUT /api/dlp/config invalidates any cached verdicts produced under
+// the previous policy before the next /api/dlp/scan can hit them.
 func (s *Server) applyLiveDLP(c profile.DLPConfigSnapshot) {
 	if s == nil || s.DLP == nil {
 		return

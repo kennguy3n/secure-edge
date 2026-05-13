@@ -76,14 +76,18 @@ func NewPipeline(weights ScoreWeights, threshold *ThresholdEngine) *Pipeline {
 // SetLargeContentThreshold updates the byte threshold above which the
 // pipeline switches to "critical/high only" scanning. Zero or negative
 // values restore the default LargeContentThreshold. Safe to call
-// concurrently with Scan.
+// concurrently with Scan. The scan cache is reset alongside the
+// update so cached verdicts produced under the previous threshold
+// cannot leak past the change.
 func (p *Pipeline) SetLargeContentThreshold(n int) {
 	if n <= 0 {
 		n = LargeContentThreshold
 	}
 	p.mu.Lock()
 	p.largeThreshold = n
+	cache := p.cache
 	p.mu.Unlock()
+	cache.Reset()
 }
 
 // LargeContentThreshold returns the current threshold in bytes.
@@ -99,7 +103,9 @@ func (p *Pipeline) LargeContentThreshold() int {
 // SetDisabledCategories replaces the set of disabled pattern
 // categories. Pass an empty slice to re-enable all categories. The
 // agent UI uses this to let operators turn off PII or low-severity
-// pattern groups without editing the rule file.
+// pattern groups without editing the rule file. The scan cache is
+// reset alongside the update so verdicts produced before a category
+// was disabled (or re-enabled) cannot survive the change.
 func (p *Pipeline) SetDisabledCategories(categories []string) {
 	disabled := make(map[string]struct{}, len(categories))
 	for _, c := range categories {
@@ -110,7 +116,9 @@ func (p *Pipeline) SetDisabledCategories(categories []string) {
 	}
 	p.mu.Lock()
 	p.disabledCategories = disabled
+	cache := p.cache
 	p.mu.Unlock()
+	cache.Reset()
 }
 
 // DisabledCategories returns the current set of disabled categories.
@@ -177,11 +185,28 @@ func (p *Pipeline) Cache() *ScanCache {
 	return p.cache
 }
 
-// SetWeights atomically updates the scoring weights.
+// SetWeights atomically updates the scoring weights. The scan cache
+// is reset alongside the update so verdicts produced under the
+// previous weights cannot leak past the change — otherwise a PUT
+// /api/dlp/config that raises a hotword/entropy boost would only
+// take effect after the cache TTL expired.
 func (p *Pipeline) SetWeights(w ScoreWeights) {
 	p.mu.Lock()
 	p.weights = w
+	cache := p.cache
 	p.mu.Unlock()
+	cache.Reset()
+}
+
+// ResetCache drops every cached scan result. Exposed so callers that
+// mutate state outside the pipeline's setters — most notably
+// Threshold().Set() on the embedded ThresholdEngine — can keep the
+// cache in sync with the live policy. A nil cache is a no-op.
+func (p *Pipeline) ResetCache() {
+	p.mu.RLock()
+	cache := p.cache
+	p.mu.RUnlock()
+	cache.Reset()
 }
 
 // Threshold returns the threshold engine. Used by the API to expose

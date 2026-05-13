@@ -15,6 +15,12 @@
     --bg: #14181f;
     --card: #1d232c;
     --border: #313844;
+    /* Dark-mode adjustments tuned for WCAG 2.1 SC 1.4.3 contrast
+       against the dark --bg and --card. The light-mode tones are too
+       saturated to pass at this background luminance. */
+    --accent: #4f8bff;
+    --success: #4ade80;
+    --error: #f87171;
   }
 }
 

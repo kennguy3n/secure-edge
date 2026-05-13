@@ -52,6 +52,27 @@ export interface AgentStatus {
   status: string;
   uptime: string;
   version: string;
+  runtime?: {
+    go_version: string;
+    num_goroutine: number;
+    num_cpu: number;
+    heap_alloc_kb: number;
+    heap_inuse_kb: number;
+    sys_kb: number;
+    num_gc: number;
+    gomaxprocs: number;
+  };
+  rules?: Array<{ path: string; size_bytes: number; last_modified: string }>;
+  dlp_patterns?: number;
+}
+
+// RulesStatus mirrors agent.api / rules.Status. Used by the Rules
+// page to show the active rule version and the next check time.
+export interface RulesStatus {
+  current_version: string;
+  last_check: string;
+  next_check: string;
+  update_url: string;
 }
 
 // ProxyStatus mirrors agent.api.ProxyStatus on the wire.
@@ -175,5 +196,18 @@ export const agent = {
     return http<RuleOverrideLists>(`/api/rules/override/${encodeURIComponent(domain)}`, {
       method: 'DELETE',
     });
+  },
+
+  // Phase 6: read-only rules viewer for the Electron Rules page.
+  async getRulesStatus(): Promise<RulesStatus | null> {
+    try {
+      return await http<RulesStatus>('/api/rules/status');
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Agent 503')) {
+        // No updater wired on this build — show "n/a" in the UI.
+        return null;
+      }
+      throw err;
+    }
   },
 };

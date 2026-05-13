@@ -1,6 +1,6 @@
 // Type augmentation for the preload bridge exposed on `window.secureEdge`.
 
-export type SecureEdgeView = 'status' | 'settings' | 'proxy';
+export type SecureEdgeView = 'status' | 'settings' | 'proxy' | 'rules' | 'setup';
 
 export interface SecureEdgeBridge {
   getAgentBase(): Promise<string>;

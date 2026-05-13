@@ -338,9 +338,18 @@ func run(configPath string) error {
 	// Phase 5: tamper detector goroutine.
 	if cfg.DNSListen != "" {
 		expectedDNS, _ := splitHostPort(cfg.DNSListen)
+		// Only assert the system proxy is wired through us when the MITM
+		// proxy is actually enabled. Otherwise the detector would
+		// transition from its initialised ProxyOK=true to false on the
+		// first tick and increment tamper_detections_total on every
+		// agent startup that doesn't enable the proxy.
+		expectedProxy := ""
+		if cfg.ProxyEnabled {
+			expectedProxy = cfg.ProxyListen
+		}
 		detector := tamper.New(tamper.Options{
 			ExpectedDNSServer: expectedDNS,
-			ExpectedProxyAddr: cfg.ProxyListen,
+			ExpectedProxyAddr: expectedProxy,
 			Reporter:          counter,
 		})
 		apiServer.SetTamperReporter(tamperAdapter{detector: detector})
@@ -492,19 +501,21 @@ func (a storeAdapter) GetStats(ctx context.Context) (stats.Snapshot, error) {
 		return stats.Snapshot{}, err
 	}
 	return stats.Snapshot{
-		DNSQueriesTotal: v.DNSQueriesTotal,
-		DNSBlocksTotal:  v.DNSBlocksTotal,
-		DLPScansTotal:   v.DLPScansTotal,
-		DLPBlocksTotal:  v.DLPBlocksTotal,
+		DNSQueriesTotal:       v.DNSQueriesTotal,
+		DNSBlocksTotal:        v.DNSBlocksTotal,
+		DLPScansTotal:         v.DLPScansTotal,
+		DLPBlocksTotal:        v.DLPBlocksTotal,
+		TamperDetectionsTotal: v.TamperDetectionsTotal,
 	}, nil
 }
 
 func (a storeAdapter) AddStats(ctx context.Context, delta stats.Snapshot) error {
 	return a.s.AddStats(ctx, store.AggregateStats{
-		DNSQueriesTotal: delta.DNSQueriesTotal,
-		DNSBlocksTotal:  delta.DNSBlocksTotal,
-		DLPScansTotal:   delta.DLPScansTotal,
-		DLPBlocksTotal:  delta.DLPBlocksTotal,
+		DNSQueriesTotal:       delta.DNSQueriesTotal,
+		DNSBlocksTotal:        delta.DNSBlocksTotal,
+		DLPScansTotal:         delta.DLPScansTotal,
+		DLPBlocksTotal:        delta.DLPBlocksTotal,
+		TamperDetectionsTotal: delta.TamperDetectionsTotal,
 	})
 }
 

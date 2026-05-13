@@ -310,7 +310,7 @@ response is sent. No content reaches disk, SQLite, or any log.
 }
 ```
 
-`match_type` accepts `exact` (default) or `substring` and is honoured for
+`match_type` accepts `exact` or `proximity` (default) and is honoured for
 dictionary exclusions. `window` is optional on dictionary exclusions and
 restricts the suppression to a byte window around the match; regex
 exclusions match the secret span directly. The optional `suppress` field

@@ -39,8 +39,16 @@ type OverrideStore struct {
 }
 
 // NewOverrideStore loads the existing override files from dir,
-// creating the directory if missing. An empty dir disables overrides
-// (Add/Remove are no-ops, List returns nil, Sources returns nil).
+// creating the directory and empty placeholder files if missing.
+// An empty dir disables overrides (Add/Remove return an error,
+// List returns nil, Sources returns nil).
+//
+// The placeholder files are created up front so the policy engine's
+// source list always references them, even before the admin has
+// added anything via the API. Otherwise Reload would silently keep
+// using the pre-startup snapshot whenever a fresh install ran the
+// first POST /api/rules/override and there was no file on disk to
+// merge.
 func NewOverrideStore(dir string) (*OverrideStore, error) {
 	s := &OverrideStore{
 		dir:   dir,
@@ -60,11 +68,18 @@ func NewOverrideStore(dir string) (*OverrideStore, error) {
 		{overrideAllowFile, s.allow},
 		{overrideBlockFile, s.block},
 	} {
-		if entries, err := readOverrideFile(filepath.Join(dir, kind.file)); err == nil {
+		path := filepath.Join(dir, kind.file)
+		entries, err := readOverrideFile(path)
+		switch {
+		case err == nil:
 			for _, d := range entries {
 				kind.dest[d] = struct{}{}
 			}
-		} else if !errors.Is(err, os.ErrNotExist) {
+		case errors.Is(err, os.ErrNotExist):
+			if werr := writeOverrideFile(path, nil); werr != nil {
+				return nil, werr
+			}
+		default:
 			return nil, err
 		}
 	}
@@ -135,22 +150,18 @@ func (s *OverrideStore) List() ([]string, []string) {
 }
 
 // Sources returns RuleSource entries that the lookup builder can
-// merge with the bundled rules. Empty results when there are no
-// overrides on disk so callers don't have to special-case nothing.
+// merge with the bundled rules. When dir is configured both files
+// are always returned (NewOverrideStore creates empty placeholders
+// if needed) so the engine's source list is stable across reloads,
+// even when the admin has not yet added an override.
 func (s *OverrideStore) Sources() []RuleSource {
 	if s.dir == "" {
 		return nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var out []RuleSource
-	if len(s.allow) > 0 {
-		out = append(out, RuleSource{Category: OverrideAllowCategory, Path: filepath.Join(s.dir, overrideAllowFile)})
+	return []RuleSource{
+		{Category: OverrideAllowCategory, Path: filepath.Join(s.dir, overrideAllowFile)},
+		{Category: OverrideBlockCategory, Path: filepath.Join(s.dir, overrideBlockFile)},
 	}
-	if len(s.block) > 0 {
-		out = append(out, RuleSource{Category: OverrideBlockCategory, Path: filepath.Join(s.dir, overrideBlockFile)})
-	}
-	return out
 }
 
 func (s *OverrideStore) targetForList(list string) (map[string]struct{}, string) {

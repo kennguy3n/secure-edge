@@ -21,6 +21,55 @@ func TestOverrideStoreEmptyDir(t *testing.T) {
 	}
 }
 
+// Regression: Sources must surface both override paths the moment
+// the directory is configured, even before any Add has run. The
+// agent wires these into the policy engine's source list at
+// startup so a later POST /api/rules/override + Reload picks up
+// the new entries — gating on "do entries exist yet?" caused the
+// new domain to be silently ignored on fresh installs.
+func TestOverrideStoreSourcesAvailableBeforeAdd(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewOverrideStore(dir)
+	if err != nil {
+		t.Fatalf("NewOverrideStore: %v", err)
+	}
+	got := s.Sources()
+	if len(got) != 2 {
+		t.Fatalf("expected 2 sources when dir is configured, got %d: %+v", len(got), got)
+	}
+	for _, src := range got {
+		if _, err := os.Stat(src.Path); err != nil {
+			t.Fatalf("Sources references missing file %q: %v", src.Path, err)
+		}
+	}
+	// Sanity check: Build must succeed against the empty placeholders.
+	if _, err := Build(got); err != nil {
+		t.Fatalf("Build on empty overrides: %v", err)
+	}
+}
+
+// Regression: when the admin adds a domain after startup, the on-
+// disk file must be picked up by a subsequent Build/Reload using
+// the same sources slice we registered with the engine at startup.
+func TestOverrideStoreReloadSeesNewEntries(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewOverrideStore(dir)
+	if err != nil {
+		t.Fatalf("NewOverrideStore: %v", err)
+	}
+	srcs := s.Sources()
+	if err := s.Add("late.example.com", "block"); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	lookup, err := Build(srcs)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if cat, ok := lookup.Lookup("late.example.com"); !ok || cat != OverrideBlockCategory {
+		t.Fatalf("override not seen by Build: cat=%q ok=%v", cat, ok)
+	}
+}
+
 func TestOverrideStoreAddRemoveList(t *testing.T) {
 	dir := t.TempDir()
 	s, err := NewOverrideStore(dir)

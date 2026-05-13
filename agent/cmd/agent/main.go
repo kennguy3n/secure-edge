@@ -89,6 +89,7 @@ func runNativeMessaging(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	resolveLocalRulesDir(&cfg)
 	if cfg.DLPPatternsPath == "" {
 		return fmt.Errorf("native messaging requires dlp_patterns in config")
 	}
@@ -152,6 +153,7 @@ func run(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	resolveLocalRulesDir(&cfg)
 
 	s, err := store.Open(cfg.DBPath)
 	if err != nil {
@@ -312,7 +314,11 @@ func run(configPath string) error {
 	}
 
 	// Phase 5: admin rule override store. An empty
-	// local_rules_dir disables overrides.
+	// local_rules_dir disables overrides; otherwise the store always
+	// exposes both override files (empty placeholders are created
+	// on first run), and we register them with the policy engine
+	// here so a later POST/DELETE /api/rules/override Reload picks
+	// them up without requiring a restart.
 	overrideStore, err := rules.NewOverrideStore(cfg.LocalRulesDir)
 	if err != nil {
 		return fmt.Errorf("init override store: %w", err)
@@ -439,6 +445,24 @@ func validateRulesAlignment(rulesDir string, rulePaths []string, dlpPatternsPath
 		return err
 	}
 	return nil
+}
+
+// resolveLocalRulesDir applies the documented "RulesDir/local"
+// fallback when local_rules_dir is blank, mirroring how callers
+// resolve RulesDir at use-site. Without this the override store
+// would receive an empty path and silently reject every Add/Remove
+// with "store disabled (no directory configured)", so the admin
+// override UI and POST /api/rules/override would 500 unless the
+// user had explicitly set local_rules_dir in config.yaml.
+func resolveLocalRulesDir(cfg *config.Config) {
+	if cfg.LocalRulesDir != "" {
+		return
+	}
+	base := cfg.RulesDir
+	if base == "" {
+		base = defaultRulesDir(cfg.RulePaths)
+	}
+	cfg.LocalRulesDir = filepath.Join(base, "local")
 }
 
 // defaultRulesDir derives the directory rule files live in when the

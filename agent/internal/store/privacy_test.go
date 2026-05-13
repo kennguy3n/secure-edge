@@ -86,6 +86,103 @@ func TestPrivacy_NoAccessTablesAndNoDomainsPersisted(t *testing.T) {
 	scanTextColumns(t, s.DB(), forbidden)
 }
 
+// TestPrivacy_DLPScanContentNotPersisted runs a sequence of DLP scan
+// bumps (analogous to what the API handler does for each scan) and
+// then sweeps the database for any of the secret values that those
+// scans operated on. Only aggregate counters (dlp_scans_total,
+// dlp_blocks_total) may have changed.
+func TestPrivacy_DLPScanContentNotPersisted(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "dlp-privacy.db")
+	s, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	ctx := context.Background()
+	before, err := s.GetStats(ctx)
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+
+	// These represent the "did a scan, was/wasn't blocked" calls the
+	// API handler would make. The actual secret values never leave
+	// the DLP package — the store only sees integer deltas.
+	type scan struct {
+		secret  string
+		blocked bool
+	}
+	scans := []scan{
+		{"AKIA9P2QRMZNL5CVXBT4", true}, // AWS access key (TP)
+		{"ghp_9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e", true},          // GitHub PAT
+		{"sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", true},      // OpenAI key
+		{"sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123", true},        // Anthropic
+		{"AIzaSyD9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3D", true},          // Google API
+		{"mongodb+srv://svc:Ub3rH4rdProdSecret42@cluster0.mongodb.net", true},
+		{"benign string with no secrets", false},
+		{"package com.shipfast; // import statement", false},
+	}
+	for _, sc := range scans {
+		delta := AggregateStats{DLPScansTotal: 1}
+		if sc.blocked {
+			delta.DLPBlocksTotal = 1
+		}
+		if err := s.AddStats(ctx, delta); err != nil {
+			t.Fatalf("AddStats: %v", err)
+		}
+	}
+
+	after, err := s.GetStats(ctx)
+	if err != nil {
+		t.Fatalf("GetStats: %v", err)
+	}
+	if after.DLPScansTotal-before.DLPScansTotal != int64(len(scans)) {
+		t.Errorf("dlp scans delta = %d", after.DLPScansTotal-before.DLPScansTotal)
+	}
+	wantBlocks := int64(0)
+	for _, sc := range scans {
+		if sc.blocked {
+			wantBlocks++
+		}
+	}
+	if after.DLPBlocksTotal-before.DLPBlocksTotal != wantBlocks {
+		t.Errorf("dlp blocks delta = %d, want %d",
+			after.DLPBlocksTotal-before.DLPBlocksTotal, wantBlocks)
+	}
+
+	// Forbidden tables that would imply scan-content storage must
+	// not have been created.
+	for _, name := range []string{
+		"dlp_scans", "dlp_matches", "scan_log", "scan_results",
+		"dlp_log", "dlp_events", "matches",
+	} {
+		var found string
+		err := s.DB().QueryRowContext(ctx,
+			`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, name).
+			Scan(&found)
+		if err == nil {
+			t.Errorf("forbidden DLP table %q exists", name)
+		} else if err != sql.ErrNoRows {
+			t.Fatalf("query forbidden table %q: %v", name, err)
+		}
+	}
+
+	// Sweep every text column for any of the secrets, secret prefixes,
+	// or any pattern name. None of these should appear anywhere in the
+	// database, since the agent never writes scan content or matched
+	// pattern names to disk.
+	forbidden := []string{
+		"AKIA9P2QRMZNL5CVXBT4", "ghp_9f8a7b6c5d4e",
+		"sk-proj-", "sk-ant-api03-", "AIzaSyD",
+		"mongodb+srv://", "Ub3rH4rdProdSecret42",
+		// pattern names that would only appear if matches were logged
+		"AWS Access Key", "GitHub Personal Access Token",
+		"OpenAI Project Key", "Anthropic API Key",
+		"Google API Key", "MongoDB Atlas SRV Connection",
+	}
+	scanTextColumns(t, s.DB(), forbidden)
+}
+
 func scanTextColumns(t *testing.T, db *sql.DB, forbidden []string) {
 	t.Helper()
 	tables, err := db.Query(

@@ -126,7 +126,13 @@ export function ProxySettings() {
       </p>
 
       {feedback && (
-        <div className={`feedback feedback-${feedback.kind}`}>{feedback.message}</div>
+        <div
+          className={`feedback feedback-${feedback.kind}`}
+          role={feedback.kind === 'error' ? 'alert' : 'status'}
+          aria-live={feedback.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          {feedback.message}
+        </div>
       )}
 
       <section className="proxy-status">

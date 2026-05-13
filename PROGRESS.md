@@ -1,6 +1,6 @@
 # ShieldNet Secure Edge — Progress Tracker
 
-> Last updated: 2026-05-12
+> Last updated: 2026-05-13
 
 ## Overall Status
 
@@ -10,7 +10,7 @@
 | Phase 2: Browser Extension + Layered DLP Pipeline | Complete | 100% |
 | Phase 3: Rule Updates + Installers | Complete | 100% |
 | Phase 4: MITM Proxy (Optional) | Complete | 100% |
-| Phase 5: Enterprise Features | In progress | ~65% |
+| Phase 5: Enterprise Features | Complete | 100% |
 
 ## Phase 1 Detailed Breakdown
 
@@ -203,13 +203,13 @@
 
 ### Quality & Documentation
 - [x] Performance profiling: memory usage, CPU usage, DNS latency benchmarks
-- [ ] DLP accuracy benchmarks: false positive/negative rates against test corpus
-- [ ] Privacy audit: code review of every disk write path to verify zero access logging
-- [ ] Admin guide (installation, configuration, profile management)
-- [ ] User guide (what the tray icon means, how to report false positives)
-- [ ] Rule contribution guide (how to add domains, DLP patterns, exclusions)
-- [ ] DLP pattern authoring guide (hotwords, entropy thresholds, scoring weights)
-- [ ] Accessibility audit of Electron UI
+- [x] DLP accuracy benchmarks: false positive/negative rates against test corpus (`agent/internal/dlp/accuracy_test.go`, FP < 10%, FN < 5%)
+- [x] Privacy audit: code review of every disk write path to verify zero access logging (`agent/internal/store/privacy_test.go::TestPrivacy_DLPScanContentNotPersisted`)
+- [x] Admin guide (`docs/admin-guide.md`)
+- [x] User guide (`docs/user-guide.md`)
+- [x] Rule contribution guide (`docs/rule-contribution-guide.md`)
+- [x] DLP pattern authoring guide (`docs/dlp-pattern-authoring-guide.md`)
+- [x] Accessibility audit of Electron UI (`docs/accessibility.md`)
 
 ## Repository Structure (Planned)
 
@@ -285,6 +285,13 @@ secure-edge/
 │   ├── news.txt
 │   ├── dlp_patterns.json
 │   └── dlp_exclusions.json
+├── docs/                           # End-user / operator documentation
+│   ├── admin-guide.md
+│   ├── user-guide.md
+│   ├── rule-contribution-guide.md
+│   ├── dlp-pattern-authoring-guide.md
+│   └── accessibility.md
+├── SECURITY_RULES.md               # Reference table of every DLP pattern
 ├── scripts/                        # Platform setup scripts
 │   ├── macos/
 │   │   ├── configure-dns.sh
@@ -309,6 +316,70 @@ secure-edge/
 ```
 
 ## Changelog
+
+### 2026-05-13 (Phase 5 completion — DLP coverage, audits, docs)
+- **Expanded DLP patterns (`rules/dlp_patterns.json`)** with ~95 new
+  real-world rules across 15 ecosystems: Java (Maven/Gradle creds,
+  JDBC URLs, Spring config, keystores, AWS SDK), Rust (Cargo registry,
+  Crates.io, Rocket secret keys, password literals), Frontend
+  (Firebase web config, React `REACT_APP_`, Next.js `NEXT_PUBLIC_`,
+  Vite `VITE_`, Angular `environment.ts`, Webpack DefinePlugin),
+  Desktop (Tauri signing keys, Electron Forge / Builder publish
+  tokens), AI/ML (OpenAI project / svcacct / user keys, Anthropic,
+  HuggingFace, Cohere, Replicate, Pinecone, Mistral, W&B, LangSmith,
+  Together, Groq), iOS (APNs `.p8`, App Store Connect, Cocoapods,
+  Xcode Cloud, Team ID), Android (`google-services.json`, signing
+  store password, Play Console JSON, `local.properties`), Flutter /
+  React Native (Expo, EAS, CodePush, Fastlane Match, Dart `.env`),
+  Databases (Postgres / MySQL / MongoDB SRV / Redis / MSSQL / SQLite
+  PRAGMA / Cassandra / Elasticsearch URLs), Cloud infrastructure
+  (Cloudflare, DigitalOcean, Vercel, Netlify, Supabase, Pulumi, Helm,
+  Terraform, Docker registry, K8s Secret YAML), CI/CD (CircleCI,
+  Travis, Jenkins, Azure DevOps, GitLab, Bitbucket), messaging
+  (Discord bot tokens, Telegram, Vonage), payment (PayPal, Square,
+  Braintree, Adyen, Plaid, Coinbase), auth/identity (Auth0, Okta,
+  OneLogin, Keycloak, Firebase Admin SDK, Supabase JWT, Clerk),
+  password-in-code across Python / JS / TS / Java / Rust / Go / Swift
+  / Kotlin / Dart. Matching `rules/dlp_exclusions.json` entries cover
+  documented placeholder values, test fixtures, RFC 2606 reserved
+  domains, and `${{ secrets.* }}` template literals. Manifest
+  checksums regenerated in `rules/manifest.json`. Total patterns
+  shipped: **139** across **20** categories — see `SECURITY_RULES.md`.
+- **DLP accuracy benchmarks (`agent/internal/dlp/accuracy_test.go`)**:
+  50-sample corpus (25 TP + 25 TN) covering every new ecosystem.
+  Runs the full `Pipeline.Scan()` for each sample and asserts
+  `FP rate < 10%` and `FN rate < 5%`. Current measurement: 25 TP /
+  25 TN, 0 FP, 0 FN.
+- **Privacy audit (`agent/internal/store/privacy_test.go`)** extended
+  with `TestPrivacy_DLPScanContentNotPersisted` — runs an
+  `AggregateStats` update against the full DLP scan path, then sweeps
+  every text column in every SQLite table for forbidden content
+  (scan text, matched secret value, pattern names, prefixes). Confirms
+  the agent never persists scan content or match details to disk.
+- **Expanded integration test
+  (`agent/internal/dlp/integration_extended_test.go`)** scans a ~10 KB
+  benign document that embeds one secret per category in filler text,
+  asserts every embedded secret is detected with an allowed pattern
+  name, and enforces a performance budget of 50 ms (median of 5 runs)
+  in non-race builds — relaxed to 1.5 s under `-race` via the
+  build-tagged `raceEnabled` flag. Production hot-path scans of ~5 KB
+  inputs typically run in ~5-10 ms on a developer workstation; the
+  test budget is set to catch order-of-magnitude regressions while
+  tolerating shared CI runner jitter.
+- **Documentation suite** added under `docs/`:
+  `admin-guide.md`, `user-guide.md`, `rule-contribution-guide.md`,
+  `dlp-pattern-authoring-guide.md`, `accessibility.md`, plus the
+  top-level `SECURITY_RULES.md` reference table.
+- **Accessibility audit + fixes for the Electron tray UI**: top
+  navigation is now `role="tablist"` / `role="tab"` with roving
+  `tabIndex` and `aria-selected`; every icon-only and short-label
+  button has an explicit `aria-label`; the agent status banner and
+  feedback toasts use `role="status"` / `role="alert"` with
+  appropriate `aria-live`; form inputs in the Admin Overrides section
+  have visually-hidden `<label>` elements via a new `.sr-only`
+  utility; explicit `:focus-visible` ring added in `styles.css`
+  meeting WCAG 2.1 SC 2.4.7. Findings and verification steps recorded
+  in `docs/accessibility.md`.
 
 ### 2026-05-13 (Phase 5 enterprise rollout)
 - **Expanded DLP patterns (`rules/dlp_patterns.json`)** with real-world

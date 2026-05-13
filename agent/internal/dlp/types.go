@@ -107,6 +107,12 @@ type Exclusion struct {
 	Window    int                 `json:"window,omitempty"`
 	MatchType DictionaryMatchType `json:"match_type,omitempty"`
 
+	// Suppress, when true on a regex exclusion, fully drops the match
+	// instead of subtracting ExclusionPenalty. Use for known-doc
+	// patterns such as AIza...EXAMPL... that should never count even
+	// if all other signals (hotwords, entropy) line up.
+	Suppress bool `json:"suppress,omitempty"`
+
 	// Compiled is populated by LoadExclusions for regex exclusions.
 	Compiled *regexp.Regexp `json:"-"`
 }

@@ -299,12 +299,52 @@ response is sent. No content reaches disk, SQLite, or any log.
       "type": "dictionary",
       "words": ["AKIAIOSFODNN7EXAMPLE"],
       "match_type": "exact"
+    },
+    {
+      "applies_to": "GitHub Actions Secret Template",
+      "type": "regex",
+      "pattern": "\\$\\{\\{\\s*secrets\\.[A-Z0-9_]+\\s*\\}\\}",
+      "suppress": true
     }
   ]
 }
 ```
 
+`match_type` accepts `exact` or `proximity` (default) and is honoured for
+dictionary exclusions. `window` is optional on dictionary exclusions and
+restricts the suppression to a byte window around the match; regex
+exclusions match the secret span directly. The optional `suppress` field
+on a regex exclusion fully suppresses the match (instead of merely
+applying `ExclusionPenalty`); this is useful for known placeholder
+formats such as `${{ secrets.NAME }}` in GitHub Actions YAML.
+
 Community can contribute exclusions via PR to reduce false positives without modifying core patterns.
+
+#### Shipped Pattern Coverage
+
+The repository ships **139** patterns across **20** categories — see
+[`SECURITY_RULES.md`](./SECURITY_RULES.md) for the full reference table.
+Categories include cloud providers (AWS, Azure, GCP), cloud
+infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify, Supabase,
+Pulumi, Helm, Terraform, Docker, Kubernetes), version control (GitHub,
+GitLab, Bitbucket), AI/ML platforms (OpenAI, Anthropic, HuggingFace,
+Cohere, Replicate, Pinecone, Mistral, W&B, LangSmith, Together, Groq),
+payment processors (Stripe, PayPal, Square, Braintree, Adyen, Plaid,
+Coinbase), CI/CD (CircleCI, Travis, Jenkins, Azure DevOps), messaging
+(Slack, Discord, Telegram, Twilio, SendGrid, Vonage, Mailchimp),
+auth/identity (Auth0, Okta, OneLogin, Keycloak, Firebase Admin SDK,
+Supabase JWT, Clerk), language ecosystems (Java JDBC / Maven / Spring /
+Keystore, Rust Cargo / Rocket, JS/TS / React / Next / Vite / Angular /
+Webpack, Swift, Kotlin, Dart Flutter, Go, Python), desktop (Electron
+Forge / Builder, Tauri signing), mobile (iOS APNs / Cocoapods / Xcode
+Cloud / App Store Connect, Android signing / `google-services.json` /
+`local.properties`, Expo / EAS / Fastlane Match / CodePush),
+databases (Postgres, MySQL, MongoDB SRV, Redis, MSSQL, SQLite PRAGMA,
+Cassandra, Elasticsearch), private keys (PEM), JWTs, generic
+password-in-code patterns, and PII (SSN, credit cards, emails, phones).
+Accuracy is enforced by
+[`agent/internal/dlp/accuracy_test.go`](./agent/internal/dlp/accuracy_test.go)
+with budgets `FP < 10%` and `FN < 5%`.
 
 ### 3. Local MITM Proxy (Optional, Phase 4)
 

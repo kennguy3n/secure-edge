@@ -13,7 +13,7 @@
 
 | Area | Status |
 | --- | --- |
-| Keyboard navigation | **Pass** — every interactive element is a native `<button>`, `<input>`, or `<select>` and reachable via Tab. |
+| Keyboard navigation | **Pass** — every interactive element is a native `<button>`, `<input>`, or `<select>` and reachable via Tab. The top tablist also supports the standard WAI-ARIA tabs pattern: `ArrowLeft` / `ArrowRight` cycle through tabs with wrap-around, `Home` jumps to the first tab, `End` to the last. |
 | Visible focus indicator | **Pass** — explicit `:focus-visible` outline in `styles.css` (`2px solid var(--accent)`, `outline-offset: 2px`). |
 | Semantic landmarks | **Pass** — top nav is `role="tablist"`, the body is `role="tabpanel"` with `aria-labelledby` pointing at the active tab. |
 | Icon-only buttons / non-text controls | **Pass** — every icon-only or short-label button now carries an `aria-label` describing the action (e.g. `Remove example.com from allow list`). |
@@ -30,6 +30,7 @@
 
 - **Before:** topbar was a `<nav>` with three unannotated `<button>` elements.
 - **After:** topbar is `role="tablist"` with `aria-label="Secure Edge sections"`. Each button has `role="tab"`, `aria-selected`, an `id` (`tab-status` etc.), and roving `tabIndex` (0 on the active tab, -1 on the rest). The content area below is `role="tabpanel"` with `aria-labelledby` pointing at the active tab.
+- Keyboard navigation follows the WAI-ARIA tabs pattern: `ArrowLeft` / `ArrowRight` move focus to the previous / next tab with wrap-around, `Home` focuses the first tab, `End` focuses the last. Selection follows focus, so the active hash is updated as the user arrows through. The tablist itself takes a single Tab stop (the active tab); from there the user arrows between tabs and continues Tab into the panel content.
 - Tab order is left-to-right: Status → Settings → Proxy → page content.
 
 ### `Status.tsx`

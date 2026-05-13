@@ -34,7 +34,7 @@ Columns:
 | AWS Session Token | critical | `aws_session_token` | no |
 | Azure AD Client Secret | critical | `client_secret` | yes |
 | Azure Connection String | critical | `DefaultEndpointsProtocol` | no |
-| Azure DevOps PAT | critical | `azuredevops` | no |
+| Azure DevOps PAT | critical | `_(none)_` | no |
 | Azure SAS Token | critical | `sig=` | yes |
 | Azure Storage Account Key | critical | `AccountKey=` | no |
 | Azure Subscription ID | high | `_(none)_` | yes |
@@ -46,7 +46,7 @@ Columns:
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
-| Cloudflare API Token | critical | `CLOUDFLARE` | no |
+| Cloudflare API Token | critical | `_(none)_` | no |
 | DigitalOcean OAuth Token | critical | `doo_v1_` | no |
 | DigitalOcean Personal Access Token | critical | `dop_v1_` | no |
 | Docker Registry Auth | critical | `"auths"` | no |
@@ -121,7 +121,7 @@ Columns:
 | Telegram Bot Token | critical | `_(none)_` | yes |
 | Twilio API Key | critical | `SK` | yes |
 | Twilio Account SID | critical | `AC` | yes |
-| Vonage Nexmo API Secret | high | `vonage` | yes |
+| Vonage Nexmo API Secret | high | `_(none)_` | yes |
 
 ## Auth / Identity (7)
 
@@ -175,9 +175,9 @@ Columns:
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
-| Electron Builder Publish Credentials | critical | `GH_TOKEN` | yes |
-| Electron Forge Publish Token | critical | `SNAPCRAFT_TOKEN` | no |
-| Tauri Signing Private Key | critical | `TAURI_SIGNING` | no |
+| Electron Builder Publish Credentials | critical | `_(none)_` | yes |
+| Electron Forge Publish Token | critical | `_(none)_` | no |
+| Tauri Signing Private Key | critical | `_(none)_` | no |
 
 ## iOS Native (5)
 
@@ -201,11 +201,11 @@ Columns:
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
-| Dart Password Literal | high | `const` | yes |
+| Dart Password Literal | high | `_(none)_` | yes |
 | EAS Build Secret | high | `EAS_` | no |
 | Expo Access Token | critical | `EXPO_TOKEN` | no |
 | Fastlane Match Password | critical | `MATCH_PASSWORD` | no |
-| Flutter Dart Environment Secret | high | `flutter` | yes |
+| Flutter Dart Environment Secret | high | `_(none)_` | yes |
 
 ## Databases (7)
 
@@ -214,7 +214,7 @@ Columns:
 | Cassandra Auth Provider Credentials | high | `PlainTextAuthProvider` | no |
 | Database Connection String | critical | `_(none)_` | no |
 | Elasticsearch URL with Credentials | high | `https://` | yes |
-| MSSQL Connection String with Password | critical | `Server=` | no |
+| MSSQL Connection String with Password | critical | `_(none)_` | no |
 | MongoDB Atlas SRV Connection | critical | `mongodb+srv://` | no |
 | Redis URL with Password | high | `redis` | no |
 | SQLite PRAGMA Encryption Key | high | `PRAGMA` | yes |
@@ -235,10 +235,10 @@ Columns:
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
-| Go Password Literal | high | `password` | yes |
+| Go Password Literal | high | `_(none)_` | yes |
 | Kotlin Password Literal | high | `val` | yes |
-| Password Assignment | high | `password` | yes |
-| Python Secret Key Literal | high | `SECRET_KEY` | yes |
+| Password Assignment | high | `_(none)_` | yes |
+| Python Secret Key Literal | high | `_(none)_` | yes |
 | Source Code Imports | low | `_(none)_` | no |
 | Swift Password Literal | high | `let` | yes |
 
@@ -255,16 +255,16 @@ Columns:
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
-| Datadog API Key | high | `dd_api_key` | no |
-| Firebase App Distribution Token | critical | `FIREBASE_TOKEN` | no |
+| Datadog API Key | high | `_(none)_` | no |
+| Firebase App Distribution Token | critical | `_(none)_` | no |
 | Firebase Cloud Messaging Server Key | critical | `AAAA` | no |
 | Generic API Key | high | `api` | yes |
 | Google API Key | critical | `AIza` | no |
-| HashiCorp Vault Token | critical | `hvs.` | no |
+| HashiCorp Vault Token | critical | `_(none)_` | no |
 | Heroku API Key | high | `_(none)_` | yes |
 | Internal URLs | high | `_(none)_` | no |
-| New Relic API Key | high | `NRAK-` | no |
-| Shopify Access Token | critical | `shp` | yes |
+| npm Token | critical | `npm_` | no |
+| PyPI API Token | critical | `pypi-` | no |
 
 ---
 

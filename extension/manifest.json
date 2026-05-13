@@ -7,7 +7,9 @@
   "permissions": [
     "activeTab",
     "storage",
-    "nativeMessaging"
+    "nativeMessaging",
+    "clipboardRead",
+    "scripting"
   ],
 
   "host_permissions": [
@@ -23,6 +25,12 @@
   "action": {
     "default_title": "Secure Edge",
     "default_popup": "src/popup/popup.html"
+  },
+
+  "options_page": "src/options/options.html",
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
   },
 
   "content_scripts": [
@@ -41,7 +49,9 @@
       ],
       "js": [
         "dist/content/paste-interceptor.js",
-        "dist/content/form-interceptor.js"
+        "dist/content/form-interceptor.js",
+        "dist/content/drag-interceptor.js",
+        "dist/content/clipboard-monitor.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -155,9 +156,20 @@ func runNativeMessaging(configPath string) error {
 // applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
 // loaded YAML config into the pipeline. Called from both daemon and
 // native-messaging paths so each transport observes the same defaults.
+//
+// The four DLP int fields all distinguish "omitted" (keep default)
+// from "explicit 0" (disable / opt out) at the config layer; we
+// preserve that distinction here so the documented semantics hold
+// end-to-end.
 func applyDLPRuntimeConfig(p *dlp.Pipeline, cfg config.Config) {
-	if cfg.LargeContentThreshold > 0 {
+	switch {
+	case cfg.LargeContentThreshold > 0:
 		p.SetLargeContentThreshold(cfg.LargeContentThreshold)
+	case cfg.LargeContentThreshold == 0:
+		// Explicit 0 → disable adaptive scanning. The pipeline
+		// has no native "never trigger" flag, so pass a ceiling
+		// that no realistic payload will exceed.
+		p.SetLargeContentThreshold(math.MaxInt)
 	}
 	if len(cfg.DLPDisabledCategories) > 0 {
 		p.SetDisabledCategories(cfg.DLPDisabledCategories)
@@ -166,6 +178,7 @@ func applyDLPRuntimeConfig(p *dlp.Pipeline, cfg config.Config) {
 		ttl := time.Duration(cfg.DLPCacheTTLSeconds) * time.Second
 		p.EnableCache(dlp.NewScanCache(cfg.DLPCacheCapacity, ttl))
 	}
+	// cfg.DLPCacheTTLSeconds == 0 → leave the pipeline cacheless.
 }
 
 func run(configPath string) error {
@@ -213,11 +226,12 @@ func run(configPath string) error {
 	apiServer := api.NewServer(s, engine, counter)
 
 	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).
-	// Zero or negative disables the limiter entirely so operators can
-	// opt out for synthetic load tests.
+	// Explicit 0 disables the limiter entirely so operators can opt
+	// out for synthetic load tests; the config loader already
+	// rejects negative values.
 	if cfg.DLPRateLimitPerSec > 0 {
 		apiServer.SetScanRateLimit(float64(cfg.DLPRateLimitPerSec), cfg.DLPRateLimitPerSec)
-	} else if cfg.DLPRateLimitPerSec < 0 {
+	} else {
 		apiServer.SetScanRateLimit(0, 1)
 	}
 

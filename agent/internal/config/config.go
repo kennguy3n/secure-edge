@@ -91,21 +91,30 @@ type Config struct {
 
 	// LargeContentThreshold is the byte size above which the DLP
 	// pipeline drops low/medium-severity patterns and only runs
-	// critical/high. Defaults to 51200 (50 KiB). Set 0 to disable
-	// the optimisation.
+	// critical/high. Defaults to 51200 (50 KiB). Explicitly setting
+	// this to 0 in YAML disables adaptive scanning so every payload
+	// runs the full pattern set; omitting the field keeps the
+	// default. Negative values are rejected at load time.
 	LargeContentThreshold int `yaml:"large_content_threshold"`
 
 	// DLPCacheTTLSeconds is the lifetime of the in-memory scan
-	// result cache. Zero disables caching entirely. Defaults to 5s.
+	// result cache. Explicitly setting this to 0 in YAML disables
+	// caching entirely; omitting the field keeps the 5s default.
+	// Negative values are rejected at load time.
 	DLPCacheTTLSeconds int `yaml:"dlp_cache_ttl_seconds"`
 
 	// DLPCacheCapacity is the maximum number of entries the scan
-	// cache holds. Defaults to 1024.
+	// cache holds. Defaults to 1024 when omitted. Explicitly setting
+	// this to 0 in YAML also keeps the built-in default — the cache
+	// always retains at least one slot so it can dedupe back-to-back
+	// scans of the same content.
 	DLPCacheCapacity int `yaml:"dlp_cache_capacity"`
 
 	// DLPRateLimitPerSec is the per-process rate limit applied to
-	// POST /api/dlp/scan. Defaults to 100 requests per second.
-	// Zero disables the limiter entirely.
+	// POST /api/dlp/scan. Defaults to 100 requests per second when
+	// omitted. Explicitly setting this to 0 in YAML disables the
+	// limiter entirely so synthetic load tests can opt out. Negative
+	// values are rejected at load time.
 	DLPRateLimitPerSec int `yaml:"dlp_rate_limit_per_sec"`
 
 	// DLPDisabledCategories is the list of pattern categories
@@ -169,11 +178,54 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
 
+	// Re-decode the int fields that have explicit "zero disables"
+	// semantics into pointer-typed shadow fields. YAML unmarshal
+	// folds an omitted field and an explicit `0` into the same Go
+	// zero value on an `int`, so merge() cannot tell them apart on
+	// the regular Config view alone.
+	var overlay phase6IntOverlay
+	if err := yaml.Unmarshal(data, &overlay); err != nil {
+		return Config{}, fmt.Errorf("parse config: %w", err)
+	}
+
 	merged := merge(cfg, parsed)
+	overlay.apply(&merged)
 	if err := merged.validate(); err != nil {
 		return Config{}, err
 	}
 	return merged, nil
+}
+
+// phase6IntOverlay re-decodes the four DLP int fields whose
+// documented behaviour distinguishes "omitted" from "explicit 0".
+// A pointer field lets the YAML decoder give us a nil value when
+// the key is absent and a `*int` pointing at zero when the operator
+// wrote `: 0` explicitly. This is the only way to recover that
+// distinction without changing the public Config struct's field
+// types and rippling through every consumer.
+type phase6IntOverlay struct {
+	LargeContentThreshold *int `yaml:"large_content_threshold"`
+	DLPCacheTTLSeconds    *int `yaml:"dlp_cache_ttl_seconds"`
+	DLPCacheCapacity      *int `yaml:"dlp_cache_capacity"`
+	DLPRateLimitPerSec    *int `yaml:"dlp_rate_limit_per_sec"`
+}
+
+// apply copies any explicitly-set overlay values onto cfg. nil
+// pointers (omitted keys) are skipped so the default seeded by
+// merge() survives.
+func (o phase6IntOverlay) apply(cfg *Config) {
+	if o.LargeContentThreshold != nil {
+		cfg.LargeContentThreshold = *o.LargeContentThreshold
+	}
+	if o.DLPCacheTTLSeconds != nil {
+		cfg.DLPCacheTTLSeconds = *o.DLPCacheTTLSeconds
+	}
+	if o.DLPCacheCapacity != nil {
+		cfg.DLPCacheCapacity = *o.DLPCacheCapacity
+	}
+	if o.DLPRateLimitPerSec != nil {
+		cfg.DLPRateLimitPerSec = *o.DLPRateLimitPerSec
+	}
 }
 
 func merge(defaults, override Config) Config {
@@ -241,18 +293,10 @@ func merge(defaults, override Config) Config {
 	if override.LocalRulesDir != "" {
 		out.LocalRulesDir = override.LocalRulesDir
 	}
-	if override.LargeContentThreshold != 0 {
-		out.LargeContentThreshold = override.LargeContentThreshold
-	}
-	if override.DLPCacheTTLSeconds != 0 {
-		out.DLPCacheTTLSeconds = override.DLPCacheTTLSeconds
-	}
-	if override.DLPCacheCapacity != 0 {
-		out.DLPCacheCapacity = override.DLPCacheCapacity
-	}
-	if override.DLPRateLimitPerSec != 0 {
-		out.DLPRateLimitPerSec = override.DLPRateLimitPerSec
-	}
+	// The four DLP int fields with "zero disables" semantics are
+	// handled by phase6IntOverlay.apply() after merge() runs, so
+	// they are intentionally not copied here — a `!= 0` guard would
+	// silently drop the operator's explicit `0`.
 	if len(override.DLPDisabledCategories) > 0 {
 		out.DLPDisabledCategories = override.DLPDisabledCategories
 	}
@@ -289,6 +333,18 @@ func (c Config) validate() error {
 	}
 	if c.ProxyListen == "" {
 		return errors.New("proxy_listen must not be empty")
+	}
+	if c.LargeContentThreshold < 0 {
+		return errors.New("large_content_threshold must not be negative")
+	}
+	if c.DLPCacheTTLSeconds < 0 {
+		return errors.New("dlp_cache_ttl_seconds must not be negative")
+	}
+	if c.DLPCacheCapacity < 0 {
+		return errors.New("dlp_cache_capacity must not be negative")
+	}
+	if c.DLPRateLimitPerSec < 0 {
+		return errors.New("dlp_rate_limit_per_sec must not be negative")
 	}
 	return nil
 }

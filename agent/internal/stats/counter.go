@@ -15,10 +15,11 @@ import (
 // last persisted total). It mirrors store.AggregateStats but is local to
 // this package to avoid a dependency cycle.
 type Snapshot struct {
-	DNSQueriesTotal int64 `json:"dns_queries_total"`
-	DNSBlocksTotal  int64 `json:"dns_blocks_total"`
-	DLPScansTotal   int64 `json:"dlp_scans_total"`
-	DLPBlocksTotal  int64 `json:"dlp_blocks_total"`
+	DNSQueriesTotal       int64 `json:"dns_queries_total"`
+	DNSBlocksTotal        int64 `json:"dns_blocks_total"`
+	DLPScansTotal         int64 `json:"dlp_scans_total"`
+	DLPBlocksTotal        int64 `json:"dlp_blocks_total"`
+	TamperDetectionsTotal int64 `json:"tamper_detections_total"`
 }
 
 // Store is the subset of the persistence layer that Counter needs. Defined
@@ -41,6 +42,7 @@ type Counter struct {
 	dnsBlocks  int64
 	dlpScans   int64
 	dlpBlocks  int64
+	tamperHits int64
 
 	store Store
 }
@@ -60,13 +62,17 @@ func (c *Counter) IncrementDLPScans() { atomic.AddInt64(&c.dlpScans, 1) }
 // IncrementDLPBlocks adds one to the DLP blocks counter.
 func (c *Counter) IncrementDLPBlocks() { atomic.AddInt64(&c.dlpBlocks, 1) }
 
+// IncrementTamperDetections adds one to the tamper detections counter.
+func (c *Counter) IncrementTamperDetections() { atomic.AddInt64(&c.tamperHits, 1) }
+
 // MemorySnapshot returns the in-memory delta values (not yet flushed).
 func (c *Counter) MemorySnapshot() Snapshot {
 	return Snapshot{
-		DNSQueriesTotal: atomic.LoadInt64(&c.dnsQueries),
-		DNSBlocksTotal:  atomic.LoadInt64(&c.dnsBlocks),
-		DLPScansTotal:   atomic.LoadInt64(&c.dlpScans),
-		DLPBlocksTotal:  atomic.LoadInt64(&c.dlpBlocks),
+		DNSQueriesTotal:       atomic.LoadInt64(&c.dnsQueries),
+		DNSBlocksTotal:        atomic.LoadInt64(&c.dnsBlocks),
+		DLPScansTotal:         atomic.LoadInt64(&c.dlpScans),
+		DLPBlocksTotal:        atomic.LoadInt64(&c.dlpBlocks),
+		TamperDetectionsTotal: atomic.LoadInt64(&c.tamperHits),
 	}
 }
 
@@ -79,10 +85,11 @@ func (c *Counter) GetStats(ctx context.Context) (Snapshot, error) {
 	}
 	mem := c.MemorySnapshot()
 	return Snapshot{
-		DNSQueriesTotal: persisted.DNSQueriesTotal + mem.DNSQueriesTotal,
-		DNSBlocksTotal:  persisted.DNSBlocksTotal + mem.DNSBlocksTotal,
-		DLPScansTotal:   persisted.DLPScansTotal + mem.DLPScansTotal,
-		DLPBlocksTotal:  persisted.DLPBlocksTotal + mem.DLPBlocksTotal,
+		DNSQueriesTotal:       persisted.DNSQueriesTotal + mem.DNSQueriesTotal,
+		DNSBlocksTotal:        persisted.DNSBlocksTotal + mem.DNSBlocksTotal,
+		DLPScansTotal:         persisted.DLPScansTotal + mem.DLPScansTotal,
+		DLPBlocksTotal:        persisted.DLPBlocksTotal + mem.DLPBlocksTotal,
+		TamperDetectionsTotal: persisted.TamperDetectionsTotal + mem.TamperDetectionsTotal,
 	}, nil
 }
 
@@ -90,10 +97,11 @@ func (c *Counter) GetStats(ctx context.Context) (Snapshot, error) {
 // persisted totals, and zeroes the in-memory counters.
 func (c *Counter) Flush(ctx context.Context) error {
 	delta := Snapshot{
-		DNSQueriesTotal: atomic.SwapInt64(&c.dnsQueries, 0),
-		DNSBlocksTotal:  atomic.SwapInt64(&c.dnsBlocks, 0),
-		DLPScansTotal:   atomic.SwapInt64(&c.dlpScans, 0),
-		DLPBlocksTotal:  atomic.SwapInt64(&c.dlpBlocks, 0),
+		DNSQueriesTotal:       atomic.SwapInt64(&c.dnsQueries, 0),
+		DNSBlocksTotal:        atomic.SwapInt64(&c.dnsBlocks, 0),
+		DLPScansTotal:         atomic.SwapInt64(&c.dlpScans, 0),
+		DLPBlocksTotal:        atomic.SwapInt64(&c.dlpBlocks, 0),
+		TamperDetectionsTotal: atomic.SwapInt64(&c.tamperHits, 0),
 	}
 	if delta == (Snapshot{}) {
 		return nil
@@ -105,6 +113,7 @@ func (c *Counter) Flush(ctx context.Context) error {
 		atomic.AddInt64(&c.dnsBlocks, delta.DNSBlocksTotal)
 		atomic.AddInt64(&c.dlpScans, delta.DLPScansTotal)
 		atomic.AddInt64(&c.dlpBlocks, delta.DLPBlocksTotal)
+		atomic.AddInt64(&c.tamperHits, delta.TamperDetectionsTotal)
 		return err
 	}
 	return nil
@@ -116,6 +125,7 @@ func (c *Counter) Reset(ctx context.Context) error {
 	atomic.StoreInt64(&c.dnsBlocks, 0)
 	atomic.StoreInt64(&c.dlpScans, 0)
 	atomic.StoreInt64(&c.dlpBlocks, 0)
+	atomic.StoreInt64(&c.tamperHits, 0)
 	return c.store.ResetStats(ctx)
 }
 

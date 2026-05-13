@@ -14,6 +14,38 @@ export interface Stats {
   dns_blocks_total: number;
   dlp_scans_total: number;
   dlp_blocks_total: number;
+  tamper_detections_total?: number;
+}
+
+export interface DLPConfig {
+  threshold_critical: number;
+  threshold_high: number;
+  threshold_medium: number;
+  threshold_low: number;
+  hotword_boost: number;
+  entropy_boost: number;
+  entropy_penalty: number;
+  exclusion_penalty: number;
+  multi_match_boost: number;
+}
+
+export interface TamperStatus {
+  dns_ok: boolean;
+  proxy_ok: boolean;
+  last_check: string;
+  detections_total: number;
+}
+
+export interface RuleOverrideLists {
+  allow: string[];
+  block: string[];
+}
+
+export interface AgentProfile {
+  name: string;
+  version: string;
+  managed: boolean;
+  categories?: Record<string, PolicyAction>;
 }
 
 export interface AgentStatus {
@@ -98,6 +130,50 @@ export const agent = {
     return http<ProxyStatus>('/api/proxy/disable', {
       method: 'POST',
       body: JSON.stringify({ remove_ca: removeCA }),
+    });
+  },
+
+  // Phase 5: DLP scoring threshold tuning.
+  async getDLPConfig(): Promise<DLPConfig> {
+    return http<DLPConfig>('/api/dlp/config');
+  },
+  async updateDLPConfig(cfg: DLPConfig): Promise<DLPConfig> {
+    return http<DLPConfig>('/api/dlp/config', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    });
+  },
+
+  // Phase 5: tamper detection.
+  async getTamperStatus(): Promise<TamperStatus> {
+    return http<TamperStatus>('/api/tamper/status');
+  },
+
+  // Phase 5: enterprise profile.
+  async getProfile(): Promise<AgentProfile | null> {
+    try {
+      return await http<AgentProfile>('/api/profile');
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Agent 404')) {
+        return null;
+      }
+      throw err;
+    }
+  },
+
+  // Phase 5: admin allow/block override list.
+  async listOverrides(): Promise<RuleOverrideLists> {
+    return http<RuleOverrideLists>('/api/rules/override');
+  },
+  async addOverride(domain: string, list: 'allow' | 'block'): Promise<RuleOverrideLists> {
+    return http<RuleOverrideLists>('/api/rules/override', {
+      method: 'POST',
+      body: JSON.stringify({ domain, list }),
+    });
+  },
+  async removeOverride(domain: string): Promise<RuleOverrideLists> {
+    return http<RuleOverrideLists>(`/api/rules/override/${encodeURIComponent(domain)}`, {
+      method: 'DELETE',
     });
   },
 };

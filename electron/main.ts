@@ -25,6 +25,7 @@ let healthTimer: NodeJS.Timeout | null = null;
 let lastHealthy: boolean | null = null;
 let updateAvailable = false;
 let proxyRunning: boolean | null = null;
+let lastTamperDetections: number | null = null;
 
 function rendererPath(): string {
   // In production main.ts is compiled to dist/main.js and the renderer
@@ -190,12 +191,66 @@ function pingProxy(): Promise<boolean> {
   });
 }
 
+// pingTamper returns the tamper detector's running count, or null
+// when the endpoint is unavailable (Phase 1–4 agents return 503).
+function pingTamper(): Promise<number | null> {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: AGENT_HOST,
+        port: AGENT_PORT,
+        path: '/api/tamper/status',
+        method: 'GET',
+        timeout: 2000,
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(null);
+          return;
+        }
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body) as { detections_total?: number };
+            resolve(typeof parsed.detections_total === 'number' ? parsed.detections_total : null);
+          } catch {
+            resolve(null);
+          }
+        });
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.end();
+  });
+}
+
 async function tickHealth() {
-  const [ok, proxyOk] = await Promise.all([pingAgent(), pingProxy()]);
+  const [ok, proxyOk, tamper] = await Promise.all([pingAgent(), pingProxy(), pingTamper()]);
   updateTrayHealth(ok);
   if (proxyOk !== proxyRunning) {
     proxyRunning = proxyOk;
     refreshTrayMenu();
+  }
+  if (tamper !== null) {
+    if (lastTamperDetections !== null && tamper > lastTamperDetections) {
+      // Surface an ephemeral notification — no persistent log of the
+      // event, per the privacy invariant. The tray tooltip already
+      // reflects the elevated detections count via the menu.
+      tray?.displayBalloon?.({
+        title: 'Secure Edge',
+        content: 'Possible tamper detected — DNS or proxy configuration changed',
+      });
+    }
+    lastTamperDetections = tamper;
   }
 }
 

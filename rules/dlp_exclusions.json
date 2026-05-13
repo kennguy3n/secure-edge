@@ -16,7 +16,10 @@
         "redacted",
         "<redacted>",
         "CHANGEME",
-        "TODO"
+        "TODO",
+        "documentation",
+        "tutorial",
+        "mock"
       ],
       "window": 50,
       "match_type": "proximity"
@@ -26,6 +29,160 @@
       "type": "dictionary",
       "words": ["AKIAIOSFODNN7EXAMPLE", "AKIA1234567890123456"],
       "match_type": "exact"
+    },
+    {
+      "applies_to": "AWS Secret Access Key",
+      "type": "regex",
+      "pattern": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    },
+    {
+      "applies_to": "AWS Session Token",
+      "type": "dictionary",
+      "words": ["EXAMPLE", "FAKE", "PLACEHOLDER"],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "AWS ARN",
+      "type": "regex",
+      "pattern": "arn:aws:[a-zA-Z0-9\\-]+:[a-z0-9\\-]*:(000000000000|111111111111|123456789012|999999999999):"
+    },
+    {
+      "applies_to": "Azure Storage Account Key",
+      "type": "dictionary",
+      "words": [
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+        "EXAMPLE_ACCOUNT_KEY_BASE64_PADDED_TO_88_CHARS_FOR_LOCAL_TESTING_PURPOSES_ONLY_AAAA=="
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Azure Connection String",
+      "type": "regex",
+      "pattern": "AccountName=(devstoreaccount1|examplestorage|teststorage)"
+    },
+    {
+      "applies_to": "Azure SAS Token",
+      "type": "dictionary",
+      "words": ["EXAMPLE_SAS_SIGNATURE", "documentation", "tutorial"],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Azure Subscription ID",
+      "type": "dictionary",
+      "words": [
+        "00000000-0000-0000-0000-000000000000",
+        "11111111-1111-1111-1111-111111111111",
+        "12345678-1234-1234-1234-123456789012",
+        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "GCP Service Account Key",
+      "type": "dictionary",
+      "words": ["example", "demo-project", "test-project"],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "GCP OAuth Client Secret",
+      "type": "dictionary",
+      "words": ["GOCSPX-EXAMPLEEXAMPLEEXAMPLEEX"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Firebase Cloud Messaging Server Key",
+      "type": "dictionary",
+      "words": ["AAAAEXAMPLE", "documentation"],
+      "window": 200,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "GitHub Personal Access Token",
+      "type": "dictionary",
+      "words": ["ghp_000000000000000000000000000000000000"],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "Stripe Live Secret Key",
+      "type": "regex",
+      "pattern": "sk_live_(4242424242424242|0000000000000000|EXAMPLE)"
+    },
+    {
+      "applies_to": "Stripe Restricted Key",
+      "type": "regex",
+      "pattern": "rk_live_(0000000000000000|EXAMPLE)"
+    },
+    {
+      "applies_to": "Twilio Account SID",
+      "type": "regex",
+      "pattern": "AC(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    },
+    {
+      "applies_to": "Twilio API Key",
+      "type": "regex",
+      "pattern": "SK(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+    },
+    {
+      "applies_to": "SendGrid API Key",
+      "type": "regex",
+      "pattern": "SG\\.(EXAMPLE|TEST|DEMO|TUTORIAL)"
+    },
+    {
+      "applies_to": "Mailchimp API Key",
+      "type": "regex",
+      "pattern": "(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)-us[0-9]{1,2}"
+    },
+    {
+      "applies_to": "npm Token",
+      "type": "regex",
+      "pattern": "npm_(0{36}|EXAMPLE[A-Za-z0-9]*)"
+    },
+    {
+      "applies_to": "PyPI API Token",
+      "type": "regex",
+      "pattern": "pypi-(EXAMPLE|AgEIcHlwaS5vcmcCJDI[A-Za-z0-9_\\-]*)"
+    },
+    {
+      "applies_to": "Heroku API Key",
+      "type": "dictionary",
+      "words": [
+        "00000000-0000-0000-0000-000000000000",
+        "11111111-1111-1111-1111-111111111111",
+        "12345678-1234-1234-1234-123456789012"
+      ],
+      "match_type": "exact"
+    },
+    {
+      "applies_to": "JWT Token",
+      "type": "regex",
+      "pattern": "eyJhbGciOiJub25lIg|eyJ0eXAiOiJKV1Q[A-Za-z0-9_\\-]*\\.eyJzdWIiOiIxMjM0NTY3ODkwIg"
+    },
+    {
+      "applies_to": "Database Connection String",
+      "type": "regex",
+      "pattern": "(?i)://[^/@\\s]*@?(localhost|127\\.0\\.0\\.1|::1|0\\.0\\.0\\.0|example\\.com|example\\.org|example\\.net)"
+    },
+    {
+      "applies_to": "Password Assignment",
+      "type": "dictionary",
+      "words": ["example", "test", "placeholder", "your-password", "your_password", "CHANGEME"],
+      "window": 50,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "HashiCorp Vault Token",
+      "type": "dictionary",
+      "words": ["hvs.EXAMPLE", "hvb.EXAMPLE"],
+      "window": 100,
+      "match_type": "proximity"
+    },
+    {
+      "applies_to": "Datadog API Key",
+      "type": "regex",
+      "pattern": "(00000000000000000000000000000000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
     },
     {
       "applies_to": "Email Addresses (bulk)",
@@ -42,12 +199,6 @@
       "applies_to": "Credit Card Number",
       "type": "dictionary",
       "words": ["4111111111111111", "4242424242424242", "5555555555554444", "378282246310005"],
-      "match_type": "exact"
-    },
-    {
-      "applies_to": "GitHub Personal Access Token",
-      "type": "dictionary",
-      "words": ["ghp_000000000000000000000000000000000000"],
       "match_type": "exact"
     },
     {

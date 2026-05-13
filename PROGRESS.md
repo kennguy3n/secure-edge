@@ -10,7 +10,7 @@
 | Phase 2: Browser Extension + Layered DLP Pipeline | Complete | 100% |
 | Phase 3: Rule Updates + Installers | Complete | 100% |
 | Phase 4: MITM Proxy (Optional) | Complete | 100% |
-| Phase 5: Enterprise Features | Not Started | 0% |
+| Phase 5: Enterprise Features | In progress | ~65% |
 
 ## Phase 1 Detailed Breakdown
 
@@ -175,34 +175,34 @@
 ## Phase 5 Detailed Breakdown
 
 ### Enterprise Configuration
-- [ ] JSON-based policy profile format (categories, actions, DLP thresholds, rule update URL)
-- [ ] Profile download from server URL
-- [ ] Profile application on agent startup
-- [ ] Profile lock (prevent local override when managed)
-- [ ] API: `GET /api/profile` — current profile
-- [ ] API: `POST /api/profile/import` — import profile from URL or file
+- [x] JSON-based policy profile format (categories, actions, DLP thresholds, rule update URL)
+- [x] Profile download from server URL
+- [x] Profile application on agent startup
+- [x] Profile lock (prevent local override when managed)
+- [x] API: `GET /api/profile` — current profile
+- [x] API: `POST /api/profile/import` — import profile from URL or file
 
 ### Tamper Detection
-- [ ] Periodic check: is OS DNS still pointing to 127.0.0.1?
-- [ ] Periodic check: is system proxy still configured (if Phase 4 enabled)?
-- [ ] Ephemeral tray notification on tamper detection (no persistent log)
-- [ ] Tamper counter in `aggregate_stats`
+- [x] Periodic check: is OS DNS still pointing to 127.0.0.1?
+- [x] Periodic check: is system proxy still configured (if Phase 4 enabled)?
+- [x] Ephemeral tray notification on tamper detection (no persistent log)
+- [x] Tamper counter in `aggregate_stats`
 
 ### Agent Heartbeat (Optional)
-- [ ] Configurable heartbeat URL (disabled by default)
-- [ ] Heartbeat payload: agent version, OS type, aggregate counters ONLY
-- [ ] Heartbeat interval: configurable (default: 1 hour)
-- [ ] NO access data, NO domain data, NO DLP match details in heartbeat
+- [x] Configurable heartbeat URL (disabled by default)
+- [x] Heartbeat payload: agent version, OS type, aggregate counters ONLY
+- [x] Heartbeat interval: configurable (default: 1 hour)
+- [x] NO access data, NO domain data, NO DLP match details in heartbeat
 
 ### Admin Tools
-- [ ] Export aggregate stats as JSON
-- [ ] Custom rule file support (local override directory)
-- [ ] Custom DLP patterns/exclusions override files
-- [ ] DLP scoring threshold tuning UI in Electron settings
-- [ ] Allowlist/blocklist override UI (add/remove individual domains)
+- [x] Export aggregate stats as JSON
+- [x] Custom rule file support (local override directory)
+- [x] Custom DLP patterns/exclusions override files
+- [x] DLP scoring threshold tuning UI in Electron settings
+- [x] Allowlist/blocklist override UI (add/remove individual domains)
 
 ### Quality & Documentation
-- [ ] Performance profiling: memory usage, CPU usage, DNS latency benchmarks
+- [x] Performance profiling: memory usage, CPU usage, DNS latency benchmarks
 - [ ] DLP accuracy benchmarks: false positive/negative rates against test corpus
 - [ ] Privacy audit: code review of every disk write path to verify zero access logging
 - [ ] Admin guide (installation, configuration, profile management)
@@ -242,8 +242,11 @@ secure-edge/
 │   │       ├── exclusion.go        # Exclusion rule engine
 │   │       ├── scorer.go           # Multi-signal scoring aggregator
 │   │       └── pipeline.go         # Pipeline orchestrator
-│   │   └── proxy/                  # Phase 4 local MITM proxy (selective TLS
-│   │                                 decryption for Tier-2 hosts only)
+│   │   ├── proxy/                  # Phase 4 local MITM proxy (selective TLS
+│   │   │                             decryption for Tier-2 hosts only)
+│   │   ├── profile/                # Phase 5 enterprise profile loader + lock
+│   │   ├── tamper/                 # Phase 5 OS DNS/proxy tamper detector
+│   │   └── heartbeat/              # Phase 5 optional outbound heartbeat
 │   ├── go.mod
 │   └── go.sum
 ├── electron/                       # Electron tray app
@@ -306,6 +309,63 @@ secure-edge/
 ```
 
 ## Changelog
+
+### 2026-05-13 (Phase 5 enterprise rollout)
+- **Expanded DLP patterns (`rules/dlp_patterns.json`)** with real-world
+  cloud credentials: AWS secret access key / session token / ARN / MWS;
+  Azure storage account key, AD client secret, SAS token, connection
+  string, DevOps PAT, subscription ID; GCP service-account JSON, OAuth2
+  client secret, Firebase FCM server key; plus Stripe, Twilio,
+  SendGrid, Mailchimp, npm, PyPI, Heroku, JWT, generic DB connection
+  string, password-in-assignment, HashiCorp Vault, Datadog. Each entry
+  ships with a literal `prefix` for the Aho-Corasick scan, severity,
+  hotwords, and where relevant `require_hotword`/`entropy_min`. Matching
+  exclusions added in `rules/dlp_exclusions.json`. Manifest checksums
+  regenerated.
+- **Enterprise configuration profiles (`agent/internal/profile/`)**:
+  JSON profile schema, `LoadFromFile`/`LoadFromURL` with a 1 MiB cap
+  and 30s HTTP timeout, `Profile.Apply()` writes the policy and DLP
+  thresholds back through the existing `store.Store`, `Holder.Locked()`
+  blocks `PUT /api/policies/:category` and `PUT /api/dlp/config` when
+  `managed=true`. API: `GET /api/profile`, `POST /api/profile/import`.
+  Wired in `cmd/agent/main.go` via `loadProfileOnStartup` (local file
+  takes precedence over URL when both are configured). Comprehensive
+  tests in `profile_test.go` and `handlers_test.go`.
+- **Tamper detection (`agent/internal/tamper/`)**: `Detector` periodic
+  check (default 60s) of OS DNS + system proxy. Platform-specific
+  probes via build tags — `/etc/resolv.conf` on Linux/BSD,
+  `networksetup -getdnsservers` on macOS, `netsh interface ipv4 show
+  dnsservers` on Windows; proxy probes use env vars on Linux/BSD,
+  `networksetup -get{web,securewebp}roxy` on macOS, `netsh winhttp
+  show proxy` on Windows. Counter `tamper_detections_total` added via
+  additive migration in `store.Store`. Electron tray balloon notifies
+  on transition without persisting any event. API: `GET /api/tamper/status`.
+- **Agent heartbeat (`agent/internal/heartbeat/`)**: optional, disabled
+  by default (URL=""). Payload is exactly
+  `{agent_version, os_type, os_arch, aggregate_counters}` — tests
+  assert no URL / domain / IP / DLP-match field is ever serialised.
+  Configurable interval (default 1h), errors swallowed so a flaky
+  collector never blocks the agent.
+- **Admin override tools**: `agent/internal/rules/override.go`
+  manages `rules/local/allow.txt` / `block.txt` with mutual
+  exclusivity + atomic temp-rename writes; sources are merged into
+  `policy.Engine` on startup without mutating bundled files.
+  `agent/internal/dlp/override.go` merges
+  `rules/local/dlp_patterns_override.json` and
+  `dlp_exclusions_override.json` on top of bundled rules
+  (same-name pattern replaces, others append). New API:
+  `GET /api/rules/override`, `POST /api/rules/override`,
+  `DELETE /api/rules/override/:domain`, `GET /api/stats/export`.
+- **Electron Settings UI** (`electron/src/pages/Settings.tsx`): DLP
+  scoring sliders (threshold_{critical,high,medium,low}, hotword
+  boost, entropy boost/penalty, exclusion penalty, multi-match
+  boost) call `PUT /api/dlp/config`. Allow/block override form +
+  per-domain remove buttons. UI auto-disables every input when the
+  current profile reports `managed=true`.
+- **Performance benchmarks**: `pipeline_bench_test.go`,
+  `resolver_bench_test.go`, `stats_bench_test.go` with results
+  captured in `BENCHMARKS.md` at the repo root. Hot-path scan stays
+  sub-25µs on small payloads; counter increment is 3ns.
 
 ### 2026-05-12 (Phase 4 + Safari extension)
 - **Phase 4 local MITM proxy (`agent/internal/proxy/`)**: `proxy.go`

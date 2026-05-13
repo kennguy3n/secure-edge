@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
@@ -430,8 +431,8 @@ func TestDLPConfig_PutPropagatesWeightsToPipeline(t *testing.T) {
 
 // stubUpdater is a minimal RuleUpdater for handler tests.
 type stubUpdater struct {
-	check    func(ctx context.Context) (rules.Result, error)
-	status   rules.Status
+	check      func(ctx context.Context) (rules.Result, error)
+	status     rules.Status
 	checkCalls int
 }
 
@@ -553,12 +554,12 @@ func TestRulesStatus_RejectsNonGet(t *testing.T) {
 
 // fakeProxyController is a deterministic ProxyController for tests.
 type fakeProxyController struct {
-	enableCalls   int
-	disableCalls  int
-	lastRemoveCA  bool
-	statusSnap    ProxyStatus
-	enableErr     error
-	disableErr    error
+	enableCalls  int
+	disableCalls int
+	lastRemoveCA bool
+	statusSnap   ProxyStatus
+	enableErr    error
+	disableErr   error
 }
 
 func (f *fakeProxyController) Enable(_ context.Context) (string, error) {
@@ -768,6 +769,246 @@ func TestProxy_RejectsNonMatchingMethods(t *testing.T) {
 		srv.Handler().ServeHTTP(rec, newLocalRequest(tc.method, tc.path, nil))
 		if rec.Code != http.StatusMethodNotAllowed {
 			t.Errorf("%s %s -> %d, want 405", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
+// ---------- Phase 5: profile, tamper, stats export, rule override ----------
+
+type fakeRuleOverride struct {
+	allow []string
+	block []string
+	added []string
+	rm    []string
+	err   error
+}
+
+func (f *fakeRuleOverride) Add(d, list string) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.added = append(f.added, list+":"+d)
+	switch list {
+	case "allow":
+		f.allow = append(f.allow, d)
+	case "block":
+		f.block = append(f.block, d)
+	}
+	return nil
+}
+func (f *fakeRuleOverride) Remove(d string) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.rm = append(f.rm, d)
+	return nil
+}
+func (f *fakeRuleOverride) List() ([]string, []string) { return f.allow, f.block }
+
+type fakeTamper struct{ st TamperStatus }
+
+func (f fakeTamper) Status() TamperStatus { return f.st }
+
+type fakePolicyStore struct{ calls int64 }
+
+func (f *fakePolicyStore) SetPolicy(_ context.Context, _, _ string) error {
+	atomic.AddInt64(&f.calls, 1)
+	return nil
+}
+func (f *fakePolicyStore) GetDLPConfig(_ context.Context) (profile.DLPConfigSnapshot, error) {
+	return profile.DLPConfigSnapshot{}, nil
+}
+func (f *fakePolicyStore) SetDLPConfig(_ context.Context, _ profile.DLPConfigSnapshot) error {
+	atomic.AddInt64(&f.calls, 1)
+	return nil
+}
+
+func TestProfileGetReturnsHolderContents(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/profile", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("no holder wired => 404 expected, got %d", w.Code)
+	}
+
+	h := profile.NewHolder(nil)
+	if err := h.Set(&profile.Profile{Name: "acme", Version: "1", Managed: true}); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	srv.SetProfile(h, &fakePolicyStore{})
+
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/profile", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	var got profile.Profile
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Name != "acme" || !got.Managed {
+		t.Fatalf("unexpected profile: %+v", got)
+	}
+}
+
+func TestProfileImportLocksPolicies(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	h := profile.NewHolder(nil)
+	ps := &fakePolicyStore{}
+	srv.SetProfile(h, ps)
+
+	body := bytes.NewBufferString(`{"profile":{"name":"acme","version":"1","managed":true,"categories":{"AI Chat":"deny"}}}`)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/profile/import", body))
+	if w.Code != http.StatusOK {
+		t.Fatalf("import code=%d body=%s", w.Code, w.Body.String())
+	}
+	if !h.Locked() {
+		t.Fatalf("expected holder locked after import")
+	}
+	if atomic.LoadInt64(&ps.calls) == 0 {
+		t.Fatalf("expected policy store calls during apply")
+	}
+
+	// Once locked, PUT /api/policies/:cat must return 403.
+	put := bytes.NewBufferString(`{"action":"allow"}`)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPut, "/api/policies/AI%20Chat", put))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("policy PUT not locked, code=%d", w.Code)
+	}
+
+	// And PUT /api/dlp/config too.
+	dlp := bytes.NewBufferString(`{"threshold_critical":1}`)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPut, "/api/dlp/config", dlp))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("dlp PUT not locked, code=%d", w.Code)
+	}
+}
+
+func TestProfileImportRequiresPayload(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})
+
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/profile/import",
+		bytes.NewBufferString(`{}`)))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("empty payload code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestTamperStatusUnconfigured(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/tamper/status", nil))
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unconfigured tamper => 503 expected, got %d", w.Code)
+	}
+}
+
+func TestTamperStatusOK(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetTamperReporter(fakeTamper{st: TamperStatus{DNSOK: true, ProxyOK: false, DetectionsTotal: 7}})
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/tamper/status", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var got TamperStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.ProxyOK || !got.DNSOK || got.DetectionsTotal != 7 {
+		t.Fatalf("unexpected status: %+v", got)
+	}
+}
+
+func TestStatsExportEnvelope(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/stats/export", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d", w.Code)
+	}
+	if cd := w.Header().Get("Content-Disposition"); cd == "" {
+		t.Fatalf("missing Content-Disposition")
+	}
+	var got statsExportResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.AgentVersion == "" || got.OSType == "" {
+		t.Fatalf("missing envelope metadata: %+v", got)
+	}
+	if got.Stats.DNSQueriesTotal == 0 {
+		t.Fatalf("stats body not forwarded: %+v", got.Stats)
+	}
+}
+
+func TestRuleOverrideAddListRemove(t *testing.T) {
+	srv, rel, _ := newTestServer(t)
+	fake := &fakeRuleOverride{}
+	srv.SetRuleOverride(fake)
+
+	add := bytes.NewBufferString(`{"domain":"foo.example","list":"allow"}`)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/rules/override", add))
+	if w.Code != http.StatusOK {
+		t.Fatalf("add code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(fake.added) != 1 || fake.added[0] != "allow:foo.example" {
+		t.Fatalf("Add not invoked correctly: %v", fake.added)
+	}
+	if atomic.LoadInt64(&rel.calls) == 0 {
+		t.Fatalf("expected policy reload after override change")
+	}
+
+	// GET listing.
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodGet, "/api/rules/override", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("list code=%d", w.Code)
+	}
+
+	// DELETE :domain.
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodDelete, "/api/rules/override/foo.example", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(fake.rm) != 1 || fake.rm[0] != "foo.example" {
+		t.Fatalf("Remove not invoked: %v", fake.rm)
+	}
+}
+
+func TestRuleOverrideValidation(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRuleOverride(&fakeRuleOverride{})
+
+	bad := bytes.NewBufferString(`{"domain":"","list":"allow"}`)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/rules/override", bad))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("empty domain => 400 expected, got %d", w.Code)
+	}
+
+	bad = bytes.NewBufferString(`{"domain":"ok","list":"middle"}`)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/rules/override", bad))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("bad list => 400 expected, got %d", w.Code)
+	}
+}
+
+func TestRuleOverrideUnconfigured(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	for _, m := range []string{http.MethodGet, http.MethodPost} {
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, newLocalRequest(m, "/api/rules/override", nil))
+		if w.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s => 503 expected, got %d", m, w.Code)
 		}
 	}
 }

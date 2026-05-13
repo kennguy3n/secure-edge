@@ -339,6 +339,93 @@ bodies. `integration_test.go` regression-tests this by capturing stdout + stderr
 Tier-2 request and asserting that neither the request body nor the Host header sentinel ever
 appears in the captured stream.
 
+### 3b. Enterprise Configuration Profiles (Phase 5)
+
+Optional, server-distributed policy bundles for managed deployments.
+
+```
+agent/internal/profile/
+├── profile.go   # Profile struct + Holder (current/locked state)
+├── loader.go    # LoadFromFile, LoadFromURL (1 MiB cap, 30s timeout)
+├── apply.go     # Apply(): write through to store; PolicyStore interface
+└── profile_test.go
+```
+
+| Capability | Approach |
+|------------|----------|
+| Schema | `{name, version, managed, categories:{...}, dlp:{...}, rule_update_url}` JSON |
+| Source | Local file (`profile_path`) or HTTPS GET (`profile_url`); `profile_path` takes precedence when both are set |
+| Size cap | 1 MiB, enforced in `loader.go` so a malicious server cannot OOM the agent |
+| Apply | Iterates `categories` → `store.SetPolicy`; copies `dlp` block → `store.SetDLPConfig` |
+| Lock | `Holder.Locked()` returns `managed`; consulted by `PUT /api/policies/:cat` and `PUT /api/dlp/config` to return `403 Forbidden` |
+| API | `GET /api/profile`, `POST /api/profile/import` (body is `{url}` or `{profile}`) |
+
+The profile holder lives in `api.Server`; locking is enforced at the
+HTTP handler, not at the store level, so a profile import that fails
+to apply leaves the existing on-disk config untouched.
+
+### 3c. Tamper Detection (Phase 5)
+
+Periodic OS-level check that the device is still routing through the
+agent. Runs as a goroutine started by `main.go`.
+
+```
+agent/internal/tamper/
+├── detector.go            # core loop + Status; Reporter interface bumps counter
+├── dns_unix.go            # Linux/BSD/macOS DNS probe (resolv.conf + networksetup)
+├── dns_windows.go         # netsh interface ipv4 show dnsservers
+├── proxy_check.go         # cross-platform shared helpers + env-var fallback
+├── proxy_darwin.go        # networksetup -getwebproxy / -getsecurewebproxy
+├── proxy_windows.go       # netsh winhttp show proxy
+├── proxy_other.go         # build-tag stubs for non-darwin/non-windows
+└── detector_test.go
+```
+
+| Capability | Approach |
+|------------|----------|
+| Cadence | 60s by default; `CheckNow()` for one-shot |
+| DNS probe | Compares the active resolver list against the expected `dns_listen` host |
+| Proxy probe | Compares the active system proxy against `proxy_listen`; uses platform CLI when available, falls back to `HTTP(S)_PROXY` env vars on Linux/BSD |
+| Counter | `Reporter.IncrementTamperDetections()` is called **only on transitions** (steady-state tamper does not double-count) |
+| Notification | Electron polls `GET /api/tamper/status` every 10s and shows an ephemeral tray balloon on rising-edge; no on-disk event log |
+
+### 3d. Agent Heartbeat (Phase 5, Optional)
+
+Disabled by default. Set `heartbeat_url` in `config.yaml` to enable.
+
+```
+agent/internal/heartbeat/
+├── heartbeat.go      # New / BuildPayload / SendOnce / Start
+└── heartbeat_test.go # asserts payload shape + no access fields leak
+```
+
+| Capability | Approach |
+|------------|----------|
+| Cadence | 1h by default; `heartbeat_interval` overrides |
+| Payload | Exactly `{agent_version, os_type, os_arch, aggregate_counters}` — nothing else |
+| Transport | `http.Client` with a 30s timeout; HTTP errors are logged to stderr and otherwise swallowed |
+| Privacy guarantee | A unit test deserialises the payload and asserts no key matches `/url|domain|ip|match|host|pattern/i` |
+
+### 3e. Admin Override Mechanism (Phase 5)
+
+```
+agent/internal/rules/override.go         # OverrideStore: rules/local/allow.txt + block.txt
+agent/internal/dlp/override.go           # MergePatternsFromDir, MergeExclusionsFromDir
+```
+
+| File | Behaviour |
+|------|-----------|
+| `rules/local/allow.txt` | Domains forced into the `allow_admin` category |
+| `rules/local/block.txt` | Domains forced into the `block_admin` category |
+| `rules/local/dlp_patterns_override.json` | Patterns with the same `name` replace bundled; others append |
+| `rules/local/dlp_exclusions_override.json` | Exclusions deduplicated by `(type, applies_to, pattern, words)` |
+
+The override store enforces mutual exclusivity (adding a domain to
+allow removes it from block, and vice versa) and uses atomic temp
+file + rename writes so a crash mid-write cannot corrupt the list.
+Bundled rule files are never mutated; the merge happens in memory at
+load time.
+
 ### 4. Electron Tray Application
 
 Minimal Electron shell for system tray presence and settings UI.
@@ -474,12 +561,13 @@ CREATE TABLE category_policies (
 
 -- Anonymous aggregate counters (NO domain, NO IP, NO timestamp per event)
 CREATE TABLE aggregate_stats (
-    id                  INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
-    dns_queries_total   INTEGER NOT NULL DEFAULT 0,
-    dns_blocks_total    INTEGER NOT NULL DEFAULT 0,
-    dlp_scans_total     INTEGER NOT NULL DEFAULT 0,
-    dlp_blocks_total    INTEGER NOT NULL DEFAULT 0,
-    last_reset_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                       INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+    dns_queries_total        INTEGER NOT NULL DEFAULT 0,
+    dns_blocks_total         INTEGER NOT NULL DEFAULT 0,
+    dlp_scans_total          INTEGER NOT NULL DEFAULT 0,
+    dlp_blocks_total         INTEGER NOT NULL DEFAULT 0,
+    tamper_detections_total  INTEGER NOT NULL DEFAULT 0,  -- Phase 5
+    last_reset_at            DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Rule update tracking
@@ -624,5 +712,12 @@ sequenceDiagram
 | `POST` | `/api/proxy/enable` | Generate the per-device Root CA (if missing) and start the local MITM proxy; returns `{ca_cert_path}` | No user data; cert path is a local filesystem location |
 | `POST` | `/api/proxy/disable` | Stop the local MITM proxy; pass `{"remove_ca": true}` to also delete the CA files | — |
 | `GET` | `/api/proxy/status` | `{running, ca_installed, listen_addr, dlp_scans_total, dlp_blocks_total}` | Integers + booleans only |
+| `GET` | `/api/profile` | Current enterprise profile (404 if none loaded) | Config only |
+| `POST` | `/api/profile/import` | Import a profile from `{url}` or `{profile}` body; applies it and locks local edits when `managed=true` | Profile content + URL only; no access data |
+| `GET` | `/api/tamper/status` | `{dns_ok, proxy_ok, last_check, detections_total}` | Booleans + counter only |
+| `GET` | `/api/stats/export` | Counter snapshot wrapped in `{agent_version, os_type, os_arch, exported_at, stats}`, `Content-Disposition: attachment` | Same fields as `/api/stats` |
+| `GET` | `/api/rules/override` | List admin allow/block override sets | Config only |
+| `POST` | `/api/rules/override` | Add `{domain, list:"allow"\|"block"}`; moves between lists if needed | Config only |
+| `DELETE` | `/api/rules/override/:domain` | Remove an override regardless of list | Config only |
 
 **There is no `/api/alerts` endpoint. There is no `/api/logs` endpoint. This is by design.**

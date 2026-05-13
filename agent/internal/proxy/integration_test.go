@@ -334,4 +334,3 @@ func (c *fdCapture) read() string {
 		return ""
 	}
 }
-

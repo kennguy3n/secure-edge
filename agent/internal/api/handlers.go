@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
@@ -107,6 +109,10 @@ func (s *Server) handlePolicyItem(w http.ResponseWriter, r *http.Request) {
 	category = strings.TrimSpace(category)
 	if category == "" {
 		writeError(w, http.StatusBadRequest, "category is required")
+		return
+	}
+	if s.Profile != nil && s.Profile.Locked() {
+		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
 		return
 	}
 	var body PolicyUpdate
@@ -221,6 +227,10 @@ func (s *Server) handleDLPConfigGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
+	if s.Profile != nil && s.Profile.Locked() {
+		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
+		return
+	}
 	var body store.DLPConfig
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -382,4 +392,234 @@ func (s *Server) handleProxyStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.Proxy.Status())
+}
+
+// maxProfileBytes caps the size of a profile uploaded via
+// /api/profile/import to keep an unbounded body from exhausting
+// memory. Profiles are tiny JSON documents in practice.
+const maxProfileBytes = 1 << 20 // 1 MiB
+
+// profileImportRequest is the body for POST /api/profile/import. A
+// non-empty URL takes precedence over an inline Profile body — the
+// agent downloads the profile and applies it.
+type profileImportRequest struct {
+	URL     string           `json:"url,omitempty"`
+	Profile *profile.Profile `json:"profile,omitempty"`
+}
+
+// handleProfileGet returns the active enterprise profile or 404 if
+// none is loaded.
+func (s *Server) handleProfileGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Profile == nil {
+		writeError(w, http.StatusNotFound, "no profile loaded")
+		return
+	}
+	p := s.Profile.Get()
+	if p == nil {
+		writeError(w, http.StatusNotFound, "no profile loaded")
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
+// handleProfileImport accepts either a URL to fetch the profile from
+// or an inline JSON profile body, validates it, applies it to the
+// store (which can flip Managed=true and lock the device), and
+// returns the active profile.
+func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Profile == nil {
+		writeError(w, http.StatusServiceUnavailable, "profile holder not configured")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxProfileBytes)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusRequestEntityTooLarge, "request too large")
+		return
+	}
+
+	var req profileImportRequest
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+	}
+
+	var p *profile.Profile
+	switch {
+	case strings.TrimSpace(req.URL) != "":
+		p, err = profile.LoadFromURL(r.Context(), nil, req.URL)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "fetch profile: "+err.Error())
+			return
+		}
+	case req.Profile != nil:
+		if err := req.Profile.Validate(); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		p = req.Profile
+	default:
+		writeError(w, http.StatusBadRequest, "url or profile required")
+		return
+	}
+
+	if s.ProfileApply != nil {
+		if err := p.Apply(r.Context(), profile.ApplyOptions{
+			PolicyStore: s.ProfileApply,
+			Reloader:    s.Policy,
+		}); err != nil {
+			writeError(w, http.StatusInternalServerError, "apply profile: "+err.Error())
+			return
+		}
+	}
+	if err := s.Profile.Set(p); err != nil {
+		writeError(w, http.StatusInternalServerError, "store profile: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Profile.Get())
+}
+
+// handleTamperStatus surfaces the tamper detector's most recent check.
+func (s *Server) handleTamperStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Tamper == nil {
+		writeError(w, http.StatusServiceUnavailable, "tamper detector not configured")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Tamper.Status())
+}
+
+// statsExportResponse adds the human / runtime context that turns a
+// raw counter dump into a usable export. Nothing sensitive is added
+// — only the build/OS metadata an admin needs to correlate the
+// counters with the device.
+type statsExportResponse struct {
+	AgentVersion string         `json:"agent_version"`
+	OSType       string         `json:"os_type"`
+	OSArch       string         `json:"os_arch"`
+	ExportedAt   time.Time      `json:"exported_at"`
+	Stats        stats.Snapshot `json:"stats"`
+}
+
+// handleStatsExport returns the same counters as /api/stats wrapped
+// with a small envelope so the export file is self-describing. The
+// response has a Content-Disposition header so the Electron UI can
+// surface "Save as…" naturally.
+func (s *Server) handleStatsExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	snap, err := s.Stats.GetStats(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "stats unavailable")
+		return
+	}
+	body := statsExportResponse{
+		AgentVersion: Version,
+		OSType:       runtime.GOOS,
+		OSArch:       runtime.GOARCH,
+		ExportedAt:   time.Now().UTC(),
+		Stats:        snap,
+	}
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=\"secure-edge-stats-%s.json\"",
+			body.ExportedAt.Format("20060102-150405")))
+	writeJSON(w, http.StatusOK, body)
+}
+
+// ruleOverrideRequest is the body for POST /api/rules/override.
+type ruleOverrideRequest struct {
+	Domain string `json:"domain"`
+	// List is "allow" or "block". Anything else returns 400.
+	List string `json:"list"`
+}
+
+// ruleOverrideResponse is the body returned by the override
+// endpoints; ListAllow / ListBlock reflect the merged-on-disk state
+// after the call.
+type ruleOverrideResponse struct {
+	Allow []string `json:"allow"`
+	Block []string `json:"block"`
+}
+
+// handleRuleOverride adds (POST) or lists (GET) admin allow/block
+// override entries. Writes through to rules/local/*.txt and then
+// triggers a policy reload so the change is picked up immediately.
+func (s *Server) handleRuleOverride(w http.ResponseWriter, r *http.Request) {
+	if s.Rules == nil {
+		writeError(w, http.StatusServiceUnavailable, "rule overrides not configured")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		a, b := s.Rules.List()
+		writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
+	case http.MethodPost:
+		var body ruleOverrideRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		if strings.TrimSpace(body.Domain) == "" {
+			writeError(w, http.StatusBadRequest, "domain is required")
+			return
+		}
+		if body.List != "allow" && body.List != "block" {
+			writeError(w, http.StatusBadRequest, "list must be allow or block")
+			return
+		}
+		if err := s.Rules.Add(body.Domain, body.List); err != nil {
+			writeError(w, http.StatusInternalServerError, "add override: "+err.Error())
+			return
+		}
+		if s.Policy != nil {
+			_ = s.Policy.Reload(r.Context())
+		}
+		a, b := s.Rules.List()
+		writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// handleRuleOverrideItem handles DELETE /api/rules/override/:domain.
+func (s *Server) handleRuleOverrideItem(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.Rules == nil {
+		writeError(w, http.StatusServiceUnavailable, "rule overrides not configured")
+		return
+	}
+	domain := strings.TrimPrefix(r.URL.Path, "/api/rules/override/")
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		writeError(w, http.StatusBadRequest, "domain is required")
+		return
+	}
+	if err := s.Rules.Remove(domain); err != nil {
+		writeError(w, http.StatusInternalServerError, "remove override: "+err.Error())
+		return
+	}
+	if s.Policy != nil {
+		_ = s.Policy.Reload(r.Context())
+	}
+	a, b := s.Rules.List()
+	writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
 }

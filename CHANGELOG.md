@@ -87,6 +87,22 @@ may introduce breaking changes between feature releases.
   `manifestBody` is enforced by the run-time
   `TestManifestBody_MirrorsManifestMinusSignature` reflection test,
   not by the compiler (the two structs are independent types).
+- **D1a**: Release-artefact hardening (signing + supply-chain
+  transparency). The `release.yml` workflow now publishes, alongside
+  every release: a `SHA256SUMS` manifest of every artefact; per-
+  artefact and SHA256SUMS-level Sigstore keyless signatures
+  (`.sig` + `.pem`) issued under the workflow's GitHub OIDC
+  identity (no maintainer-held private keys); CycloneDX 1.5 SBOMs
+  for the Go agent, Electron tray, and browser extension; and a
+  SLSA Build Level 3 provenance attestation via
+  `actions/attest-build-provenance@v2`. `SECURITY.md` gains a new
+  "Verifying a release" section with a copy-paste recipe covering
+  `sha256sum -c`, `cosign verify-blob` (with `--certificate-
+  identity-regexp` pinned to this repo's workflow on a `v*` tag),
+  and `gh attestation verify`. Platform-native code signing
+  (Apple Developer ID, Windows Authenticode, Linux GPG) remains
+  deferred to D1b until the respective certificates are provisioned
+  (`PHASES.md:156`).
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

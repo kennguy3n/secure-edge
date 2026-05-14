@@ -72,3 +72,100 @@ The following are explicitly **out of scope**:
 If your report is valid and we ship a fix, we will credit you in
 the release notes unless you ask us not to. Please do not publish
 the details of the vulnerability before we publish the fix.
+
+## Verifying a release
+
+Every release published to
+<https://github.com/kennguy3n/secure-edge/releases> ships with the
+following artefacts you can use to verify integrity, authenticity,
+and supply-chain provenance **before** running any installer:
+
+| Artefact                          | Purpose                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `SHA256SUMS`                      | SHA-256 of every other file in the release.                      |
+| `SHA256SUMS.sig` / `.pem`         | Sigstore keyless signature + certificate over `SHA256SUMS`.      |
+| `<artefact>.sig` / `.pem`         | Sigstore keyless signature + certificate over each artefact.     |
+| `secure-edge-agent.cdx.json`      | CycloneDX 1.5 SBOM for the Go agent.                             |
+| `secure-edge-electron.cdx.json`   | CycloneDX 1.5 SBOM for the Electron tray app.                    |
+| `secure-edge-extension.cdx.json`  | CycloneDX 1.5 SBOM for the browser extension.                    |
+
+In addition, each artefact has a SLSA Build Level 3 provenance
+attestation stored in GitHub's [attestation store][gh-attest] and
+verifiable with `gh attestation verify`.
+
+Platform-native code signing (Apple Developer ID, Microsoft
+Authenticode, Linux GPG package signatures) is **not yet
+available** — see `PHASES.md`, "Code signing of release artifacts."
+Until those certificates are provisioned, the Sigstore-based
+verification below is the authoritative trust chain.
+
+### One-shot verification recipe (Linux / macOS / WSL / git-bash)
+
+```bash
+# Required tools: gh (GitHub CLI), cosign >= 2.0, jq (optional, for SBOM inspection).
+#   brew install gh cosign jq                     # macOS
+#   sudo apt install gh jq && go install github.com/sigstore/cosign/v2/cmd/cosign@latest  # Debian/Ubuntu
+
+TAG=v0.5.1   # adjust to the release you want to verify
+REPO=kennguy3n/secure-edge
+
+# 1) Download every asset from the release.
+mkdir -p secure-edge-$TAG && cd secure-edge-$TAG
+gh release download "$TAG" --repo "$REPO"
+
+# 2) Verify integrity (offline). Should print "OK" for every line.
+sha256sum -c SHA256SUMS
+
+# 3) Verify SHA256SUMS authenticity. Queries the Rekor transparency log.
+#    The --certificate-identity-regexp pins the signer to this repo's
+#    release workflow on a v* tag; nothing else can produce a valid
+#    signature for SHA256SUMS.
+cosign verify-blob \
+  --certificate SHA256SUMS.pem \
+  --signature   SHA256SUMS.sig \
+  --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release\\.yml@refs/tags/v.+\$" \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  SHA256SUMS
+
+# 4) Optional: verify a single artefact directly without going through SHA256SUMS.
+cosign verify-blob \
+  --certificate "secure-edge-agent-linux-amd64.pem" \
+  --signature   "secure-edge-agent-linux-amd64.sig" \
+  --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release\\.yml@refs/tags/v.+\$" \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  secure-edge-agent-linux-amd64
+
+# 5) Verify SLSA build provenance (uses GitHub's attestation store).
+gh attestation verify --owner kennguy3n secure-edge-agent-linux-amd64
+
+# 6) Inspect SBOMs (optional).
+jq '.metadata.component.name, (.components | length)' secure-edge-agent.cdx.json
+```
+
+If any of steps 2, 3, 4, or 5 fail, **do not run the installer**.
+File a security advisory using the link at the top of this
+document.
+
+### What each verification step proves
+
+- **Step 2 (`sha256sum -c`)** — bit-for-bit integrity of every
+  artefact you downloaded against the published manifest. Catches
+  corrupted downloads and tampered mirrors. Offline-only.
+- **Step 3 (`cosign verify-blob SHA256SUMS`)** — proves the
+  `SHA256SUMS` manifest itself was emitted by *this repository's*
+  release workflow on a `v*` tag. The signing identity is a short-
+  lived certificate issued by Sigstore's Fulcio CA, bound to the
+  GitHub Actions OIDC subject for `kennguy3n/secure-edge`'s
+  release workflow. The signature is recorded in the Rekor
+  transparency log; you can independently verify it at
+  <https://search.sigstore.dev>.
+- **Step 4 (per-artefact `cosign verify-blob`)** — same proof
+  as step 3 but for a single artefact, useful when you only
+  download one file and don't want to fetch the entire release.
+- **Step 5 (`gh attestation verify`)** — SLSA Build Level 3
+  provenance: proves the artefact was built by GitHub-hosted
+  runners from this repository's `Release` workflow, including
+  the commit SHA, the workflow file path, and the runner image.
+  Independent of cosign; uses GitHub's attestation API.
+
+[gh-attest]: https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations

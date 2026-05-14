@@ -153,7 +153,7 @@ mechanism without requiring an agent binary update.
 - [x] Privacy audit: internal code review + automated SQLite-sweep test of zero-logging guarantees (`agent/internal/store/privacy_test.go`); third-party external audit deferred to post-1.0 release.
 - [x] DLP accuracy audit: measure false positive/negative rates against test corpus (`agent/internal/dlp/accuracy_test.go`, FP < 10%, FN < 5%; current measurement 0/0)
 - [x] Accessibility audit of Electron UI (`docs/accessibility.md`)
-- [ ] Code signing of release artifacts — deferred until Apple Developer ID, Windows code-signing certificate, and Linux package-signing GPG key are provisioned.
+- [~] Code signing of release artifacts — partial. Sigstore keyless signing of every release artefact, `SHA256SUMS` manifest with a Sigstore-signed envelope, CycloneDX 1.5 SBOMs for the Go agent / Electron tray / browser extension, and SLSA Build Level 3 provenance attestation via `actions/attest-build-provenance@v2` are all live in `.github/workflows/release.yml`. Platform-native code signing (Apple Developer ID, Windows Authenticode, Linux GPG) is still pending certificate provisioning; see `SECURITY.md` for the current Sigstore-based verification recipe.
 
 ### Enterprise Privacy Boundary
 Even in enterprise mode, the agent NEVER sends access logs, domain lists, DLP match details,

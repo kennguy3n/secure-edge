@@ -243,7 +243,20 @@ jobs:
     name: GitHub Release
     needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
     runs-on: ubuntu-latest
+    # id-token + attestations are required for cosign keyless signing and
+    # actions/attest-build-provenance. contents:write was already implied
+    # by the workflow-level permissions block.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
+      # Source checkout is required so anchore/sbom-action can read
+      # agent/go.mod, electron/package-lock.json, and
+      # extension/package-lock.json. The original release job had no
+      # checkout because it only flattened pre-built artefacts.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artefacts
@@ -257,10 +270,122 @@ jobs:
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
 
+      # ----------------------------------------------------------------
+      # D1a: release-artifact hardening — SHA256SUMS + SBOM + cosign
+      # keyless + SLSA build provenance. Platform-native code signing
+      # (Apple codesign, Microsoft signtool, dpkg-sig, rpm --addsign,
+      # GPG) is deferred to PR5b once the respective certificates are
+      # provisioned (see PHASES.md:156).
+      # ----------------------------------------------------------------
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: SBOM for Go agent (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./agent
+          format: cyclonedx-json
+          output-file: release/secure-edge-agent.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: SBOM for Electron tray (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./electron
+          format: cyclonedx-json
+          output-file: release/secure-edge-electron.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: SBOM for browser extension (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./extension
+          format: cyclonedx-json
+          output-file: release/secure-edge-extension.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate SHA256SUMS
+        working-directory: release
+        run: |
+          # Generate SHA256SUMS over every file currently in release/,
+          # including the just-written SBOMs, but excluding SHA256SUMS
+          # itself. Sort the file list for reproducible output.
+          # No shell globs are used to avoid the empty-file race against
+          # the shell's redirect creating SHA256SUMS before glob expansion.
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS' -printf '%f\n' | sort > .manifest
+          sha256sum -- $(cat .manifest) > SHA256SUMS
+          rm .manifest
+          echo "--- SHA256SUMS ---"
+          cat SHA256SUMS
+
+      - name: cosign sign-blob each artefact
+        working-directory: release
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          # Sign every artefact in release/ EXCEPT signature/certificate
+          # metadata and SHA256SUMS itself (signed in the next step so it
+          # covers the SBOMs but not the freshly-emitted .sig/.pem files).
+          shopt -s nullglob
+          for f in *; do
+            case "$f" in
+              *.sig|*.pem|SHA256SUMS) continue ;;
+            esac
+            echo "Signing $f"
+            cosign sign-blob \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.pem" \
+              "$f"
+          done
+
+      - name: cosign sign-blob SHA256SUMS
+        working-directory: release
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          # Sign SHA256SUMS after individual artefacts so its sha256 lines
+          # already cover all SBOMs. The .sig/.pem files generated above
+          # are NOT in SHA256SUMS by design — they are individually
+          # verifiable via cosign without the manifest.
+          cosign sign-blob \
+            --output-signature SHA256SUMS.sig \
+            --output-certificate SHA256SUMS.pem \
+            SHA256SUMS
+
+      - name: SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          # Attest the agent binaries, installers, extension/electron
+          # bundles, and SBOMs. We deliberately do NOT attest the cosign
+          # .sig/.pem files (they are themselves signature material) or
+          # the SHA256SUMS manifest (which is already cosign-signed).
+          subject-path: |
+            release/secure-edge-agent-*
+            release/*.pkg
+            release/*.msi
+            release/*.deb
+            release/*.rpm
+            release/*.dmg
+            release/*.AppImage
+            release/*.exe
+            release/*.zip
+            release/*.xpi
+            release/*.cdx.json
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: release/*
           generate_release_notes: true
+          # Mark D1a dry-run tags (v0.0.0-d1a-dryrun and any other
+          # v0.0.0-* tag) as prereleases so they do not steal the
+          # "Latest" badge on the releases page during validation.
+          prerelease: ${{ contains(github.ref_name, 'dryrun') || startsWith(github.ref_name, 'v0.0.0') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

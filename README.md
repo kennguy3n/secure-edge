@@ -355,7 +355,7 @@ table (name, severity, prefix, hotword requirement).
 - [PROGRESS.md](./PROGRESS.md) — per-item progress tracker
 - [CHANGELOG.md](./CHANGELOG.md) — release-by-release summary
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — development setup, PR process, coding standards
-- [SECURITY.md](./SECURITY.md) — responsible-disclosure policy
+- [SECURITY.md](./SECURITY.md) — responsible-disclosure policy + release-artefact verification recipe (SHA256SUMS, cosign keyless signatures, CycloneDX SBOMs, SLSA build provenance)
 - [BENCHMARKS.md](./BENCHMARKS.md) — DLP pipeline, DNS resolver, and stats counter benchmarks
 - [SECURITY_RULES.md](./SECURITY_RULES.md) — per-pattern reference table
 - [docs/admin-guide.md](./docs/admin-guide.md) — installation, configuration, profiles, overrides

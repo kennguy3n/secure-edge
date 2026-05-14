@@ -21,6 +21,20 @@ download/install commands.
 All builds embed a build-time SHA-256 of `rules/manifest.json` so tamper
 detection works even before the first rule update.
 
+### 1.1 Verifying release artefacts before deploying
+
+Every release ships with a `SHA256SUMS` manifest, a Sigstore keyless
+signature over that manifest, per-artefact `.sig` / `.pem` files,
+CycloneDX 1.5 SBOMs, and a SLSA build provenance attestation. Run the
+verification recipe in [SECURITY.md](../SECURITY.md#verifying-a-release)
+before pushing a build to managed endpoints — it confirms the artefact
+was emitted by this repository's `Release` workflow on a `v*` tag and
+has not been tampered with in transit. Platform-native code signing
+(Apple Developer ID / Windows Authenticode / Linux GPG) is still
+pending certificate provisioning (`PHASES.md`, "Code signing of release
+artifacts"); the Sigstore chain is the authoritative trust path until
+then.
+
 ## 2. Configuration (`config.yaml`)
 
 The agent looks for `config.yaml` in the following locations, in order:

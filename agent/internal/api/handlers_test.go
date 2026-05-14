@@ -1221,3 +1221,116 @@ func TestCORS_ControlOriginsReachControlEndpoints(t *testing.T) {
 		}
 	}
 }
+
+// TestEnforcementMode_DefaultIsPersonal locks in the no-setter
+// behaviour: a server constructed without SetEnforcementMode echoes
+// "personal" through both /api/status and /api/config/enforcement-mode.
+// This is the posture an operator gets from a config.yaml with the
+// field omitted.
+func TestEnforcementMode_DefaultIsPersonal(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	r := newLocalRequest(http.MethodGet, "/api/config/enforcement-mode", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("enforcement-mode code = %d", w.Code)
+	}
+	var em EnforcementModeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &em); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if em.Mode != "personal" {
+		t.Errorf("mode = %q, want %q", em.Mode, "personal")
+	}
+
+	r = newLocalRequest(http.MethodGet, "/api/status", nil)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status code = %d", w.Code)
+	}
+	var st StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &st); err != nil {
+		t.Fatalf("unmarshal status: %v", err)
+	}
+	if st.EnforcementMode != "personal" {
+		t.Errorf("status enforcement_mode = %q, want %q", st.EnforcementMode, "personal")
+	}
+}
+
+// TestEnforcementMode_RoundTrip walks each accepted value through
+// SetEnforcementMode and asserts both endpoints surface the same
+// string. The Electron tray (status poll) and the extension service
+// worker (dedicated endpoint) must agree on the posture or the user
+// gets contradictory UI signals.
+func TestEnforcementMode_RoundTrip(t *testing.T) {
+	for _, mode := range []string{"personal", "team", "managed"} {
+		t.Run(mode, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			srv.SetEnforcementMode(mode)
+
+			r := newLocalRequest(http.MethodGet, "/api/config/enforcement-mode", nil)
+			w := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(w, r)
+			if w.Code != http.StatusOK {
+				t.Fatalf("enforcement-mode code = %d", w.Code)
+			}
+			var em EnforcementModeResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &em); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if em.Mode != mode {
+				t.Errorf("/api/config/enforcement-mode mode = %q, want %q", em.Mode, mode)
+			}
+
+			r = newLocalRequest(http.MethodGet, "/api/status", nil)
+			w = httptest.NewRecorder()
+			srv.Handler().ServeHTTP(w, r)
+			var st StatusResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &st); err != nil {
+				t.Fatalf("unmarshal status: %v", err)
+			}
+			if st.EnforcementMode != mode {
+				t.Errorf("/api/status enforcement_mode = %q, want %q", st.EnforcementMode, mode)
+			}
+		})
+	}
+}
+
+// TestEnforcementMode_UnknownCoercesToPersonal pins the defensive
+// branch in SetEnforcementMode. config.validate() is the primary
+// gate, but if a future code path bypasses config loading (a test, a
+// future profile import, etc.) the safer behaviour is to fall back
+// to "personal" rather than report an unknown string to clients.
+func TestEnforcementMode_UnknownCoercesToPersonal(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetEnforcementMode("bogus")
+
+	r := newLocalRequest(http.MethodGet, "/api/config/enforcement-mode", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	var em EnforcementModeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &em); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if em.Mode != "personal" {
+		t.Errorf("mode = %q, want personal", em.Mode)
+	}
+}
+
+// TestEnforcementMode_RejectsNonGET confirms PUT/POST/DELETE return
+// 405. The endpoint is read-only by design — mutation must go
+// through config.yaml + restart so the policy is rooted in the
+// operator-controlled config rather than any runtime API surface.
+func TestEnforcementMode_RejectsNonGET(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+		r := newLocalRequest(method, "/api/config/enforcement-mode", nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s: code = %d, want 405", method, w.Code)
+		}
+	}
+}

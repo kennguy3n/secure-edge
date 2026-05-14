@@ -257,6 +257,16 @@ type Server struct {
 	// admin access with the wrong token) but does not reject
 	// callers that omit the header.
 	apiTokenRequired bool
+
+	// enforcementMode is the C2 fail-policy posture the agent reports
+	// to the browser extension and the Electron tray. Valid values:
+	// "personal" (fall-open, default), "team" (fall-open + warn), and
+	// "managed" (fall-closed for unreachable / oversized payloads).
+	// The agent itself does not enforce the policy — it only owns the
+	// canonical value and serves it through /api/status and
+	// /api/config/enforcement-mode so every client agrees on the
+	// active posture. Mutated only via SetEnforcementMode at startup.
+	enforcementMode string
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -363,6 +373,35 @@ func (s *Server) SetAPIToken(token string, required bool) {
 	s.apiTokenRequired = required
 }
 
+// SetEnforcementMode records the C2 fail-policy posture the agent
+// reports to clients. Valid values are "personal", "team", and
+// "managed"; an empty string is normalised to "personal" so callers
+// can pass cfg.EnforcementMode through unchanged. Any other value is
+// silently coerced to "personal" — config.validate() is the
+// authoritative gate, so reaching this function with an unexpected
+// value means the operator bypassed config loading and the safest
+// behaviour is the conservative fall-open default rather than a
+// startup panic.
+func (s *Server) SetEnforcementMode(mode string) {
+	switch mode {
+	case "personal", "team", "managed":
+		s.enforcementMode = mode
+	default:
+		s.enforcementMode = "personal"
+	}
+}
+
+// EnforcementMode returns the currently configured fail-policy
+// posture. Always one of "personal", "team", "managed"; defaults to
+// "personal" when SetEnforcementMode was never called.
+func (s *Server) EnforcementMode() string {
+	if s.enforcementMode == "" {
+		return "personal"
+	}
+	return s.enforcementMode
+}
+
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -386,6 +425,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/rules/override/", s.handleRuleOverrideItem)
 	mux.HandleFunc("/api/agent/update-check", s.handleAgentUpdateCheck)
 	mux.HandleFunc("/api/agent/update", s.handleAgentUpdate)
+	mux.HandleFunc("/api/config/enforcement-mode", s.handleEnforcementMode)
 	return s.withCORS(mux)
 }
 

@@ -165,6 +165,26 @@ type Config struct {
 	// stage the token rollout, confirm clients have the new token,
 	// and flip enforcement on without an outage.
 	APITokenRequired bool `yaml:"api_token_required"`
+
+	// EnforcementMode controls how the browser extension behaves
+	// when the local agent is unreachable or replies with no
+	// verdict (Phase 7 work item C2). Three values are accepted:
+	//
+	//   "personal" (default) — fall open, current behaviour.
+	//   "team"               — fall open but surface a warning
+	//                          toast so the user knows the scan
+	//                          was skipped.
+	//   "managed"            — fall closed: the extension blocks
+	//                          the request and surfaces a policy
+	//                          message. In this mode the
+	//                          extension also stops silently
+	//                          allowing payloads above its
+	//                          inline-scan size limit.
+	//
+	// The agent only stores and surfaces the mode; the policy is
+	// enforced on the browser side. /api/status echoes the mode
+	// so the Electron tray can display the active posture.
+	EnforcementMode string `yaml:"enforcement_mode"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -185,6 +205,7 @@ func Default() Config {
 		DLPCacheTTLSeconds:    5,
 		DLPCacheCapacity:      1024,
 		DLPRateLimitPerSec:    100,
+		EnforcementMode:       "personal",
 	}
 }
 
@@ -348,6 +369,9 @@ func merge(defaults, override Config) Config {
 	// distinction; we always copy the override's value so the
 	// operator can explicitly flip it off in the YAML.
 	out.APITokenRequired = override.APITokenRequired
+	if override.EnforcementMode != "" {
+		out.EnforcementMode = override.EnforcementMode
+	}
 	return out
 }
 
@@ -387,6 +411,12 @@ func (c Config) validate() error {
 	}
 	if c.DLPRateLimitPerSec < 0 {
 		return errors.New("dlp_rate_limit_per_sec must not be negative")
+	}
+	switch c.EnforcementMode {
+	case "", "personal", "team", "managed":
+		// ok — empty is treated as "personal" at the API surface.
+	default:
+		return fmt.Errorf("enforcement_mode %q must be one of personal|team|managed", c.EnforcementMode)
 	}
 	return nil
 }

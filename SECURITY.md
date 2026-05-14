@@ -53,6 +53,18 @@ guarantees that we consider in-scope for this policy are:
    must be installed only in the user's trust store, must be
    removable via the GUI, and must not be re-used across
    installations. Issues here are **high-severity**.
+5. **Native-messaging bridge integrity** — every non-`hello` frame
+   on the extension ↔ agent Native Messaging connection is signed
+   with HMAC-SHA256 over `nonce || direction_byte || id || kind
+   || (content | blocked + token + error)`, keyed by the per-
+   install API token. The 16-byte nonce is minted per connection
+   and surfaced in the (intentionally unsigned, TOFU) `hello`
+   reply. The agent enforces a strict-monotonic request id and
+   rejects a second `hello` on the same connection. A
+   `bridge_mac_required` knob lets operators stage the rollout
+   (false: warn, still serve; true: reject mismatched / missing
+   MAC). Bypasses of the MAC verification when
+   `bridge_mac_required=true` are **high-severity**.
 
 The following are explicitly **out of scope**:
 

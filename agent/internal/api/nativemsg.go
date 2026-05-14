@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
@@ -18,24 +19,38 @@ import (
 const MaxNativeMessageBytes uint32 = 1 * 1024 * 1024
 
 // NativeMessageRequest is the wire shape received from a connected
-// Chrome extension on stdin. The id is echoed back so the extension can
-// correlate concurrent requests.
+// Chrome extension on stdin. The id is echoed back so the extension
+// can correlate concurrent requests. MAC, when non-empty, is the
+// hex-encoded HMAC-SHA256 the extension computed over the rest of
+// the fields (work item C1) — see bridge_mac.go for the exact input
+// layout. The agent checks the MAC on every non-hello request; the
+// hello request itself is unauthenticated because the shared secret
+// + nonce are bootstrapped by the hello reply (TOFU).
 type NativeMessageRequest struct {
 	ID      int    `json:"id"`
 	Kind    string `json:"kind"`
 	Content string `json:"content"`
+	MAC     string `json:"mac,omitempty"`
 }
 
 // NativeMessageResponse is the wire shape returned on stdout.
 // Result, APIToken, and Error are mutually exclusive per response.
 // APIToken is populated on a successful "hello" reply so the
 // extension can cache the per-install token for its HTTP fallback
-// path (work item A2).
+// path (work item A2). BridgeNonce, when non-empty, is the
+// per-connection nonce the agent issues on its hello reply so the
+// extension can seed the MAC computation for every subsequent
+// request (work item C1). MAC, when non-empty, is the hex-encoded
+// HMAC-SHA256 over the rest of the response — see bridge_mac.go.
+// The hello reply itself is unauthenticated for TOFU reasons; every
+// scan reply IS MAC'd whenever the connection has a bridge secret.
 type NativeMessageResponse struct {
-	ID       int             `json:"id"`
-	Result   *dlp.ScanResult `json:"result,omitempty"`
-	APIToken string          `json:"api_token,omitempty"`
-	Error    string          `json:"error,omitempty"`
+	ID          int             `json:"id"`
+	Result      *dlp.ScanResult `json:"result,omitempty"`
+	APIToken    string          `json:"api_token,omitempty"`
+	BridgeNonce string          `json:"bridge_nonce,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	MAC         string          `json:"mac,omitempty"`
 }
 
 // NativeMessagingOptions carries optional dependencies the native
@@ -56,6 +71,31 @@ type NativeMessagingOptions struct {
 	// in that case; the legacy origin-only authorisation still
 	// applies on the agent side.
 	APIToken string
+
+	// BridgeMACRequired controls the staged-rollout posture of the
+	// Native Messaging bridge MAC (work item C1). When false
+	// (default) a request that arrives without a `mac` field — or
+	// with a `mac` that fails verification — is still served as
+	// before, but a one-time-per-connection warning is logged to
+	// stderr so operators can confirm clients have rolled to a C1
+	// extension build before flipping enforcement on.
+	//
+	// When true (post-rollout) a missing or invalid MAC produces an
+	// error reply ("bridge MAC required" / "bridge MAC mismatch")
+	// and the scan does not run. Mirrors the staged-rollout posture
+	// of APITokenRequired (PR #18, A2).
+	//
+	// The hello request is never MAC'd (TOFU bootstrap — see
+	// bridge_mac.go) so this knob does not affect the api-token
+	// handshake.
+	BridgeMACRequired bool
+
+	// LogStderr, when non-nil, overrides the default os.Stderr sink
+	// for the lenient-mode bridge-MAC warning. Tests inject a
+	// bytes.Buffer here to assert the warning text without
+	// polluting the test runner's stderr. Production callers leave
+	// it nil; nativemsg.go falls back to os.Stderr in that case.
+	LogStderr io.Writer
 }
 
 // ServeNativeMessaging is a backwards-compatible shim that delegates
@@ -84,6 +124,29 @@ func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, statsStore *s
 // request. The extension caches it in chrome.storage.session and
 // attaches it to its HTTP-fallback requests.
 func ServeNativeMessagingWithOptions(ctx context.Context, scanner DLPScanner, statsStore *store.Store, opts NativeMessagingOptions, in io.Reader, out io.Writer) error {
+	// Per-connection bridge-MAC state (work item C1). The nonce is
+	// minted once per ServeNativeMessagingWithOptions invocation
+	// (i.e. once per `connectNative` call from Chrome) and surfaced
+	// in the hello reply. macSecret is the shared HMAC key — the
+	// same per-install API token reused for the HTTP fallback (plan
+	// PR6, choice Q1: "Option A — reuse api_token"). A blank token
+	// short-circuits MAC verification entirely so a pre-A2
+	// deployment that has not yet wired up api_token_path keeps
+	// behaving exactly as it did before C1.
+	bridgeNonce, err := generateBridgeNonce()
+	if err != nil {
+		return fmt.Errorf("native: nonce: %w", err)
+	}
+	macSecret := opts.APIToken
+	macAvailable := macSecret != ""
+	helloIssued := false
+	helloLenientWarned := false
+	lastSeenID := 0 // request ids must be strictly monotonic per connection.
+	logSink := opts.LogStderr
+	if logSink == nil {
+		logSink = os.Stderr
+	}
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil
@@ -98,15 +161,63 @@ func ServeNativeMessagingWithOptions(ctx context.Context, scanner DLPScanner, st
 
 		var req NativeMessageRequest
 		resp := NativeMessageResponse{}
+		respKind := ""     // mirror request kind into the response MAC input
+		skipMAC := false   // set when the response should NOT carry a MAC (parse-error / hello reply / no secret)
 		if jerr := json.Unmarshal(raw, &req); jerr != nil {
 			// Best-effort error reply when we can't even parse the
 			// envelope. id is left at zero — the extension treats
 			// id=0 as "unsolicited" and surfaces the error to the user.
 			resp.Error = "invalid request JSON"
+			skipMAC = true
 		} else {
 			resp.ID = req.ID
+			respKind = req.Kind
 			switch req.Kind {
 			case "scan":
+				// Monotonic-id check (C1 replay defence).
+				// Drop frames whose id is not strictly greater
+				// than every id we have already seen on this
+				// connection. This catches an attacker who
+				// replays a captured (blocked=false) reply
+				// frame back at us mid-stream.
+				if req.ID <= lastSeenID {
+					resp.Error = "bridge id rollback"
+					break
+				}
+				lastSeenID = req.ID
+
+				// MAC verification (only when a secret is
+				// available — pre-A2 deployments with no
+				// api_token_path stay on the legacy posture).
+				macOK := true
+				if macAvailable {
+					if verr := verifyRequestMAC(macSecret, bridgeNonce, req.ID, req.Kind, req.Content, req.MAC); verr != nil {
+						macOK = false
+					}
+				}
+				if !macOK {
+					if opts.BridgeMACRequired {
+						if req.MAC == "" {
+							resp.Error = "bridge MAC required"
+						} else {
+							resp.Error = "bridge MAC mismatch"
+						}
+						break
+					}
+					// Lenient mode: log once per connection and
+					// continue. Operators can monitor stderr to
+					// confirm clients have moved to the C1 build
+					// before flipping bridge_mac_required on.
+					if !helloLenientWarned {
+						helloLenientWarned = true
+						why := "missing"
+						if req.MAC != "" {
+							why = "invalid"
+						}
+						fmt.Fprintf(logSink, "agent: bridge MAC %s on Native Messaging request (lenient mode); enforcement is OFF (bridge_mac_required=false). flip the knob once your extension build is using the MAC.\n", why)
+					}
+				}
+
 				if scanner == nil {
 					resp.Error = "DLP pipeline not configured"
 				} else {
@@ -128,10 +239,58 @@ func ServeNativeMessagingWithOptions(ctx context.Context, scanner DLPScanner, st
 				// in we still reply 200-ish (no Error) so the
 				// extension treats it as "no token configured"
 				// rather than a protocol-level failure.
+				//
+				// C1: a hello is allowed once per connection.
+				// Subsequent hello frames are rejected so an
+				// attacker who manages to inject a second
+				// hello mid-stream cannot re-bootstrap the
+				// shared nonce.
+				if helloIssued {
+					resp.Error = "hello already issued"
+					break
+				}
+				helloIssued = true
 				resp.APIToken = opts.APIToken
+				// Only surface the bridge nonce when there is
+				// actually a secret to MAC against — pre-A2
+				// deployments leave api_token_path empty and
+				// would otherwise pin a nonce that no MAC can
+				// verify against, confusing the extension's
+				// rollout-readiness probe.
+				if macAvailable {
+					resp.BridgeNonce = bridgeNonce
+				}
+				// Hello reply is intentionally NOT MAC'd: the
+				// extension has no nonce or secret to verify
+				// against yet — the very reply it is reading
+				// is what hands them over (TOFU). See plan
+				// PR6 "Bootstrap (Trust On First Use)".
+				skipMAC = true
 			default:
 				resp.Error = fmt.Sprintf("unknown kind: %q", req.Kind)
 			}
+		}
+
+		// MAC the response when we have a secret AND we're not on
+		// the deliberately-unauthenticated hello path AND we
+		// didn't bail out before assigning a kind. The lower-level
+		// JSON marshalling sets MAC explicitly so the omitempty
+		// JSON tag drops the field on the wire when it is the empty
+		// string.
+		if macAvailable && !skipMAC {
+			blockedByte := byte(0xff)
+			if resp.Result != nil {
+				if resp.Result.Blocked {
+					blockedByte = 0x01
+				} else {
+					blockedByte = 0x00
+				}
+			}
+			macHex, macErr := computeResponseMAC(macSecret, bridgeNonce, resp.ID, respKind, blockedByte, resp.APIToken, resp.Error)
+			if macErr != nil {
+				return fmt.Errorf("native: mac: %w", macErr)
+			}
+			resp.MAC = macHex
 		}
 
 		if werr := writeNativeMessage(out, resp); werr != nil {

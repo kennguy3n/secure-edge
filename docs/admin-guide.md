@@ -60,6 +60,59 @@ log_level: info
 
 Full reference is in `agent/internal/config/config.go`.
 
+### 2.1 Native Messaging bridge HMAC (`bridge_mac_required`)
+
+Phase 7 added an HMAC-SHA256 message-authentication code to every
+non-`hello` frame on the Native Messaging bridge that connects the
+browser extension's service worker to the locally installed agent
+binary (the program registered under `NativeMessagingHosts`).
+
+The MAC is keyed by the per-install API token (the 32-byte hex value
+under `api_token_path`, see A2). The agent mints a fresh 16-byte
+nonce per connection and surfaces it on the (intentionally
+unsigned) `hello` reply. The extension caches the nonce + token for
+the lifetime of the port and includes the MAC on every subsequent
+request; the agent verifies the MAC and signs its replies under the
+same key.
+
+Two knobs govern the behaviour:
+
+```yaml
+# Path to the per-install API token. Already documented under A2;
+# the same file is reused as the HMAC key (no separate secret).
+api_token_path: /var/lib/secure-edge/api-token
+
+# Bridge MAC enforcement. Default is false (lenient) — the agent
+# logs a one-time stderr warning per connection if a frame's MAC
+# is missing or invalid but keeps serving scans. Flip to true once
+# every extension build in your fleet is producing MACs.
+bridge_mac_required: false
+```
+
+Recommended rollout sequence for a managed fleet:
+
+1. Roll out the extension build that produces MACs to every
+   endpoint. Leave `bridge_mac_required: false` on the agent.
+2. Tail `journalctl --user -u secure-edge-agent` (Linux) /
+   `~/Library/Logs/secure-edge/agent.log` (macOS) /
+   `%LOCALAPPDATA%\secure-edge\agent.log` (Windows) for the
+   one-time `agent: bridge MAC missing on Native Messaging request`
+   warning. If you see it after the rollout completes, an
+   endpoint is still on the pre-C1 extension build.
+3. Once the warning stops appearing across your fleet, flip
+   `bridge_mac_required: true`. Any subsequent missing or
+   tampered MAC will be rejected with `bridge MAC required` /
+   `bridge MAC mismatch` in the response, and the extension's
+   scan will fall through to the HTTP fallback (which has its
+   own bearer-token guard from A2).
+
+The MAC check is automatically skipped when no `api_token_path` is
+configured — without a shared secret there is nothing to verify
+against, regardless of the `bridge_mac_required` knob's value. The
+agent also enforces a strict-monotonic request id and rejects a
+second `hello` on the same connection; both are unconditional and
+not gated by `bridge_mac_required`.
+
 ## 3. Enterprise Profiles (managed mode)
 
 Phase 5 added managed-mode profiles for enrolled fleets. A profile is a YAML

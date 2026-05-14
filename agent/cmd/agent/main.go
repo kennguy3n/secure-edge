@@ -162,8 +162,16 @@ func runNativeMessaging(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("api token: %w", err)
 	}
+	// C1: BridgeMACRequired plumbs through to the Native Messaging
+	// handler so the operator can flip strict-MAC enforcement on
+	// once their extension build is producing MACs. LogStderr is
+	// left at its os.Stderr default; the NM handler writes the
+	// lenient-mode warning to it.
 	return api.ServeNativeMessagingWithOptions(ctx, pipeline, statsStore,
-		api.NativeMessagingOptions{APIToken: apiToken},
+		api.NativeMessagingOptions{
+			APIToken:          apiToken,
+			BridgeMACRequired: cfg.BridgeMACRequired,
+		},
 		os.Stdin, os.Stdout)
 }
 

@@ -11,8 +11,12 @@
 // passing duck-typed mocks; the document-level listener is only wired
 // up in a real DOM environment.
 
-import { scanContent } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    ensureEnforcementModeBootstrapped,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
 /** Concatenate every textual <textarea> and text <input> value in
  *  document order. Non-text inputs (file, password, checkbox, …)
@@ -57,7 +61,26 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
     ev.stopPropagation();
 
     const result = await scanContent(text);
-    if (result === null || !result.blocked) {
+    if (result === null) {
+        // No verdict from the agent: defer to enforcement-mode policy.
+        // personal = silent submit, team = warn + submit, managed =
+        // block + surface a policy toast and leave the form intact.
+        const policy = policyForUnavailable();
+        if (policy === "block") {
+            showPolicyBlockedToast("agent-unavailable", "submission");
+            return;
+        }
+        if (policy === "warn") {
+            showPolicyWarnToast("agent-unavailable", "submission");
+        }
+        try {
+            form.submit();
+        } catch {
+            /* see note below — non-standard submit() impl. */
+        }
+        return;
+    }
+    if (!result.blocked) {
         try {
             form.submit();
         } catch {
@@ -71,6 +94,9 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
 }
 
 if (typeof document !== "undefined") {
+    // First-script bootstrap so a managed-mode posture is in the
+    // cache before the first form submit.
+    ensureEnforcementModeBootstrapped();
     document.addEventListener("submit", (ev) => void handleSubmit(ev as SubmitEvent), {
         capture: true,
     });

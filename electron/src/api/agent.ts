@@ -48,6 +48,11 @@ export interface AgentProfile {
   categories?: Record<string, PolicyAction>;
 }
 
+// Mirrors the agent's enforcement-mode posture (Phase 7 / C2). The
+// tray reads this value so the operator can confirm the deployment
+// is in the expected posture at a glance.
+export type EnforcementMode = 'personal' | 'team' | 'managed';
+
 export interface AgentStatus {
   status: string;
   uptime: string;
@@ -64,6 +69,10 @@ export interface AgentStatus {
   };
   rules?: Array<{ path: string; size_bytes: number; last_modified: string }>;
   dlp_patterns?: number;
+  // Optional in the wire shape — older agents (pre-PR2) omit the
+  // field and the tray falls back to a dash. The agent always sends
+  // "personal" when no operator override is configured.
+  enforcement_mode?: EnforcementMode;
 }
 
 // RulesStatus mirrors agent.api / rules.Status. Used by the Rules

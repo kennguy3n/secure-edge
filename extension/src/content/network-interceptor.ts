@@ -35,8 +35,12 @@
 // error returns `result: null`, which the bridge treats as "allow".
 
 import type { ScanResult } from "../shared.js";
-import { scanContent } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    ensureEnforcementModeBootstrapped,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
 const BRIDGE_SOURCE = "secure-edge-bridge";
 const ISO_SOURCE = "secure-edge-iso";
@@ -72,6 +76,22 @@ function isScanRequest(data: unknown): data is ScanRequestMessage {
 type ToastFn = (patternName: string) => void;
 type ReplyFn = (msg: ScanResponseMessage) => void;
 
+/** Synthetic pattern name the relay returns when the enforcement
+ *  mode demands blocking on agent unavailability. Exposed for the
+ *  adversarial bridge tests (PR10 / C3) so they can assert the
+ *  bridge aborts on this value rather than treating it as a real
+ *  DLP pattern. */
+export const POLICY_PATTERN_AGENT_UNAVAILABLE = "policy:agent-unavailable";
+
+/** Hooks exposed for tests so the policy decision can be driven
+ *  without standing up the real cached enforcement state. Production
+ *  callers leave these at the module defaults. */
+export interface BridgePolicyHooks {
+    onUnavailable?: () => "allow" | "warn" | "block";
+    showPolicyBlock?: () => void;
+    showPolicyWarn?: () => void;
+}
+
 /** Handle a single bridge message. Exported for unit tests so we can
  *  exercise the relay without standing up a real `window`. */
 export async function handleBridgeMessage(
@@ -79,6 +99,7 @@ export async function handleBridgeMessage(
     reply: ReplyFn,
     scan: (content: string) => Promise<ScanResult | null> = scanContent,
     toast: ToastFn = (p) => showBlockedToast(p, "request"),
+    policy: BridgePolicyHooks = {},
 ): Promise<void> {
     if (!isScanRequest(data)) return;
     const { id, content } = data;
@@ -90,6 +111,30 @@ export async function handleBridgeMessage(
     }
     if (result && result.blocked) {
         toast(result.pattern_name);
+        reply({ source: ISO_SOURCE, kind: "scan-resp", id, result });
+        return;
+    }
+    if (result === null) {
+        // No verdict from the agent. Per the enforcement-mode policy
+        // we either fall open silently (personal), warn but allow
+        // (team), or synthesise a blocked result so the bridge
+        // aborts the network request (managed).
+        const decision = (policy.onUnavailable ?? policyForUnavailable)();
+        if (decision === "block") {
+            (policy.showPolicyBlock ?? (() =>
+                showPolicyBlockedToast("agent-unavailable", "request")))();
+            const synthetic: ScanResult = {
+                blocked: true,
+                pattern_name: POLICY_PATTERN_AGENT_UNAVAILABLE,
+                score: 0,
+            };
+            reply({ source: ISO_SOURCE, kind: "scan-resp", id, result: synthetic });
+            return;
+        }
+        if (decision === "warn") {
+            (policy.showPolicyWarn ?? (() =>
+                showPolicyWarnToast("agent-unavailable", "request")))();
+        }
     }
     reply({ source: ISO_SOURCE, kind: "scan-resp", id, result });
 }
@@ -174,6 +219,11 @@ function pickRuntime(): BridgeRuntime | null {
 }
 
 if (typeof window !== "undefined") {
+    // First-script bootstrap of the enforcement-mode cache. The
+    // bridge handler tolerates a missed bootstrap by reading the
+    // in-process default ("personal") — kicking the fetch here just
+    // makes the managed-mode posture available sooner.
+    ensureEnforcementModeBootstrapped();
     window.addEventListener("message", (ev: MessageEvent) => {
         if (ev.source && ev.source !== window) return;
         void handleBridgeMessage(ev.data, (msg) => window.postMessage(msg, "*"));

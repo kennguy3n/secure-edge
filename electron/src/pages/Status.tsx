@@ -84,7 +84,7 @@ export function Status() {
         aria-live="polite"
       >
         {snap.reachable && snap.status
-          ? `Running · v${snap.status.version} · uptime ${snap.status.uptime}`
+          ? `Running · v${snap.status.version} · uptime ${snap.status.uptime} · enforcement ${snap.status.enforcement_mode ?? 'personal'}`
           : `Agent unreachable${snap.error ? ` — ${snap.error}` : ''}`}
       </div>
 

@@ -89,3 +89,25 @@ proxy_pinning_bypass: []
 # knob to true. Leave api_token_path empty to disable the feature.
 # api_token_path: ""
 # api_token_required: false
+
+# Phase 7 / C2 — fail policy when the agent cannot return a verdict
+# (timeout, network error, content too large for inline scan). The
+# agent only advertises the mode; the browser extension enforces it.
+#
+#   personal (default) — fall open, current behaviour. The paste /
+#                        submit / drop / fetch proceeds and a
+#                        toast never surfaces.
+#   team               — fall open but show a warning toast so the
+#                        user knows the scan was skipped and can
+#                        choose to retry once the agent is back.
+#   managed            — fall closed. Requests that would otherwise
+#                        bypass the scanner are blocked at the
+#                        edge and the user sees a policy toast
+#                        explaining why. In this mode the
+#                        extension also stops silently allowing
+#                        payloads above its inline-scan size limit.
+#
+# Use "managed" for enterprise deployments where the operator has
+# committed to a fail-closed posture; the privacy-first default
+# stays at "personal".
+# enforcement_mode: personal

@@ -10,10 +10,18 @@
 // block decision arrives we never log the dragged text — only the
 // pattern name surfaces through the toast.
 
-import { scanContent, MAX_SCAN_BYTES } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    ensureEnforcementModeBootstrapped,
+    MAX_SCAN_BYTES,
+    policyForOversize,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
 if (typeof document !== "undefined") {
+    // Bootstrap the enforcement-mode cache before the first drop.
+    ensureEnforcementModeBootstrapped();
     document.addEventListener("drop", (ev) => void onDrop(ev), { capture: true });
 }
 
@@ -28,14 +36,36 @@ export async function onDrop(ev: DragEvent): Promise<void> {
     if (!data) return;
     const text = data.getData("text/plain");
     if (!text || text.length === 0) return;
-    if (text.length > MAX_SCAN_BYTES) return;
+
+    if (text.length > MAX_SCAN_BYTES) {
+        // Oversize: managed mode blocks + surfaces a policy toast;
+        // personal/team mode keeps the prior silent-allow.
+        if (policyForOversize() === "block") {
+            ev.preventDefault();
+            ev.stopPropagation();
+            showPolicyBlockedToast("oversize", "drop");
+        }
+        return;
+    }
 
     ev.preventDefault();
     ev.stopPropagation();
 
     const target = ev.target as EventTarget | null;
     const result = await scanContent(text);
-    if (result === null || !result.blocked) {
+    if (result === null) {
+        const policy = policyForUnavailable();
+        if (policy === "block") {
+            showPolicyBlockedToast("agent-unavailable", "drop");
+            return;
+        }
+        if (policy === "warn") {
+            showPolicyWarnToast("agent-unavailable", "drop");
+        }
+        await resumeDrop(target, text);
+        return;
+    }
+    if (!result.blocked) {
         await resumeDrop(target, text);
         return;
     }

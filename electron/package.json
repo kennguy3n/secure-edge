@@ -4,6 +4,10 @@
   "private": true,
   "description": "Secure Edge tray app — minimal Electron shell that talks to the Go agent over localhost HTTP.",
   "homepage": "https://github.com/kennguy3n/secure-edge",
+  "author": {
+    "name": "ShieldNet (Secure Edge)",
+    "email": "kennguy3n@users.noreply.github.com"
+  },
   "main": "dist/main.js",
   "scripts": {
     "dev": "vite",

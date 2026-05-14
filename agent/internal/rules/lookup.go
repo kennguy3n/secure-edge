@@ -122,3 +122,39 @@ func (l *Lookup) Size() int {
 	defer l.mu.RUnlock()
 	return len(l.exact) + len(l.wildcard)
 }
+
+// HostsInCategories returns the set of hosts indexed under any of the
+// given categories. Hosts are returned in unspecified order with the
+// leading dot stripped (the form the extension's dynamic-hosts updater
+// expects). Duplicates are collapsed (a wildcard `.example.com` and an
+// exact `example.com` produce one entry).
+//
+// The caller passes the categories it wants; this keeps the policy →
+// hosts projection in one place (the engine) rather than spreading
+// it across packages.
+func (l *Lookup) HostsInCategories(categories map[string]struct{}) []string {
+	if len(categories) == 0 {
+		return nil
+	}
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	seen := make(map[string]struct{}, len(l.exact)+len(l.wildcard))
+	for host, cat := range l.exact {
+		if _, ok := categories[cat]; ok {
+			seen[host] = struct{}{}
+		}
+	}
+	for host, cat := range l.wildcard {
+		if _, ok := categories[cat]; ok {
+			seen[host] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(seen))
+	for h := range seen {
+		out = append(out, h)
+	}
+	return out
+}

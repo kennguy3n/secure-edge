@@ -63,6 +63,45 @@ test("bodyToText handles string and URLSearchParams", () => {
     assert.equal(bodyToText({ unrelated: true }), "");
 });
 
+test("bodyToText extracts FormData text fields and skips files (P1-5)", () => {
+    const fd = new FormData();
+    fd.append("prompt", "leak: AKIAABCDEFGHIJKLMNOP");
+    fd.append("model", "gpt-4");
+    // File / Blob entries must be ignored — reading them is async
+    // and the hook runs synchronously.
+    fd.append("upload", new Blob(["secret"], { type: "text/plain" }), "secret.txt");
+
+    const out = bodyToText(fd);
+
+    // Order is insertion-order per the FormData spec.
+    assert.equal(
+        out,
+        "prompt=leak%3A%20AKIAABCDEFGHIJKLMNOP&model=gpt-4",
+        `unexpected FormData encoding: ${out}`,
+    );
+    // The Blob value must not have leaked into the scan input.
+    assert.ok(!out.includes("secret"), "Blob value must not appear in scan input");
+});
+
+test("extractFetchBody extracts FormData text fields (P1-5)", () => {
+    const fd = new FormData();
+    fd.append("question", "AKIAABCDEFGHIJKLMNOP");
+    const args = [
+        "https://x.test/api",
+        { method: "POST", body: fd },
+    ] as unknown as Parameters<typeof fetch>;
+    assert.equal(extractFetchBody(args), "question=AKIAABCDEFGHIJKLMNOP");
+});
+
+test("bodyToText returns empty string for Blob / ArrayBuffer (intentional, P1-5)", () => {
+    // Per the spec comment in bodyValueToText: reading Blob /
+    // ArrayBuffer is async and intentionally NOT supported in the
+    // synchronous interception path. They must short-circuit to ""
+    // rather than triggering a misleading partial scan.
+    assert.equal(bodyToText(new Blob(["AKIA..."], { type: "text/plain" })), "");
+    assert.equal(bodyToText(new ArrayBuffer(16)), "");
+});
+
 test("requestScan resolves with the isolated-world verdict", async () => {
     const win = makeBridgedWindow(() => ({ blocked: true, pattern_name: "aws_key", score: 9 }));
     const r = await requestScan(win, "X".repeat(80));

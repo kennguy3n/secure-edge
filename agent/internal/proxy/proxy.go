@@ -22,6 +22,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -310,13 +311,21 @@ func (s *Server) bumpStats(ctx context.Context, blocked bool) {
 // downstream goproxy machinery can use to forward the request body
 // to the upstream server unchanged. Returns nil bytes and a nil
 // replacement when req.Body is nil or empty.
+//
+// Memory bound (P1-3): the scan window is capped at maxScanBytes
+// regardless of body size. Anything past the cap is NOT buffered —
+// the original body is left open and chained behind the already-read
+// prefix via io.MultiReader so goproxy streams the remainder upstream
+// byte-for-byte. A bodyChainCloser wraps the chain so the original
+// reader is closed exactly once when the replacement is closed.
 func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 	if req == nil || req.Body == nil || req.Body == http.NoBody {
 		return nil, nil, nil
 	}
 
 	body := req.Body
-	defer body.Close()
+	// Body close is deferred to the replacement reader's Close so a
+	// large body isn't buffered into RAM just to close the original.
 
 	buf := make([]byte, 0, 4096)
 	tmp := make([]byte, 4096)
@@ -324,20 +333,29 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 		n, err := body.Read(tmp)
 		if n > 0 {
 			if len(buf)+n > maxScanBytes {
-				// Trim to the cap and keep reading so the upstream
-				// still receives the entire body — we just don't
-				// scan past the limit. Concatenating the rest into
-				// an io.Reader chain is enough to forward it.
+				// Trim to the cap and let goproxy stream the rest.
+				// We've consumed [0..n) of tmp; [0..keep) goes into
+				// the scan buffer, [keep..n) gets pushed back via
+				// MultiReader, and body still has any remaining
+				// bytes that we haven't yet read.
 				keep := maxScanBytes - len(buf)
 				if keep < 0 {
 					keep = 0
 				}
 				buf = append(buf, tmp[:keep]...)
-				remaining, rErr := io.ReadAll(body)
-				if rErr != nil {
-					return nil, nil, rErr
+
+				// pushed-back tail of the current chunk
+				tail := make([]byte, n-keep)
+				copy(tail, tmp[keep:n])
+
+				replacement := &bodyChainCloser{
+					Reader: io.MultiReader(
+						bytes.NewReader(buf),
+						bytes.NewReader(tail),
+						body,
+					),
+					closer: body,
 				}
-				replacement := io.NopCloser(combineReaders(buf, tmp[keep:n], remaining))
 				return buf, replacement, nil
 			}
 			buf = append(buf, tmp[:n]...)
@@ -346,22 +364,36 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 			break
 		}
 		if err != nil {
+			_ = body.Close()
 			return nil, nil, err
 		}
 	}
-	replacement := io.NopCloser(strings.NewReader(bytesToString(buf)))
+	// Whole body fit under the cap — close the original reader now
+	// (we've already consumed it) and hand back an in-memory copy.
+	_ = body.Close()
+	replacement := io.NopCloser(bytes.NewReader(buf))
 	return buf, replacement, nil
 }
 
-func combineReaders(parts ...[]byte) io.Reader {
-	readers := make([]io.Reader, 0, len(parts))
-	for _, p := range parts {
-		if len(p) == 0 {
-			continue
-		}
-		readers = append(readers, strings.NewReader(bytesToString(p)))
+// bodyChainCloser wraps an io.MultiReader so a single Close on the
+// returned ReadCloser drains down to the underlying http.Request.Body.
+// goproxy's downstream code expects to be able to Close exactly once;
+// guarding with atomic.Bool keeps the close idempotent in case both
+// goproxy and a deferred cleanup call it.
+type bodyChainCloser struct {
+	io.Reader
+	closer io.Closer
+	closed atomic.Bool
+}
+
+func (b *bodyChainCloser) Close() error {
+	if b.closed.Swap(true) {
+		return nil
 	}
-	return io.MultiReader(readers...)
+	if b.closer == nil {
+		return nil
+	}
+	return b.closer.Close()
 }
 
 // blockedResponse builds the HTTP 451 reply documented in the API

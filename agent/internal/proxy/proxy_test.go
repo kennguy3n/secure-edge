@@ -386,3 +386,94 @@ func freePort(t *testing.T) string {
 	}
 	return port
 }
+
+// boundedReader returns 1 MiB of data per Read call so the test can
+// detect whether readScanBody fully buffered the body (peak heap)
+// vs. streamed it (constant heap). We hand it 4 GiB total. If
+// io.ReadAll is reintroduced this test will OOM on the CI runner;
+// the streaming path completes in milliseconds with ~maxScanBytes
+// of resident memory.
+type boundedReader struct {
+	total int64
+	read  int64
+	chunk []byte
+}
+
+func (r *boundedReader) Read(p []byte) (int, error) {
+	if r.read >= r.total {
+		return 0, io.EOF
+	}
+	remaining := r.total - r.read
+	n := int64(len(p))
+	if n > int64(len(r.chunk)) {
+		n = int64(len(r.chunk))
+	}
+	if n > remaining {
+		n = remaining
+	}
+	copy(p, r.chunk[:n])
+	r.read += n
+	return int(n), nil
+}
+
+func (r *boundedReader) Close() error { return nil }
+
+// TestReadScanBody_OverCapStreams pins the P1-3 invariant: a body
+// larger than maxScanBytes returns exactly maxScanBytes of scan
+// bytes and the replacement reader streams the remainder (so the
+// scan path doesn't have to fit the whole body in RAM at once).
+//
+// We send 4 GiB of zeros and verify:
+//   - readScanBody returns len(buf) == maxScanBytes (no over-read)
+//   - reading the replacement back yields exactly 4 GiB
+//   - peak resident heap growth stays below 64 MiB (well under the
+//     full body size, ruling out the old io.ReadAll path)
+func TestReadScanBody_OverCapStreams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping multi-GiB streaming test in -short mode")
+	}
+	const total int64 = 4 * 1024 * 1024 * 1024 // 4 GiB
+	chunk := make([]byte, 1024*1024)           // 1 MiB filled with zeros
+	req := &http.Request{Body: &boundedReader{total: total, chunk: chunk}}
+
+	var before, after runtimeMemStats
+	readMemStats(&before)
+
+	buf, replacement, err := readScanBody(req)
+	if err != nil {
+		t.Fatalf("readScanBody: %v", err)
+	}
+	if got := len(buf); got != maxScanBytes {
+		t.Fatalf("len(buf) = %d, want maxScanBytes = %d", got, maxScanBytes)
+	}
+
+	// Drain the replacement and count its size — must equal `total`
+	// to prove the streamed remainder isn't being silently truncated.
+	streamed, err := io.Copy(io.Discard, replacement)
+	if err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
+	if streamed != total {
+		t.Fatalf("streamed bytes = %d, want %d (body was truncated)", streamed, total)
+	}
+	if err := replacement.Close(); err != nil {
+		t.Fatalf("replacement.Close: %v", err)
+	}
+	// Second close must be a no-op (idempotent).
+	if err := replacement.Close(); err != nil {
+		t.Fatalf("replacement.Close (second): %v", err)
+	}
+
+	readMemStats(&after)
+	// Allow generous slack — we only care that we didn't buffer
+	// the whole body. maxScanBytes (4 MiB) + GC noise is far below
+	// 64 MiB; the old io.ReadAll path would have allocated ~4 GiB.
+	// HeapAlloc may also shrink (GC ran between snapshots), which is
+	// a passing outcome; only signed-positive growth counts.
+	const memCap = 64 * 1024 * 1024
+	if after.HeapAlloc > before.HeapAlloc {
+		if delta := after.HeapAlloc - before.HeapAlloc; delta > memCap {
+			t.Fatalf("heap grew by %d bytes; readScanBody must not buffer the full body", delta)
+		}
+	}
+}

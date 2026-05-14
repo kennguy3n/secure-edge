@@ -1085,3 +1085,125 @@ func TestRuleOverrideDeleteReloadFailure(t *testing.T) {
 		t.Fatalf("delete => 500 expected when reload fails, got %d body=%s", w.Code, w.Body.String())
 	}
 }
+
+// TestCORS_AIPageOriginsBlockedFromControlEndpoints pins the P0-1
+// per-path origin split. AI page origins (Tier-2 tool pages where the
+// extension's content scripts run) MUST NOT reach state-changing
+// endpoints — a compromised AI tool page that talks to the agent is
+// restricted to /api/dlp/scan and the GET-only status surface. The
+// Electron renderer and chrome-/moz-/safari-extension origins remain
+// the only callers that can mutate policy, flip the proxy, import a
+// profile, or roll a rule update.
+func TestCORS_AIPageOriginsBlockedFromControlEndpoints(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	controlPaths := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPut, "/api/policies/AI%20Chat%20Blocked"},
+		{http.MethodPut, "/api/dlp/config"},
+		{http.MethodPost, "/api/proxy/enable"},
+		{http.MethodPost, "/api/proxy/disable"},
+		{http.MethodPost, "/api/profile/import"},
+		{http.MethodPost, "/api/rules/update"},
+		{http.MethodPost, "/api/rules/override"},
+		{http.MethodDelete, "/api/rules/override/foo.example"},
+		{http.MethodPost, "/api/agent/update"},
+		{http.MethodGet, "/api/agent/update-check"},
+		{http.MethodPost, "/api/stats/reset"},
+	}
+	aiPageOrigins := []string{
+		"https://chatgpt.com",
+		"https://chat.openai.com",
+		"https://claude.ai",
+		"https://gemini.google.com",
+		"https://copilot.microsoft.com",
+		"https://you.com",
+		"https://www.perplexity.ai",
+		"https://huggingface.co",
+		"https://poe.com",
+	}
+	for _, origin := range aiPageOrigins {
+		for _, c := range controlPaths {
+			r := newLocalRequest(c.method, c.path, nil)
+			r.Header.Set("Origin", origin)
+			w := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(w, r)
+			if w.Code != http.StatusForbidden {
+				t.Errorf("%s %s from %s: code = %d, want 403", c.method, c.path, origin, w.Code)
+			}
+			if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
+				t.Errorf("%s %s from %s: ACAO leaked %q", c.method, c.path, origin, got)
+			}
+		}
+	}
+}
+
+// TestCORS_AIPageOriginsAllowedOnReadEndpoints confirms the read-only
+// half of the split: AI page origins keep their access to the scan
+// pipeline, status readouts, profile read, and rules-status polling
+// so the in-page DLP coaching and the extension's dynamic Tier-2
+// updater both continue to work.
+func TestCORS_AIPageOriginsAllowedOnReadEndpoints(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRuleUpdater(&stubUpdater{})
+
+	readPaths := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/status"},
+		{http.MethodGet, "/api/stats"},
+		{http.MethodGet, "/api/stats/export"},
+		{http.MethodGet, "/api/proxy/status"},
+		{http.MethodGet, "/api/tamper/status"},
+		{http.MethodGet, "/api/rules/status"},
+		{http.MethodGet, "/api/policies"},
+		{http.MethodOptions, "/api/dlp/scan"},
+	}
+	for _, c := range readPaths {
+		r := newLocalRequest(c.method, c.path, nil)
+		r.Header.Set("Origin", "https://chatgpt.com")
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		// We're only verifying that the CORS layer didn't 403 the
+		// request and echoed the origin back. The handlers themselves
+		// can still return 404 / 503 / etc., which is fine — what
+		// would be a P0-1 regression is a 403 from the middleware.
+		if w.Code == http.StatusForbidden {
+			t.Errorf("%s %s from chatgpt.com: code = 403 (control endpoint regression)", c.method, c.path)
+		}
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://chatgpt.com" {
+			t.Errorf("%s %s from chatgpt.com: ACAO = %q, want https://chatgpt.com", c.method, c.path, got)
+		}
+	}
+}
+
+// TestCORS_ControlOriginsReachControlEndpoints confirms the Electron
+// renderer and any installed extension build can still drive the
+// state-changing endpoints. Without this pin a future tightening of
+// isControlOrigin could lock the tray app out of its own agent.
+func TestCORS_ControlOriginsReachControlEndpoints(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	controlOrigins := []string{
+		"null",                  // packaged Electron renderer (file://)
+		"http://localhost:5173", // Vite dev server
+		"chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+		"moz-extension://01234567-89ab-cdef-0123-456789abcdef",
+		"safari-web-extension://01234567-89ab-cdef-0123-456789abcdef",
+	}
+	for _, origin := range controlOrigins {
+		r := newLocalRequest(http.MethodOptions, "/api/policies/AI%20Chat%20Blocked", nil)
+		r.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusNoContent {
+			t.Errorf("%s preflight to /api/policies/...: code = %d, want 204", origin, w.Code)
+		}
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Errorf("%s: ACAO = %q, want %q", origin, got, origin)
+		}
+	}
+}

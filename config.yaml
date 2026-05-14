@@ -1,0 +1,66 @@
+# Secure Edge agent configuration (packaged default).
+#
+# This file is installed to /etc/secure-edge/config.yaml on Linux (see
+# agent/nfpm.yaml) and C:\ProgramData\SecureEdge\config.yaml on Windows
+# (see installer/wix/secure-edge.wxs). Treat it as a starting point
+# tuned for an out-of-the-box install — operators are expected to
+# override values via the agent's `--config` flag or by editing this
+# file in place.
+#
+# Every value here mirrors the example in README.md; keep them in sync
+# so the README is the canonical reference.
+
+# DNS resolver
+upstream_dns: "8.8.8.8:53"
+dns_listen: "127.0.0.1:5353"
+
+# Local agent HTTP API. Used by the Electron tray, the browser
+# extension service worker, and the rules/scan endpoints.
+api_listen: "127.0.0.1:8080"
+
+# SQLite state lives next to the binary in the packaged install.
+# When run from source the file is created in the working directory.
+db_path: "secure-edge.db"
+stats_flush_interval: 60s
+
+# Bundled rule files. Each entry resolves relative to the agent's
+# working directory (so the packaged install loads them from the
+# rules/ folder installed alongside the binary).
+rule_paths:
+  - rules/ai_chat_blocked.txt
+  - rules/ai_code_blocked.txt
+  - rules/ai_allowed.txt
+  - rules/ai_chat_dlp.txt
+  - rules/phishing.txt
+  - rules/social.txt
+  - rules/news.txt
+
+# DLP pipeline. Leaving these blank disables /api/dlp/* (returns 503)
+# while DNS, policies, and stats keep working.
+dlp_patterns: rules/dlp_patterns.json
+dlp_exclusions: rules/dlp_exclusions.json
+
+# Phase 3 rule updater. Leaving rule_update_url blank disables the
+# updater; everything else keeps working.
+rule_update_url: ""
+rule_update_interval: 6h
+rules_dir: rules
+
+# Phase 4 local MITM proxy. proxy_enabled=false (default) leaves the
+# listener stopped — /api/proxy/enable can start it at runtime.
+proxy_listen: "127.0.0.1:8443"
+proxy_enabled: false
+ca_cert_path: ""
+ca_key_path: ""
+proxy_pinning_bypass: []
+
+# Phase 6 DLP engine tuning. Omitting a field keeps the built-in default.
+# large_content_threshold: 51200
+# dlp_cache_ttl_seconds: 5
+# dlp_cache_capacity: 256
+# dlp_rate_limit_per_sec: 100
+# dlp_disabled_categories: []
+
+# Agent self-update. Both fields are required to enable.
+# agent_update_manifest_url: ""
+# agent_update_public_key: ""

@@ -124,3 +124,31 @@ func (e *Engine) Categories() map[string]Action {
 	}
 	return out
 }
+
+// Tier2Hosts returns every indexed host whose category currently
+// resolves to AllowWithDLP. The result is consumed by main.go and
+// surfaced through GET /api/rules/status so the browser extension can
+// keep its content_scripts.matches in sync with the agent's resolved
+// Tier-2 set without a manifest push.
+//
+// Hosts are returned without a leading dot. Order is unspecified;
+// callers that need deterministic output should sort.
+func (e *Engine) Tier2Hosts() []string {
+	e.mu.RLock()
+	lookup := e.lookup
+	cats := e.categories
+	e.mu.RUnlock()
+	if lookup == nil || len(cats) == 0 {
+		return nil
+	}
+	tier2 := make(map[string]struct{})
+	for cat, action := range cats {
+		if action == AllowWithDLP {
+			tier2[cat] = struct{}{}
+		}
+	}
+	if len(tier2) == 0 {
+		return nil
+	}
+	return lookup.HostsInCategories(tier2)
+}

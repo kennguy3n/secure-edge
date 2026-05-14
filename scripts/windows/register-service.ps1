@@ -3,13 +3,16 @@
     Register the Secure Edge Go agent as a Windows Service.
 
 .DESCRIPTION
-    Creates a Windows Service named "SecureEdgeAgent" that runs the agent
-    binary with the bundled config. Equivalent shell-level command:
+    Creates a Windows Service named "SecureEdge" that runs the agent
+    binary with the bundled config. The service name, display name,
+    and install paths must match scripts/windows/secure-edge.wxs so an
+    MSI install and a hand-run of this script produce the same service
+    registration. Equivalent shell-level command:
 
-        sc.exe create SecureEdgeAgent ^
-            binPath= "\"C:\Program Files\Secure Edge\secure-edge-agent.exe\" --config \"C:\ProgramData\Secure Edge\config.yaml\"" ^
+        sc.exe create SecureEdge ^
+            binPath= "\"C:\Program Files\SecureEdge\bin\secure-edge-agent.exe\" --config \"C:\ProgramData\SecureEdge\config.yaml\"" ^
             start= auto ^
-            DisplayName= "Secure Edge Agent"
+            DisplayName= "Secure Edge"
 
 .PARAMETER Mode
     'install'   — create and start the service (default)
@@ -27,10 +30,10 @@
 param(
     [ValidateSet('install','uninstall')]
     [string]$Mode = 'install',
-    [string]$BinaryPath = 'C:\Program Files\Secure Edge\secure-edge-agent.exe',
-    [string]$ConfigPath = 'C:\ProgramData\Secure Edge\config.yaml',
-    [string]$ServiceName = 'SecureEdgeAgent',
-    [string]$DisplayName = 'Secure Edge Agent'
+    [string]$BinaryPath = 'C:\Program Files\SecureEdge\bin\secure-edge-agent.exe',
+    [string]$ConfigPath = 'C:\ProgramData\SecureEdge\config.yaml',
+    [string]$ServiceName = 'SecureEdge',
+    [string]$DisplayName = 'Secure Edge'
 )
 
 function Assert-Admin {

@@ -42,7 +42,15 @@
         "https://you.com/*",
         "https://www.perplexity.ai/*",
         "https://huggingface.co/chat/*",
-        "https://poe.com/*"
+        "https://poe.com/*",
+        "https://grok.com/*",
+        "https://x.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://mistral.ai/*",
+        "https://openrouter.ai/*",
+        "https://chat.lmsys.org/*",
+        "https://aistudio.google.com/*",
+        "https://notebooklm.google.com/*"
       ],
       "js": [
         "dist/content/paste-interceptor.js",
@@ -62,7 +70,15 @@
         "https://you.com/*",
         "https://www.perplexity.ai/*",
         "https://huggingface.co/chat/*",
-        "https://poe.com/*"
+        "https://poe.com/*",
+        "https://grok.com/*",
+        "https://x.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://mistral.ai/*",
+        "https://openrouter.ai/*",
+        "https://chat.lmsys.org/*",
+        "https://aistudio.google.com/*",
+        "https://notebooklm.google.com/*"
       ],
       "js": [
         "dist/content/network-interceptor.js"
@@ -87,7 +103,15 @@
         "https://you.com/*",
         "https://www.perplexity.ai/*",
         "https://huggingface.co/chat/*",
-        "https://poe.com/*"
+        "https://poe.com/*",
+        "https://grok.com/*",
+        "https://x.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://mistral.ai/*",
+        "https://openrouter.ai/*",
+        "https://chat.lmsys.org/*",
+        "https://aistudio.google.com/*",
+        "https://notebooklm.google.com/*"
       ]
     }
   ]

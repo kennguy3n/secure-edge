@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestParseAndValidate(t *testing.T) {
@@ -91,7 +93,15 @@ func TestLoadFromFile(t *testing.T) {
 }
 
 func TestLoadFromURL(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// httptest.NewTLSServer binds to 127.0.0.1, which the production
+	// SSRF guard rejects. Stub the hook out for the duration of this
+	// test so we can exercise the happy / error paths through HTTPS
+	// without standing up a non-loopback TLS endpoint.
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/ok":
 			w.Header().Set("Content-Type", "application/json")
@@ -135,6 +145,203 @@ func TestLoadFromURL(t *testing.T) {
 	}
 	if _, err := LoadFromURL(ctx, srv.Client(), "ftp://example.com/p.json"); err == nil {
 		t.Fatalf("expected error on non-http scheme")
+	}
+}
+
+// TestLoadFromURL_RejectsHTTPScheme pins the P0-2 HTTPS-only guard.
+// A profile document is a load-bearing security artefact (it can flip
+// the agent into managed mode, lock the device, and rewrite category
+// policies) and must not be subject to in-flight modification by a
+// network attacker. A plain http:// scheme is rejected unconditionally.
+func TestLoadFromURL_RejectsHTTPScheme(t *testing.T) {
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	cases := []string{
+		"http://mdm.example.com/profile.json",
+		"http://127.0.0.1/profile.json",
+		"http://[::1]/profile.json",
+	}
+	for _, rawURL := range cases {
+		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		if err == nil {
+			t.Errorf("%s: expected scheme error, got nil", rawURL)
+			continue
+		}
+		if !strings.Contains(err.Error(), "https") {
+			t.Errorf("%s: error %q must mention https", rawURL, err)
+		}
+	}
+}
+
+// TestLoadFromURL_RejectsPrivateOrLoopbackHosts pins the P0-2 SSRF
+// guard. A managed profile is fetched on agent startup as well as on
+// every rule update; without this guard a hostile `profile_url` (or a
+// fleet operator whose own MDM has been compromised) could trick the
+// agent into talking to internal services on the same host or LAN.
+//
+// We exercise literal IP rejection here so the test doesn't depend on
+// the host's DNS being able to resolve a public name; the resolver
+// path is covered by TestLoadFromURL_RejectsHostnameResolvingToPrivate.
+func TestLoadFromURL_RejectsPrivateOrLoopbackHosts(t *testing.T) {
+	cases := []string{
+		"https://127.0.0.1/profile.json",
+		"https://127.1.2.3/profile.json",
+		"https://[::1]/profile.json",
+		"https://10.0.0.1/profile.json",
+		"https://10.255.255.255/profile.json",
+		"https://172.16.0.1/profile.json",
+		"https://172.31.255.254/profile.json",
+		"https://192.168.0.1/profile.json",
+		"https://192.168.255.254/profile.json",
+		"https://169.254.169.254/profile.json", // AWS / Azure IMDS
+		"https://[fc00::1]/profile.json",       // unique-local IPv6
+		"https://[fe80::1]/profile.json",       // link-local IPv6
+		"https://0.0.0.0/profile.json",
+		"https://[::]/profile.json",
+	}
+	for _, rawURL := range cases {
+		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		if err == nil {
+			t.Errorf("%s: expected SSRF rejection, got nil", rawURL)
+			continue
+		}
+		if !strings.Contains(err.Error(), "private/loopback") {
+			t.Errorf("%s: error %q must mention private/loopback", rawURL, err)
+		}
+	}
+}
+
+// TestLoadFromURL_RejectsHostnameResolvingToPrivate exercises the
+// resolver branch of the SSRF guard: a benign-looking hostname whose
+// DNS resolution happens to return a loopback / RFC1918 address is
+// still rejected. This is the DNS-rebinding flavour of SSRF — without
+// it, a public hostname could legitimately return 127.0.0.1 and the
+// agent would happily POST a profile fetch through localhost.
+func TestLoadFromURL_RejectsHostnameResolvingToPrivate(t *testing.T) {
+	origResolver := profileResolver
+	profileResolver = func(_ context.Context, host string) ([]string, error) {
+		if host == "mdm-rebinder.example.com" {
+			return []string{"127.0.0.1"}, nil
+		}
+		return nil, errors.New("unexpected host")
+	}
+	t.Cleanup(func() { profileResolver = origResolver })
+
+	_, err := LoadFromURL(context.Background(), nil, "https://mdm-rebinder.example.com/profile.json")
+	if err == nil {
+		t.Fatalf("expected SSRF rejection for hostname resolving to 127.0.0.1, got nil")
+	}
+	if !strings.Contains(err.Error(), "private/loopback") {
+		t.Fatalf("error %q must mention private/loopback", err)
+	}
+}
+
+// TestLoadFromURL_RejectsHTTPRedirect pins the redirect half of the
+// SSRF guard. Before this guard existed, an attacker-controlled HTTPS
+// origin could return a 302 to http://169.254.169.254/… (cloud IMDS)
+// or any RFC1918 host and the agent's default http.Client would
+// happily follow it — bypassing both the HTTPS scheme check and the
+// initial hostCheck. We assert two properties here:
+//
+//  1. A redirect that downgrades to http:// is rejected.
+//  2. A redirect whose target host resolves to a private/loopback IP
+//     is rejected even though the initial host passed the guard.
+func TestLoadFromURL_RejectsHTTPRedirect(t *testing.T) {
+	// The httptest TLS server's cert SAN is `example.com, *.example.com`,
+	// so we use "example.com" as the initial host (which the cert
+	// validates) and rewrite the dial below to point at the loopback
+	// listener. The redirect targets ("attacker.controlled" and
+	// "internal.invalid") are deliberately different so the
+	// hostCheck stub can tell the initial hop apart from the redirect
+	// hop — only the redirect hop must be rejected.
+	orig := hostCheck
+	hostCheck = func(_ context.Context, host string) error {
+		if host == "example.com" {
+			return nil // initial fetch passes the guard
+		}
+		// Anything else (the redirect target) must be rejected.
+		return errors.New("profile: private/loopback IP not allowed")
+	}
+	t.Cleanup(func() { hostCheck = orig })
+
+	cases := []struct {
+		name        string
+		location    string
+		errContains string
+	}{
+		{
+			name:        "http downgrade",
+			location:    "http://attacker.controlled/anything",
+			errContains: "non-https scheme",
+		},
+		{
+			name:        "redirect to private host",
+			location:    "https://internal.invalid/path",
+			errContains: "private/loopback IP not allowed",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			redirector := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, tc.location, http.StatusFound)
+			}))
+			t.Cleanup(redirector.Close)
+
+			// Use "example.com" so the test cert validates, then
+			// hijack the dial to point at the loopback test server.
+			// This lets us exercise the redirect logic without a real
+			// public endpoint or InsecureSkipVerify.
+			tr := redirector.Client().Transport.(*http.Transport).Clone()
+			tr.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, redirector.Listener.Addr().String())
+			}
+			client := &http.Client{Transport: tr, Timeout: 5 * time.Second}
+
+			_, err := LoadFromURL(context.Background(), client, "https://example.com/profile.json")
+			if err == nil {
+				t.Fatalf("expected redirect to be rejected; got nil")
+			}
+			if !strings.Contains(err.Error(), tc.errContains) {
+				t.Fatalf("error %q must contain %q", err, tc.errContains)
+			}
+		})
+	}
+}
+
+// TestLoadFromURL_RedirectGuardEnforcesChainCap pins the redirect-
+// depth cap. Even when every hop has a "valid" https + non-private
+// target, a deep chain is suspicious and must be cut short — the
+// guard returns an error rather than silently following Go's
+// default 10-hop limit.
+func TestLoadFromURL_RedirectGuardEnforcesChainCap(t *testing.T) {
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	var srv *httptest.Server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Always redirect back to /next so the chain never terminates;
+		// the depth cap (not a redirect loop in net/http) must be what
+		// returns the error.
+		http.Redirect(w, r, srv.URL+"/next", http.StatusFound)
+	})
+	srv = httptest.NewTLSServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := srv.Client()
+	client.Timeout = 5 * time.Second
+
+	_, err := LoadFromURL(context.Background(), client, srv.URL+"/start")
+	if err == nil {
+		t.Fatalf("expected redirect chain to be cut short; got nil")
+	}
+	if !strings.Contains(err.Error(), "redirect chain too long") {
+		t.Fatalf("error %q must mention chain length", err)
 	}
 }
 

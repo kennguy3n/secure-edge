@@ -1,6 +1,6 @@
 module github.com/kennguy3n/secure-edge/agent
 
-go 1.25.9
+go 1.25.0
 
 require (
 	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396

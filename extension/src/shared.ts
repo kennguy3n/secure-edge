@@ -49,6 +49,16 @@ export const TIER2_HOSTNAMES: ReadonlyArray<string> = [
     "www.perplexity.ai",
     "huggingface.co",
     "poe.com",
+    // Tier-2 expansion (P1-2). Kept in sync with manifest.json
+    // content_scripts.matches and agent CORS aiPageOrigins.
+    "grok.com",
+    "x.ai",
+    "chat.mistral.ai",
+    "mistral.ai",
+    "openrouter.ai",
+    "chat.lmsys.org",
+    "aistudio.google.com",
+    "notebooklm.google.com",
 ];
 
 /** Native Messaging host application identifier. Must match the

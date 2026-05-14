@@ -87,6 +87,12 @@ type Updater struct {
 	currentVersion string
 	lastCheck      time.Time
 	nextCheck      time.Time
+	// tier2Hosts is the resolved set of Tier-2 (DLP-inspected) hosts
+	// that the engine is currently treating as paste / fetch targets.
+	// The extension's dynamic-hosts updater reads this list from
+	// GET /api/rules/status so its content_scripts.matches can stay
+	// in sync with the agent's resolved tier without a manifest push.
+	tier2Hosts []string
 }
 
 // New constructs an Updater. Returns an error when ManifestURL is empty
@@ -112,23 +118,66 @@ func New(opts Options) (*Updater, error) {
 
 // Status is a snapshot of the updater's bookkeeping fields. Returned by
 // the GET /api/rules/status handler.
+//
+// CurrentVersion / RuleVersion: both fields carry the same value. The
+// extension's dynamic-hosts updater reads `rule_version` from this
+// endpoint; the original Electron tray reads `current_version`. Adding
+// `RuleVersion` instead of renaming preserves both consumers.
+//
+// Tier2Hosts: the resolved set of Tier-2 (DLP-inspected) hosts. The
+// extension uses this to keep its content_scripts.matches in sync with
+// the agent's resolved tier without a manifest push.
 type Status struct {
 	CurrentVersion string    `json:"current_version"`
+	RuleVersion    string    `json:"rule_version"`
 	LastCheck      time.Time `json:"last_check"`
 	NextCheck      time.Time `json:"next_check"`
 	UpdateURL      string    `json:"update_url"`
+	Tier2Hosts     []string  `json:"tier2_hosts"`
 }
 
 // Status returns a snapshot of the updater's bookkeeping fields.
 func (u *Updater) Status() Status {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
+	// Defensive copy so a caller can't mutate the updater's internal
+	// slice through the returned Status value.
+	hosts := make([]string, len(u.tier2Hosts))
+	copy(hosts, u.tier2Hosts)
+	// Always return a non-nil slice — encoding/json renders nil as
+	// `null`, but the extension expects `[]` when no Tier-2 hosts are
+	// configured (see extension/src/background/dynamic-hosts.ts).
+	if hosts == nil {
+		hosts = []string{}
+	}
 	return Status{
 		CurrentVersion: u.currentVersion,
+		RuleVersion:    u.currentVersion,
 		LastCheck:      u.lastCheck,
 		NextCheck:      u.nextCheck,
 		UpdateURL:      u.opts.ManifestURL,
+		Tier2Hosts:     hosts,
 	}
+}
+
+// SetTier2Hosts records the resolved set of Tier-2 (DLP-inspected)
+// hosts so it can be surfaced through GET /api/rules/status to the
+// extension. Called by the agent's main.go on startup and whenever a
+// rule reload / profile update changes the tier mapping.
+//
+// hosts is copied — callers may mutate the input slice after this
+// returns. A nil or zero-length input is stored as an empty slice so
+// Status() always returns a non-nil JSON array.
+func (u *Updater) SetTier2Hosts(hosts []string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if len(hosts) == 0 {
+		u.tier2Hosts = nil
+		return
+	}
+	cp := make([]string, len(hosts))
+	copy(cp, hosts)
+	u.tier2Hosts = cp
 }
 
 // Result describes the outcome of one update cycle.

@@ -16,36 +16,36 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
 )
 
-// allowedOrigins is the strict allowlist of browser origins that are
-// permitted to talk to the local agent. Three classes are accepted,
-// all enforced through isAllowedOrigin so wildcard CORS is never used
-// (state-changing endpoints exist, so wildcards would be a real
-// DNS-rebinding vector):
+// controlOrigins is the strict allowlist of browser origins permitted
+// to call the agent's state-changing (control) endpoints. Only the
+// Electron renderer (file:// "null" and the Vite dev server) is listed
+// here by exact match; the chrome- / moz- / safari-extension prefixes
+// are also treated as control origins via isControlOrigin so any
+// installed build of the companion extension can drive the admin
+// surface.
 //
-//  1. The Electron renderer: file:// in production (Origin: "null")
-//     and the Vite dev server. Exact match.
-//  2. The browser companion extension's service worker, which sends
-//     Origin: chrome-extension://<extension-id>. The ID is fixed once
-//     the extension is published but not knowable at compile time, so
-//     any chrome-extension://* origin is accepted. Host permissions in
-//     the extension's own manifest gate which agents the extension is
-//     allowed to call — the Origin check here is in series with that.
-//  3. The 10 Tier-2 AI tool pages where the paste-interceptor content
-//     script runs. The browser stamps the page's own origin (not the
-//     extension's) when content scripts fetch with mode:"cors", so
-//     these origins must be explicitly listed. The list is the same
-//     set as extension/manifest.json's content_scripts.matches.
-//
-// The Host-header allowlist (allowedHostnames) remains the actual
-// DNS-rebinding defence — a hostile site can hijack a DNS name to
-// point at 127.0.0.1, but it cannot forge the Host header.
-var allowedOrigins = map[string]struct{}{
+// AI page origins (Tier-2 tool pages where the content script runs)
+// are intentionally NOT included — a compromised AI tool page that
+// talks to our agent should be limited to the scan / read endpoints,
+// never to policy mutation, proxy enable/disable, or rule updates.
+var controlOrigins = map[string]struct{}{
 	"null":                  {}, // file:// — packaged Electron renderer
 	"http://localhost:5173": {}, // Vite dev server
 	"http://127.0.0.1:5173": {},
+}
 
-	// Tier-2 AI tools (extension content scripts). Keep in sync with
-	// extension/manifest.json content_scripts.matches.
+// aiPageOrigins is the set of Tier-2 AI tool page origins where the
+// extension's content scripts run. Keep in sync with
+// extension/manifest.json content_scripts.matches.
+//
+// These origins are permitted to call the read-only / scan endpoints
+// (POST /api/dlp/scan, GET /api/status, GET /api/stats, etc.) but are
+// rejected by isControlOrigin so they cannot reach state-changing
+// endpoints (PUT /api/policies/, /api/proxy/enable, etc.). The browser
+// stamps the page's own origin (not the extension's) when content
+// scripts fetch with mode:"cors", which is why these origins are
+// allowlisted at all.
+var aiPageOrigins = map[string]struct{}{
 	"https://chat.openai.com":       {},
 	"https://chatgpt.com":           {},
 	"https://claude.ai":             {},
@@ -56,7 +56,39 @@ var allowedOrigins = map[string]struct{}{
 	"https://www.perplexity.ai":     {},
 	"https://huggingface.co":        {},
 	"https://poe.com":               {},
+	// Tier-2 expansion (P1-2). These chat / agent UIs may be flipped
+	// to AllowWithDLP by an enterprise policy; pre-allowing the CORS
+	// origin avoids a 403 on the first scan after the flip.
+	"https://grok.com":              {},
+	"https://x.ai":                  {},
+	"https://chat.mistral.ai":       {},
+	"https://mistral.ai":            {},
+	"https://openrouter.ai":         {},
+	"https://chat.lmsys.org":        {},
+	"https://aistudio.google.com":   {},
+	"https://notebooklm.google.com": {},
 }
+
+// allowedOrigins is the union of controlOrigins and aiPageOrigins,
+// used by isAllowedOrigin to gate the CORS allowlist on any path. The
+// per-path control / read-only split is enforced in withCORS via
+// isControlPath + isControlOrigin so wildcard CORS is never used
+// (state-changing endpoints exist, so wildcards would be a real
+// DNS-rebinding vector).
+//
+// The Host-header allowlist (allowedHostnames) remains the actual
+// DNS-rebinding defence — a hostile site can hijack a DNS name to
+// point at 127.0.0.1, but it cannot forge the Host header.
+var allowedOrigins = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(controlOrigins)+len(aiPageOrigins))
+	for k := range controlOrigins {
+		m[k] = struct{}{}
+	}
+	for k := range aiPageOrigins {
+		m[k] = struct{}{}
+	}
+	return m
+}()
 
 // chromeExtensionScheme / mozExtensionScheme / safariExtensionScheme
 // are matched as prefixes so any companion extension build (unpacked
@@ -328,12 +360,26 @@ func withCORS(h http.Handler) http.Handler {
 		}
 
 		// Echo Access-Control-* only for known callers (Electron
-		// renderer / Vite dev). Requests without an Origin header
-		// (Electron main process via Node http, curl, etc.) are
-		// allowed through but receive no CORS headers.
+		// renderer / Vite dev / companion extension / Tier-2 AI pages).
+		// Requests without an Origin header (Electron main process via
+		// Node http, curl, etc.) are allowed through but receive no
+		// CORS headers.
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			if !isAllowedOrigin(origin) {
+				http.Error(w, "forbidden origin", http.StatusForbidden)
+				return
+			}
+			// Per-path control / read-only split: AI page origins
+			// (Tier-2 tool pages where the content script runs) may
+			// call scan / status / read endpoints but MUST NOT reach
+			// state-changing endpoints (policy mutation, proxy
+			// enable / disable, profile import, rule updates /
+			// overrides, agent self-update, stats reset). The Origin
+			// check is in series with the Host-header check above;
+			// together they keep both a DNS-rebinding attacker and a
+			// compromised AI tool page out of the admin surface.
+			if isControlPath(r.URL.Path) && !isControlOrigin(origin) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -349,6 +395,63 @@ func withCORS(h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+// isControlPath reports whether path is a state-changing endpoint
+// that must reject AI page origins. The list mirrors the mux
+// registrations in Handler() — keep them in sync.
+//
+// Endpoints intentionally absent from this list (POST /api/dlp/scan,
+// GET /api/status, GET /api/stats, GET /api/stats/export,
+// GET /api/proxy/status, GET /api/tamper/status,
+// GET /api/rules/status, GET /api/profile, GET /api/policies) are
+// read-only or scan-only and are reachable from AI page origins.
+func isControlPath(path string) bool {
+	switch path {
+	case "/api/dlp/config",
+		"/api/proxy/enable",
+		"/api/proxy/disable",
+		"/api/profile/import",
+		"/api/rules/update",
+		"/api/rules/override",
+		"/api/agent/update",
+		"/api/agent/update-check",
+		"/api/stats/reset":
+		return true
+	}
+	// Prefix-matched collections with item children:
+	//   PUT /api/policies/:category      — state-changing per-category policy
+	//   POST/DELETE /api/rules/override/ — admin allow/block overrides
+	// /api/policies (no trailing slash) is the read-only listing handler
+	// and is NOT matched here.
+	return strings.HasPrefix(path, "/api/policies/") ||
+		strings.HasPrefix(path, "/api/rules/override/")
+}
+
+// isControlOrigin reports whether origin is permitted to call
+// state-changing endpoints. AI page origins (Tier-2 tool pages) are
+// explicitly excluded; only the Electron renderer and any installed
+// build of the companion extension qualify.
+func isControlOrigin(origin string) bool {
+	if _, ok := aiPageOrigins[origin]; ok {
+		return false
+	}
+	if _, ok := controlOrigins[origin]; ok {
+		return true
+	}
+	if strings.HasPrefix(origin, chromeExtensionScheme) &&
+		len(origin) > len(chromeExtensionScheme) {
+		return true
+	}
+	if strings.HasPrefix(origin, mozExtensionScheme) &&
+		len(origin) > len(mozExtensionScheme) {
+		return true
+	}
+	if strings.HasPrefix(origin, safariExtensionScheme) &&
+		len(origin) > len(safariExtensionScheme) {
+		return true
+	}
+	return false
 }
 
 func isAllowedOrigin(origin string) bool {

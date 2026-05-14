@@ -143,7 +143,74 @@ The heartbeat carries only aggregate counters — no domain names, no URLs, no
 user identifiers. The receiving endpoint should reply 200 OK; non-200 responses
 are retried with exponential backoff. See `agent/internal/heartbeat/`.
 
-## 8. Troubleshooting
+## 8. Enforcement Boundary: Extension vs. Proxy
+
+ShieldNet Secure Edge has two on-device inspection paths and it is important
+to understand exactly what each one guarantees before relying on one in a
+deployment.
+
+| Layer                  | Role                                  | Bypassable by the page?                                          |
+| ---------------------- | ------------------------------------- | ---------------------------------------------------------------- |
+| Browser extension      | DLP **coaching** (UX, real-time toast) | Yes — the page sees `window.postMessage` traffic and is in the same JS world as the bridge. |
+| Local MITM proxy       | DLP **enforcement** (TLS termination on Tier-2 hosts) | No — runs outside the browser process and gates the network. |
+| Managed browser policy | Hard domain blocklist / allowlist     | No — enforced by the browser before any page JS runs.            |
+
+### Why the extension is coaching, not enforcement
+
+The companion extension installs a MAIN-world content script that patches the
+page's own `window.fetch` and `XMLHttpRequest.prototype.send`. To talk to the
+isolated-world content script (which owns the agent connection), it uses
+`window.postMessage`. The page's own JavaScript sits in the same MAIN world and
+can:
+
+- See every `secure-edge-bridge` message the MAIN-world script posts.
+- Reply with a forged `secure-edge-iso` `scan-resp` `{ result: { blocked: false }}`.
+- Replace `window.fetch` or `XMLHttpRequest.prototype.send` *after* our patch
+  installs, restoring the original unpatched function.
+
+The `BRIDGE_SOURCE` / `ISO_SOURCE` channel tags are best-effort identification
+markers, not security tokens (see the inline comment in
+`extension/src/content/main-world-network.ts`). A hostile or compromised page
+trivially defeats them. The extension is therefore the right tool for *honest
+user error* (someone pasting an API key into ChatGPT) but not for adversarial
+or compromised pages.
+
+### When to enable the proxy
+
+Enable the local MITM proxy whenever any of the following are true:
+
+- The threat model includes pages or web apps that may be hostile to the
+  extension (compromised AI portals, browser extensions that fight ours,
+  enterprise SSO-wrapped AI tools that load arbitrary third-party JS).
+- You need enforcement coverage for non-browser traffic — desktop AI apps,
+  IDE plugins (e.g. Copilot, Cursor) hitting Tier-2 endpoints, CLI tools, or
+  any other process that bypasses the browser entirely.
+- You require auditable "the network refused to forward this body" semantics
+  rather than "the browser was asked nicely not to".
+
+Start the proxy with `POST /api/proxy/enable`; the agent generates a local CA,
+prompts the user to install it, and routes only Tier-2 hostnames through the
+TLS termination path. All other hosts get an opaque CONNECT tunnel — the proxy
+never sees their plaintext. See `agent/internal/proxy/proxy.go` for the policy
+hook and `scripts/macos/configure-proxy.sh` / the Windows equivalent for the
+system-proxy handoff.
+
+### When to deploy managed browser policies
+
+Managed browser policies (Chrome Enterprise `URLBlocklist` and friends, Firefox
+`policies.json`, Edge GPO) are enforced by the browser itself before any page
+script runs. Combine them with the proxy for defence in depth:
+
+- Use `URLBlocklist` to keep blocked AI domains unreachable even if the user
+  somehow disables the agent.
+- Use `ManagedConfigurationPerOrigin` to push a hard deny / read-only mode on
+  internal AI tools.
+
+The agent does **not** distribute managed browser policies — that is the
+endpoint management system's job. Document the policy bundle you deploy
+alongside Secure Edge so future operators understand which layer enforces what.
+
+## 9. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |

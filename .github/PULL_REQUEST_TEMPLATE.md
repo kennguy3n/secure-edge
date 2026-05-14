@@ -13,7 +13,8 @@ one exists.
 
 ## Checklist
 
-- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md).
+- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md) and
+      [AGENTS.md](../AGENTS.md).
 - [ ] I have added or updated unit tests for the new behaviour.
 - [ ] I have updated `CHANGELOG.md` if the change is user-visible.
 - [ ] I have updated the relevant `.md` documentation (`README.md`,
@@ -24,6 +25,11 @@ one exists.
 - [ ] **Privacy invariant**: I confirm this change does not persist
       scanned content, domain names, URLs, or IP addresses to disk
       and does not transmit them off-device.
+- [ ] **AI usage**: this PR is **not** fully or predominantly
+      AI-generated. If AI was used in an assistive capacity, I have
+      disclosed where and how in the description above, and I can
+      defend every line under review. See
+      [AGENTS.md](../AGENTS.md).
 
 ## Screenshots / output
 

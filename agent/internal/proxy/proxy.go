@@ -348,6 +348,19 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 				tail := make([]byte, n-keep)
 				copy(tail, tmp[keep:n])
 
+				// Aliasing invariant (do NOT break this): `buf` is
+				// returned to the caller AND simultaneously handed
+				// to bytes.NewReader inside the MultiReader below.
+				// This is safe today because the only caller
+				// (handleRequest) converts buf to a string via
+				// bytesToString (which copies) for the DLP scanner
+				// and then drops its reference by setting body = nil
+				// before goproxy starts draining the replacement.
+				// Neither side mutates buf. A future maintainer
+				// tempted to zero or reuse buf for privacy must
+				// either deep-copy buf into the bytes.NewReader
+				// here, or guarantee the scan path no longer races
+				// the forwarding path.
 				replacement := &bodyChainCloser{
 					Reader: io.MultiReader(
 						bytes.NewReader(buf),

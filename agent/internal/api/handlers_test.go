@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1113,18 +1114,26 @@ func TestCORS_AIPageOriginsBlockedFromControlEndpoints(t *testing.T) {
 		{http.MethodGet, "/api/agent/update-check"},
 		{http.MethodPost, "/api/stats/reset"},
 	}
-	aiPageOrigins := []string{
-		"https://chatgpt.com",
-		"https://chat.openai.com",
-		"https://claude.ai",
-		"https://gemini.google.com",
-		"https://copilot.microsoft.com",
-		"https://you.com",
-		"https://www.perplexity.ai",
-		"https://huggingface.co",
-		"https://poe.com",
+	// Derive the fixture from the production aiPageOrigins map so a
+	// future PR that extends the allowlist (P1-2 style) is
+	// automatically covered. Before this PR the list was a hardcoded
+	// 9-entry slice; the 8 Tier-2 hosts added in P1-2 silently fell
+	// outside the test's coverage. Iterating the map directly closes
+	// that gap permanently — every entry that can reach the read-only
+	// CORS surface must also be proven to be rejected on the control
+	// surface.
+	origins := make([]string, 0, len(aiPageOrigins))
+	for origin := range aiPageOrigins {
+		origins = append(origins, origin)
 	}
-	for _, origin := range aiPageOrigins {
+	// Sort for deterministic test output — Go map iteration is
+	// randomised and a failure should always print the same origin.
+	sort.Strings(origins)
+	if len(origins) < 18 {
+		t.Fatalf("aiPageOrigins shrank: got %d entries, want at least 18 — "+
+			"check that the P1-2 Tier-2 hosts are still in the map", len(origins))
+	}
+	for _, origin := range origins {
 		for _, c := range controlPaths {
 			r := newLocalRequest(c.method, c.path, nil)
 			r.Header.Set("Origin", origin)

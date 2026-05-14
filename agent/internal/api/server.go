@@ -406,6 +406,20 @@ func withCORS(h http.Handler) http.Handler {
 // GET /api/proxy/status, GET /api/tamper/status,
 // GET /api/rules/status, GET /api/profile, GET /api/policies) are
 // read-only or scan-only and are reachable from AI page origins.
+//
+// Note on /api/dlp/config: this path is matched here regardless of
+// HTTP method, so GET /api/dlp/config is ALSO blocked from AI page
+// origins. That is deliberate, not an oversight — the DLP config
+// response includes per-category thresholds, entropy weights, and
+// classifier mappings. An adversarial Tier-2 page that could read
+// those numbers could tune its exfil payload to score just under
+// the block threshold. The Electron tray and the installed extension
+// are the only legitimate readers of DLP config, and both reach the
+// endpoint through controlOrigins (or one of the extension schemes),
+// not through aiPageOrigins. If a future client running on an AI
+// page genuinely needs to display config to the user, expose a
+// narrowed read-only projection on a separate path rather than
+// loosening this guard.
 func isControlPath(path string) bool {
 	switch path {
 	case "/api/dlp/config",

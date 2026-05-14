@@ -283,6 +283,13 @@ func run(configPath string) error {
 		apiServer.SetScanRateLimit(0, 1)
 	}
 
+	// C2 fail-policy posture (personal / team / managed). The agent
+	// only stores and serves the value; the extension applies the
+	// policy when scans fall through. Config validation already
+	// constrained the input set, so SetEnforcementMode's defensive
+	// coerce-to-personal branch is purely belt-and-suspenders.
+	apiServer.SetEnforcementMode(cfg.EnforcementMode)
+
 	// Expose rule-file mtimes through /api/status (Phase 6 Task 17).
 	// Missing files are tolerated by collectRuleFileInfo on the server
 	// side, so we can pass the configured paths unfiltered.

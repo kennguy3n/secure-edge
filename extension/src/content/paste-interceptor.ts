@@ -11,12 +11,22 @@
 // the paste proceeds so an outage of the agent does not break the
 // user's workflow. The popup surfaces an offline indicator.
 
-import { scanContent } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    ensureEnforcementModeBootstrapped,
+    policyForOversize,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
-const MAX_PASTE_BYTES = 1 * 1024 * 1024; // 1 MiB — silently allow huge pastes.
+const MAX_PASTE_BYTES = 1 * 1024 * 1024; // 1 MiB.
 
 if (typeof document !== "undefined") {
+    // Kick off a single enforcement-mode fetch on first script load so
+    // managed/team posture is available by the time the user pastes.
+    // The hot path below also tolerates a missed bootstrap by reading
+    // the in-process cache (default "personal").
+    ensureEnforcementModeBootstrapped();
     document.addEventListener("paste", (ev) => void onPaste(ev), { capture: true });
 }
 
@@ -25,7 +35,19 @@ export async function onPaste(ev: ClipboardEvent): Promise<void> {
     if (!data) return;
     const text = data.getData("text/plain");
     if (!text || text.length === 0) return;
-    if (text.length > MAX_PASTE_BYTES) return;
+
+    if (text.length > MAX_PASTE_BYTES) {
+        // Oversize handling depends on the enforcement mode. In
+        // personal/team mode the paste proceeds silently (current
+        // behaviour); in managed mode we block + surface a policy
+        // toast so the user understands why the paste was rejected.
+        if (policyForOversize() === "block") {
+            ev.preventDefault();
+            ev.stopPropagation();
+            showPolicyBlockedToast("oversize", "paste");
+        }
+        return;
+    }
 
     // Stop the paste while we ask the agent. We re-emit the paste
     // manually if the agent allows it (see resumePaste below).
@@ -36,7 +58,17 @@ export async function onPaste(ev: ClipboardEvent): Promise<void> {
     const result = await scanContent(text);
 
     if (result === null) {
-        // Agent unreachable → fall open: complete the paste.
+        // No verdict from the agent: behaviour depends on enforcement
+        // mode. "personal" = silent fall-open (preserve pre-C2 UX);
+        // "team" = warn toast + fall-open; "managed" = block.
+        const policy = policyForUnavailable();
+        if (policy === "block") {
+            showPolicyBlockedToast("agent-unavailable", "paste");
+            return;
+        }
+        if (policy === "warn") {
+            showPolicyWarnToast("agent-unavailable", "paste");
+        }
         await resumePaste(target, text);
         return;
     }

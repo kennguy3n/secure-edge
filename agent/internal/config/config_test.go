@@ -290,3 +290,66 @@ api_token_required: true
 		})
 	}
 }
+
+// TestLoad_EnforcementMode_AcceptsKnown confirms the four accepted
+// inputs (empty + the three explicit modes) load without error.
+// Empty is intentionally permitted at the YAML layer; the merge
+// step falls back to the documented "personal" default so the
+// effective value is never blank. The explicit modes pass through
+// unchanged.
+func TestLoad_EnforcementMode_AcceptsKnown(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"", "personal"}, // empty → default
+		{"personal", "personal"},
+		{"team", "team"},
+		{"managed", "managed"},
+	}
+	dir := t.TempDir()
+	for _, c := range cases {
+		path := filepath.Join(dir, "mode-"+c.in+".yaml")
+		body := "enforcement_mode: \"" + c.in + "\"\n"
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatalf("write %q: %v", c.in, err)
+		}
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatalf("Load(%q): %v", c.in, err)
+		}
+		if cfg.EnforcementMode != c.want {
+			t.Errorf("EnforcementMode(%q) = %q, want %q", c.in, cfg.EnforcementMode, c.want)
+		}
+	}
+}
+
+// TestLoad_EnforcementMode_RejectsUnknown locks in the validator:
+// an operator typo such as "manaaged" must surface as a config
+// error at boot, not silently fall back to "personal". Falling back
+// silently would let a managed deployment behave as personal
+// without anyone noticing.
+func TestLoad_EnforcementMode_RejectsUnknown(t *testing.T) {
+	cases := []string{"manaaged", "off", "strict", "PERSONAL"}
+	dir := t.TempDir()
+	for _, mode := range cases {
+		path := filepath.Join(dir, "bad.yaml")
+		body := "enforcement_mode: \"" + mode + "\"\n"
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatalf("write %q: %v", mode, err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Errorf("Load(enforcement_mode=%q): expected error", mode)
+		}
+	}
+}
+
+// TestDefault_EnforcementModeIsPersonal pins the default so callers
+// can rely on it without having to set the field explicitly. The
+// privacy-first product stance is fall-open by default — operators
+// opt in to "managed" with full intent.
+func TestDefault_EnforcementModeIsPersonal(t *testing.T) {
+	if got := Default().EnforcementMode; got != "personal" {
+		t.Errorf("Default().EnforcementMode = %q, want \"personal\"", got)
+	}
+}

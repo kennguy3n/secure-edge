@@ -11,8 +11,14 @@
 // passing duck-typed mocks; the document-level listener is only wired
 // up in a real DOM environment.
 
-import { scanContent } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    MAX_SCAN_BYTES,
+    ensureEnforcementModeBootstrapped,
+    policyForOversize,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
 /** Concatenate every textual <textarea> and text <input> value in
  *  document order. Non-text inputs (file, password, checkbox, …)
@@ -50,6 +56,26 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
     const text = extractFormText(form);
     if (text.length === 0) return;
 
+    // Oversize routing must run BEFORE the agent call. scanContent
+    // returns null for any payload bigger than MAX_SCAN_BYTES, and
+    // routing that null through the agent-unavailable branch would
+    // surface a misleading toast ("agent unavailable") on a body
+    // that's simply too large for inline scan. The other three
+    // interceptors (paste / drag / clipboard) check size first for
+    // the same reason.
+    if (text.length > MAX_SCAN_BYTES) {
+        if (policyForOversize() === "block") {
+            // Stop the submit and leave the form intact so the user
+            // can trim before retrying.
+            ev.preventDefault();
+            ev.stopPropagation();
+            showPolicyBlockedToast("oversize", "submission");
+        }
+        // personal/team: silent fall-open. Do NOT preventDefault so
+        // the native submit proceeds as it would have before C2.
+        return;
+    }
+
     // Block the native submit while we ask the agent. On allow / fall
     // open we re-submit programmatically; on block we leave the form
     // intact so the user can edit before retrying.
@@ -57,7 +83,26 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
     ev.stopPropagation();
 
     const result = await scanContent(text);
-    if (result === null || !result.blocked) {
+    if (result === null) {
+        // No verdict from the agent: defer to enforcement-mode policy.
+        // personal = silent submit, team = warn + submit, managed =
+        // block + surface a policy toast and leave the form intact.
+        const policy = policyForUnavailable();
+        if (policy === "block") {
+            showPolicyBlockedToast("agent-unavailable", "submission");
+            return;
+        }
+        if (policy === "warn") {
+            showPolicyWarnToast("agent-unavailable", "submission");
+        }
+        try {
+            form.submit();
+        } catch {
+            /* see note below — non-standard submit() impl. */
+        }
+        return;
+    }
+    if (!result.blocked) {
         try {
             form.submit();
         } catch {
@@ -71,6 +116,9 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
 }
 
 if (typeof document !== "undefined") {
+    // First-script bootstrap so a managed-mode posture is in the
+    // cache before the first form submit.
+    ensureEnforcementModeBootstrapped();
     document.addEventListener("submit", (ev) => void handleSubmit(ev as SubmitEvent), {
         capture: true,
     });

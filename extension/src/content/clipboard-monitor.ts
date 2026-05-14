@@ -11,8 +11,14 @@
 // Clipboard access requires the navigator.clipboard.readText() Web
 // API; failures are silent fall-open like every other interceptor.
 
-import { scanContent, MAX_SCAN_BYTES } from "./scan-client.js";
-import { showBlockedToast } from "./toast.js";
+import {
+    ensureEnforcementModeBootstrapped,
+    MAX_SCAN_BYTES,
+    policyForOversize,
+    policyForUnavailable,
+    scanContent,
+} from "./scan-client.js";
+import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
 
 /** Storage key for the opt-in flag set by the options page. */
 const STORAGE_KEY = "secureEdge:clipboardMonitor";
@@ -29,6 +35,9 @@ let lastFingerprint = "";
 let lastScanAt = 0;
 
 if (typeof document !== "undefined") {
+    // Bootstrap the enforcement-mode cache once per content-script
+    // load so the focus-driven scan path doesn't have to wait on it.
+    ensureEnforcementModeBootstrapped();
     document.addEventListener(
         "focus",
         () => void maybeScanClipboard(),
@@ -57,14 +66,39 @@ export async function maybeScanClipboard(): Promise<void> {
         // focus. Silent fall-open is the safe default.
         return;
     }
-    if (!text || text.length === 0 || text.length > MAX_SCAN_BYTES) return;
+    if (!text || text.length === 0) return;
+
+    if (text.length > MAX_SCAN_BYTES) {
+        // Oversize handling: managed mode surfaces a policy toast so
+        // the user knows the clipboard contains content too large
+        // for inline scan; personal/team stay silent (current
+        // behaviour). The clipboard monitor never edits the
+        // clipboard itself — the policy toast is the only effect.
+        if (policyForOversize() === "block") {
+            showPolicyBlockedToast("oversize", "clipboard");
+        }
+        return;
+    }
 
     const fp = fingerprint(text);
     if (fp === lastFingerprint) return;
     lastFingerprint = fp;
 
     const result = await scanContent(text);
-    if (!result || !result.blocked) return;
+    if (result === null) {
+        // Agent unreachable: personal stays silent, team warns,
+        // managed surfaces a policy block toast. There is no
+        // "submission" to suppress here — the policy toast is the
+        // entire user-facing signal.
+        const policy = policyForUnavailable();
+        if (policy === "block") {
+            showPolicyBlockedToast("agent-unavailable", "clipboard");
+        } else if (policy === "warn") {
+            showPolicyWarnToast("agent-unavailable", "clipboard");
+        }
+        return;
+    }
+    if (!result.blocked) return;
     showBlockedToast(result.pattern_name, "clipboard");
 }
 

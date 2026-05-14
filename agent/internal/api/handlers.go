@@ -43,6 +43,24 @@ type StatusResponse struct {
 	Runtime       RuntimeStats   `json:"runtime,omitempty"`
 	Rules         []RuleFileInfo `json:"rules,omitempty"`
 	DLPPatterns   int            `json:"dlp_patterns,omitempty"`
+	// EnforcementMode is the C2 fail-policy posture the
+	// extension consults when the agent is unreachable or the
+	// content exceeds its inline-scan size limit. Always one of
+	// "personal", "team", "managed". Surfaced here (rather than
+	// only on /api/config/enforcement-mode) so the Electron tray
+	// can show the active posture in its existing /api/status
+	// poll without an extra round trip.
+	EnforcementMode string `json:"enforcement_mode"`
+}
+
+// EnforcementModeResponse is the body served by
+// GET /api/config/enforcement-mode. The endpoint exists in addition
+// to the /api/status echo so the browser extension's service worker
+// can fetch the mode in isolation on cold start without parsing the
+// full status payload (which carries Go runtime counters the
+// extension neither needs nor should see).
+type EnforcementModeResponse struct {
+	Mode string `json:"mode"`
 }
 
 // RuntimeStats captures Go runtime counters surfaced via /api/status.
@@ -107,11 +125,12 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := StatusResponse{
-		Status:        "running",
-		Uptime:        formatUptime(since),
-		UptimeSeconds: int64(since / time.Second),
-		Version:       Version,
-		Runtime:       rt,
+		Status:          "running",
+		Uptime:          formatUptime(since),
+		UptimeSeconds:   int64(since / time.Second),
+		Version:         Version,
+		Runtime:         rt,
+		EnforcementMode: s.EnforcementMode(),
 	}
 	if s.DLP != nil {
 		resp.DLPPatterns = len(s.DLP.Patterns())
@@ -159,6 +178,21 @@ func formatUptime(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%dm", mins)
 	}
+}
+
+// handleEnforcementMode serves the C2 fail-policy posture as a small
+// JSON document the extension's service worker fetches on cold start.
+// The endpoint is read-only — there is no PUT/POST counterpart;
+// mutation goes through config.yaml + agent restart so the value is
+// always rooted in the operator-controlled config file rather than
+// any runtime API surface. That keeps the policy decision out of
+// reach of a compromised AI page origin or a hostile Tier-2 tool.
+func (s *Server) handleEnforcementMode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, EnforcementModeResponse{Mode: s.EnforcementMode()})
 }
 
 func (s *Server) handlePoliciesCollection(w http.ResponseWriter, r *http.Request) {

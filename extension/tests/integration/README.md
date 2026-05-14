@@ -2,7 +2,7 @@
 
 These Playwright-based smoke tests load the built extension into a
 real Chromium instance, navigate to an in-memory mock AI-tool page,
-paste a fake secret, and assert that the Secure Edge block toast
+paste a fake secret, and assert that the ShieldNet Secure Edge block toast
 fires. They are intentionally **not** part of the default `npm test`
 run because they require a headed Chromium binary (~200 MB) and a
 running agent.
@@ -18,7 +18,7 @@ running agent.
   `extension/dist/`. Pointing Chromium at `extension/dist/` makes
   Chrome show a *"Manifest file is missing or unreadable"* error
   dialog because `dist/` is just the compiled-JS output directory.
-- The Secure Edge agent is running on `http://127.0.0.1:8080` with
+- The ShieldNet Secure Edge agent is running on `http://127.0.0.1:8080` with
   DLP enabled.
 - Playwright is installed *out of band* — it is not pinned in
   `package.json` to keep the default install footprint small:

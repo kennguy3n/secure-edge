@@ -1,4 +1,4 @@
-# Benchmarks
+# ShieldNet Secure Edge — Benchmarks
 
 Captured on an AMD EPYC 7763 (4 logical cores) Linux runner with Go
 1.25.x and `-benchtime=2s`. Numbers are indicative — re-run on the

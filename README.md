@@ -359,4 +359,4 @@ do not file public issues for security reports.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) — Copyright (c) 2026 [ShieldNet 360](https://www.shieldnet360.com)

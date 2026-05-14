@@ -1,6 +1,6 @@
-# Contributing to Secure Edge
+# Contributing to ShieldNet Secure Edge
 
-Thanks for considering a contribution. Secure Edge is a privacy-first
+Thanks for considering a contribution. ShieldNet Secure Edge is a privacy-first
 local agent, so the bar for changes that touch the data path is high:
 nothing scanned by the DLP pipeline or resolved by the DNS resolver
 may ever be persisted to disk or transmitted off the device. Please

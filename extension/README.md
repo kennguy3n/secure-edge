@@ -1,8 +1,8 @@
-# Secure Edge browser extension
+# ShieldNet Secure Edge Browser Extension
 
 Manifest V3 companion extension that intercepts pastes, form submissions, and
 outbound requests on the Tier-2 AI tool pages listed in the manifests, and
-runs them through the local Secure Edge DLP pipeline.
+runs them through the local ShieldNet Secure Edge DLP pipeline.
 
 Same TypeScript sources build a Chrome / Edge / Chromium bundle, a Firefox
 add-on, and a Safari Web Extension.

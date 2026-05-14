@@ -1,4 +1,4 @@
-# Security Rules Reference
+# ShieldNet Secure Edge — Security Rules Reference
 
 This is a complete reference table of every DLP pattern shipped in
 [`rules/dlp_patterns.json`](./rules/dlp_patterns.json), grouped by category.

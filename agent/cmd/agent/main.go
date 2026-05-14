@@ -271,6 +271,13 @@ func run(configPath string) error {
 		}
 	} else if cfg.APITokenRequired {
 		fmt.Fprintln(os.Stderr, "agent: API auth: api_token_required=true but api_token_path is empty; control endpoints will NOT enforce a token until api_token_path is configured.")
+	} else if defaultPath := api.DefaultAPITokenPath(); defaultPath != "" {
+		// Feature is off (api_token_path empty, api_token_required false).
+		// Surface the canonical per-OS path the Electron tray already
+		// auto-discovers so operators see the exact value to drop into
+		// config.yaml when they want to enable bearer-token auth without
+		// any further tray configuration. PR #18 review follow-up.
+		fmt.Fprintf(os.Stderr, "agent: API auth: feature disabled (api_token_path empty). To enable with zero tray reconfiguration, set:\n  api_token_path: %s\nThe Electron tray's DEFAULT_API_TOKEN_PATH resolves to the same value.\n", defaultPath)
 	}
 
 	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).

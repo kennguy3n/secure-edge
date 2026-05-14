@@ -46,9 +46,15 @@ type NativeMessageResponse struct {
 type NativeMessagingOptions struct {
 	// APIToken, when non-empty, is returned to the extension on a
 	// successful "hello" message so the extension can authenticate
-	// its loopback HTTP fallback. Empty means "no token configured"
-	// and the hello reply returns a clear error so callers know
-	// they're sitting on the legacy posture.
+	// its loopback HTTP fallback. When empty (the legacy posture or
+	// a deployment with api_token_path unset) the "hello" handler
+	// still writes a successful reply, but the api_token field is
+	// stripped from the JSON envelope by `omitempty`. The extension
+	// treats a missing api_token in the hello reply as "no token
+	// configured" and skips the Authorization header on every
+	// subsequent HTTP fallback request. There is no error reply
+	// in that case; the legacy origin-only authorisation still
+	// applies on the agent side.
 	APIToken string
 }
 

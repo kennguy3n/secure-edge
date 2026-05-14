@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -18,6 +19,51 @@ import (
 // same width the agent self-updater's Ed25519 verification keys use,
 // and well above the 128-bit floor for capability tokens.
 const tokenByteLength = 32
+
+// DefaultAPITokenPath returns the recommended on-disk location for
+// the per-install API capability token (work item A2) on the current
+// OS, or "" when the home directory is not discoverable (e.g. some
+// container init scenarios where HOME is unset).
+//
+// The Electron tray's DEFAULT_API_TOKEN_PATH (electron/main.ts)
+// computes the same path so a fresh install — with `api_token_path`
+// pointing here on the agent side — needs no extra environment
+// variable on the tray launcher. Operators who deliberately pick a
+// non-default location (e.g. an OS-managed StateDirectory under
+// /var/lib/secure-edge/) still need to point the tray at it via
+// SECURE_EDGE_API_TOKEN_PATH; this function only addresses the
+// default-path mismatch the PR #18 review flagged.
+//
+// The agent's config.Default() returns "" (feature off); this helper
+// is used by main to print a startup hint pointing at the canonical
+// per-OS location so operators see exactly what to put in config.yaml
+// when they're ready to flip the feature on. It does not change the
+// default itself — the staged-rollout posture from PR #18 stays:
+//   - api_token_path: ""           => feature disabled, no token file
+//   - api_token_path: <this path>  => generated + advertised on /hello
+//                                     and recognised by the tray with
+//                                     zero further configuration.
+func DefaultAPITokenPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return ""
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "secure-edge", "api-token")
+	case "windows":
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			return filepath.Join(appData, "secure-edge", "api-token")
+		}
+		return filepath.Join(home, "AppData", "Roaming", "secure-edge", "api-token")
+	default:
+		// XDG Base Directory: $XDG_CONFIG_HOME or ~/.config.
+		if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
+			return filepath.Join(xdg, "secure-edge", "api-token")
+		}
+		return filepath.Join(home, ".config", "secure-edge", "api-token")
+	}
+}
 
 // LoadOrCreateAPIToken reads the API capability token from path,
 // generating a new 32-byte hex token and writing it with mode 0600

@@ -20,25 +20,38 @@ const HEALTH_INTERVAL_MS = 10_000;
 
 // SECURE_EDGE_API_TOKEN_PATH overrides the on-disk path where the
 // Go agent persists its API capability token (work item A2). When
-// the env var is unset we fall back to a per-OS default that mirrors
-// the agent's view of os.UserConfigDir() so the dev / source build
-// shares one token between the agent and the tray without any
-// operator setup. Packaged installs that run the agent as a system
-// service should set this env var on the tray launcher so it points
-// at the agent's StateDirectory token file.
+// the env var is unset we fall back to a per-OS default that MUST
+// stay byte-identical with the Go agent's `api.DefaultAPITokenPath`
+// (see agent/internal/api/token.go); the PR #18 review flagged the
+// mismatch where the tray would look in one place and the agent
+// would write to another, leaving operators no choice but to set
+// this env var explicitly. The two implementations now share the
+// same per-OS shape, and the agent prints the resolved value on
+// startup so operators can copy/paste it into config.yaml's
+// `api_token_path` field with no further tray configuration.
+//
+// Packaged installs that run the agent as a system service should
+// still set this env var on the tray launcher so it points at the
+// agent's StateDirectory token file (e.g.
+// /var/lib/secure-edge/api-token on systemd) — those deployments
+// deliberately choose a non-default location.
 const DEFAULT_API_TOKEN_PATH: string = (() => {
   const override = process.env.SECURE_EDGE_API_TOKEN_PATH;
   if (override && override.length > 0) return override;
   const home = app.getPath('home');
   switch (process.platform) {
     case 'darwin':
+      // Mirror api.DefaultAPITokenPath on darwin.
       return path.join(home, 'Library', 'Application Support', 'secure-edge', 'api-token');
     case 'win32': {
+      // Mirror api.DefaultAPITokenPath on windows: %APPDATA% or
+      // the fallback under the user profile.
       const appData = process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming');
       return path.join(appData, 'secure-edge', 'api-token');
     }
     default: {
-      // XDG: ~/.config or $XDG_CONFIG_HOME
+      // Mirror api.DefaultAPITokenPath on linux/*bsd: XDG base
+      // directory if set, else ~/.config.
       const xdg = process.env.XDG_CONFIG_HOME;
       const base = xdg && xdg.length > 0 ? xdg : path.join(home, '.config');
       return path.join(base, 'secure-edge', 'api-token');

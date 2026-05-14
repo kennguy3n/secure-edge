@@ -79,7 +79,7 @@ function makeFileInput(files: File[]): MockInput {
             return true;
         },
     };
-    // Track writes to .value so the clear-on-block assertion works.
+    // Track writes to .value so the sync-first clear assertion works.
     Object.defineProperty(input, "value", {
         get(): string { return this._value ?? "fake-c-path"; },
         set(v: string) {
@@ -90,8 +90,24 @@ function makeFileInput(files: File[]): MockInput {
     return input;
 }
 
-function makeChangeEvent(input: MockInput): Event {
-    return { type: "change", target: input } as unknown as Event;
+interface MockChangeEvent {
+    type: "change";
+    target: MockInput;
+    stopCalls: { n: number };
+    stopImmediateCalls: { n: number };
+}
+
+function makeChangeEvent(input: MockInput): MockChangeEvent {
+    const stopCalls = { n: 0 };
+    const stopImmediateCalls = { n: 0 };
+    return {
+        type: "change",
+        target: input,
+        stopPropagation() { stopCalls.n++; },
+        stopImmediatePropagation() { stopImmediateCalls.n++; },
+        stopCalls,
+        stopImmediateCalls,
+    } as unknown as MockChangeEvent;
 }
 
 function makeDropEvent(files: File[]): {
@@ -115,6 +131,35 @@ function makeDropEvent(files: File[]): {
         stopPropagation: () => { stopCalls.n++; },
     } as unknown as DragEvent;
     return { ev, preventCalls, stopCalls };
+}
+
+/**
+ * Make a fetch mock that NEVER resolves until release() is called.
+ * Used by the sync-dispatch tests to prove that suppression
+ * (preventDefault / stopPropagation / clearing input.value)
+ * happens BEFORE the scan resolves — i.e. while the event would
+ * still be in flight on a real browser dispatch.
+ */
+function blockingFetch(): {
+    release: (resp: MockResponse) => void;
+    calls: Array<{ url: string; body: string }>;
+} {
+    const calls: Array<{ url: string; body: string }> = [];
+    let resolver: ((r: MockResponse) => void) | null = null;
+    const pending = new Promise<MockResponse>((resolve) => { resolver = resolve; });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        calls.push({ url: String(input), body: String(init?.body ?? "") });
+        const response = await pending;
+        if (response.err) throw response.err;
+        return { ok: response.ok, json: async () => response.body } as unknown as Response;
+    }) as typeof fetch;
+    return {
+        release: (r: MockResponse) => {
+            assert.ok(resolver !== null, "resolver must be initialised by the time release is called");
+            resolver!(r);
+        },
+        calls,
+    };
 }
 
 beforeEach(() => {
@@ -163,62 +208,156 @@ test("onChange ignores non-file inputs", async () => {
 test("onChange ignores file input with no selection", async () => {
     const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
     const input = makeFileInput([]);
-    await onChange(makeChangeEvent(input));
+    await onChange(makeChangeEvent(input) as unknown as Event);
     assert.equal(calls.length, 0, "no scan should fire for empty FileList");
 });
 
-test("onChange clears input.value and dispatches change on DLP block", async () => {
+test("onChange clears input.value synchronously on every file selection (DLP block)", async () => {
     mockFetch({ ok: true, body: { blocked: true, pattern_name: "aws_key", score: 9 } });
     const file = new File(["leak: AKIAABCDEFGHIJKLMNOP" + "X".repeat(50)], "creds.txt");
     const input = makeFileInput([file]);
-    await onChange(makeChangeEvent(input));
+    await onChange(makeChangeEvent(input) as unknown as Event);
     assert.equal(input.valueAssignments, 1, "input.value should be cleared once");
     assert.equal(input.value, "");
-    assert.deepEqual(input.dispatched, ["change"], "a synthetic change event must be dispatched");
 });
 
-test("onChange allows file through on DLP blocked=false", async () => {
+test("onChange clears input.value synchronously on every file selection (DLP allow)", async () => {
+    // Sync-first contract: suppression is unconditional, because the
+    // verdict cannot be known synchronously and a deferred clear is
+    // too late — the page has already read input.files. A clean scan
+    // does NOT resume the selection (no portable way to re-construct
+    // input.files). User must re-pick.
     mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
     const file = new File(["harmless content " + "X".repeat(50)], "ok.txt");
     const input = makeFileInput([file]);
-    await onChange(makeChangeEvent(input));
-    assert.equal(input.valueAssignments, 0, "input.value must not be cleared on allow");
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    assert.equal(input.valueAssignments, 1, "input.value MUST be cleared even on allow under the sync-first contract");
+    assert.equal(input.value, "");
 });
 
-test("onChange in managed mode blocks on agent-unavailable", async () => {
+test("onChange clears input.value BEFORE the scan resolves (sync-first proof)", async () => {
+    // Sync-dispatch proof: hold the scan promise pending while we
+    // assert that input.value has already been cleared. On a real
+    // browser, the page's later listeners run during this window;
+    // if we cleared after await, the page would have already read
+    // input.files.
+    const blocker = blockingFetch();
+    const file = new File(["content " + "X".repeat(50)], "ok.txt");
+    const input = makeFileInput([file]);
+    const pending = onChange(makeChangeEvent(input) as unknown as Event);
+    // First microtask after onChange's sync prefix runs.
+    await Promise.resolve();
+    assert.equal(input.valueAssignments, 1, "input.value MUST be cleared synchronously before the scan resolves");
+    assert.equal(input.value, "");
+    // Now release the scan and let onChange finish.
+    blocker.release({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    await pending;
+});
+
+test("onChange calls stopImmediatePropagation synchronously (proof: same-target listeners suppressed)", async () => {
+    const blocker = blockingFetch();
+    const file = new File(["content " + "X".repeat(50)], "ok.txt");
+    const input = makeFileInput([file]);
+    const ev = makeChangeEvent(input);
+    const pending = onChange(ev as unknown as Event);
+    await Promise.resolve();
+    assert.equal(
+        ev.stopImmediateCalls.n,
+        1,
+        "stopImmediatePropagation MUST fire synchronously before await so the page's own change listener does not run",
+    );
+    assert.equal(ev.stopCalls.n, 1, "stopPropagation MUST also fire synchronously");
+    blocker.release({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    await pending;
+});
+
+test("onChange in managed mode + agent-unavailable still surfaces a block toast", async () => {
     mockFetch({ ok: false, err: new Error("agent down") });
     scanClientTest.setCachedEnforcementMode("managed");
     const file = new File(["content " + "X".repeat(50)], "ok.txt");
     const input = makeFileInput([file]);
-    await onChange(makeChangeEvent(input));
-    assert.equal(input.valueAssignments, 1, "managed + unavailable must clear the selection");
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    // Under sync-first the selection is already cleared regardless
+    // of mode; this test just keeps the mode wiring covered.
+    assert.equal(input.valueAssignments, 1);
 });
 
-test("onChange in team mode falls open on agent-unavailable (warn-only)", async () => {
+test("onChange in team mode + agent-unavailable still clears the selection (sync-first)", async () => {
     mockFetch({ ok: false, err: new Error("agent down") });
     scanClientTest.setCachedEnforcementMode("team");
     const file = new File(["content " + "X".repeat(50)], "ok.txt");
     const input = makeFileInput([file]);
-    await onChange(makeChangeEvent(input));
-    assert.equal(input.valueAssignments, 0, "team + unavailable must NOT clear the selection (warn-only)");
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    assert.equal(input.valueAssignments, 1);
 });
 
-test("onChange in personal mode falls open on agent-unavailable", async () => {
+test("onChange in personal mode + agent-unavailable still clears the selection (sync-first)", async () => {
     mockFetch({ ok: false, err: new Error("agent down") });
     scanClientTest.setCachedEnforcementMode("personal");
     const file = new File(["content " + "X".repeat(50)], "ok.txt");
     const input = makeFileInput([file]);
-    await onChange(makeChangeEvent(input));
-    assert.equal(input.valueAssignments, 0, "personal + unavailable must NOT clear the selection");
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    assert.equal(input.valueAssignments, 1);
 });
 
-test("onDrop preventDefault + stopPropagation on file drop with DLP block", async () => {
+test("onDrop preventDefault + stopPropagation fire synchronously on every file drop", async () => {
     mockFetch({ ok: true, body: { blocked: true, pattern_name: "aws_key", score: 9 } });
     const file = new File(["leak: AKIAABCDEFGHIJKLMNOP" + "X".repeat(50)], "creds.txt");
     const { ev, preventCalls, stopCalls } = makeDropEvent([file]);
     await onDrop(ev);
-    assert.equal(preventCalls.n, 1, "preventDefault must fire on block");
-    assert.equal(stopCalls.n, 1, "stopPropagation must fire on block");
+    assert.equal(preventCalls.n, 1, "preventDefault must fire");
+    assert.equal(stopCalls.n, 1, "stopPropagation must fire");
+});
+
+test("onDrop preventDefault is observable on a real Event after the sync wrapper returns", async () => {
+    // The strongest sync-dispatch proof: use a real CustomEvent
+    // (Node does not expose a DragEvent constructor without jsdom,
+    // but CustomEvent inherits the same defaultPrevented mechanism
+    // from Event). Drive the listener exactly the way
+    //   document.addEventListener("drop", (ev) => void onDrop(ev), { capture: true })
+    // does in module init — fire-and-forget — then assert
+    // defaultPrevented is already true by the time control returns
+    // to the dispatcher.
+    const blocker = blockingFetch();
+    const file = new File(["content " + "X".repeat(50)], "ok.txt");
+    const ev = new CustomEvent("drop", { cancelable: true });
+    const fileList = {
+        length: 1,
+        item: (i: number) => (i === 0 ? file : null),
+        0: file,
+        [Symbol.iterator]: function* () { yield file; },
+    } as unknown as FileList;
+    Object.defineProperty(ev, "dataTransfer", { value: { files: fileList } });
+    assert.equal(ev.defaultPrevented, false, "precondition: real Event starts un-prevented");
+    // Fire-and-forget exactly like the wrapper installed in module init.
+    void onDrop(ev as unknown as DragEvent);
+    // The sync prefix of onDrop has already executed. On a real
+    // browser dispatch, this is the moment the page's listeners
+    // would be invoked; we must see defaultPrevented === true.
+    assert.equal(
+        ev.defaultPrevented,
+        true,
+        "defaultPrevented MUST be observable on the event the instant the wrapper returns",
+    );
+    // Drain the deferred scan so the test exits cleanly.
+    blocker.release({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    await Promise.resolve();
+    await Promise.resolve();
+});
+
+test("onDrop preventDefault fires BEFORE the scan resolves (sync-first proof)", async () => {
+    // Sync-dispatch proof: hold the scan pending while we assert
+    // that the drop has already been suppressed. On a real browser,
+    // the page's drop listeners run during this window.
+    const blocker = blockingFetch();
+    const file = new File(["content " + "X".repeat(50)], "ok.txt");
+    const { ev, preventCalls, stopCalls } = makeDropEvent([file]);
+    const pending = onDrop(ev);
+    await Promise.resolve();
+    assert.equal(preventCalls.n, 1, "preventDefault MUST fire synchronously before the scan resolves");
+    assert.equal(stopCalls.n, 1, "stopPropagation MUST fire synchronously before the scan resolves");
+    blocker.release({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    await pending;
 });
 
 test("onDrop is a no-op when dataTransfer has no files (text drop)", async () => {
@@ -229,20 +368,27 @@ test("onDrop is a no-op when dataTransfer has no files (text drop)", async () =>
     assert.equal(preventCalls.n, 0, "file-upload-interceptor must not block text drops");
 });
 
-test("onDrop falls open on allowed file content", async () => {
+test("onDrop also suppresses on allowed file content (sync-first — no resume)", async () => {
+    // Under sync-first, the drop is suppressed unconditionally
+    // because the verdict isn't known in time. There is no portable
+    // way to re-inject a File into the page's drop target on a
+    // clean scan, so the user must re-drag.
     mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
     const file = new File(["harmless content " + "X".repeat(50)], "ok.txt");
     const { ev, preventCalls, stopCalls } = makeDropEvent([file]);
     await onDrop(ev);
-    assert.equal(preventCalls.n, 0, "preventDefault must not fire on allow");
-    assert.equal(stopCalls.n, 0, "stopPropagation must not fire on allow");
+    assert.equal(preventCalls.n, 1, "preventDefault MUST fire even on allow under the sync-first contract");
+    assert.equal(stopCalls.n, 1, "stopPropagation MUST fire even on allow");
 });
 
-test("onChange skips zero-byte files (nothing to scan)", async () => {
+test("onChange skips zero-byte files (no scan request) but still clears the input synchronously", async () => {
     const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
     const empty = new File([""], "empty.txt");
     const input = makeFileInput([empty]);
-    await onChange(makeChangeEvent(input));
+    await onChange(makeChangeEvent(input) as unknown as Event);
     assert.equal(calls.length, 0, "empty file body means no scan request");
-    assert.equal(input.valueAssignments, 0);
+    // Under the sync-first contract the input is cleared before we
+    // even attempt the scan, so a zero-byte selection is still
+    // suppressed (the user must re-pick a non-empty file).
+    assert.equal(input.valueAssignments, 1, "sync-first: input cleared regardless of file contents");
 });

@@ -10,20 +10,47 @@
 // contents would leave the page un-scanned.
 //
 // This interceptor closes that gap by snooping on the upload
-// *gesture* itself, before the page's own code reads the file:
+// *gesture* itself, before the page's own code reads the file.
 //
-//   - `<input type="file">` change events at capture phase — the
-//     File objects sit in `input.files` and the page hasn't seen
-//     them yet. We read up to MAX_SCAN_BYTES of text content,
-//     scan, and if blocked clear `input.value` and dispatch a
-//     synthetic `change` event so React-controlled forms notice
-//     the cleared selection.
-//   - `drop` events with `dataTransfer.files`. The drag interceptor
-//     only handles `text/plain` payloads (it returns early when
-//     `dataTransfer.getData("text/plain")` is empty), so a file
-//     drop falls through here. We `preventDefault()` +
-//     `stopPropagation()` to keep the file from reaching the page's
-//     own handler.
+// SYNCHRONOUS-FIRST CONTRACT
+// ---------------------------
+// Both handlers are registered via
+//   document.addEventListener("drop", (ev) => void onDrop(ev), { capture: true })
+// which means the wrapper returns synchronously after kicking off
+// the async body. The browser's dispatch cycle does NOT wait for
+// the returned promise — it proceeds to call the page's own
+// target / bubble-phase listeners during the same tick. By the
+// time `await scanFileList(...)` resolves, the page has already
+// consumed the event: a deferred `preventDefault()` /
+// `stopPropagation()` is a no-op, and the file has already left
+// the page.
+//
+// Therefore every observable suppression — `preventDefault`,
+// `stopPropagation`, `stopImmediatePropagation`, clearing
+// `input.value` — MUST happen synchronously, BEFORE the first
+// `await`. The async scan only drives the toast UX after the
+// suppression is already in effect. This matches the pattern in
+// paste-interceptor / form-interceptor / drag-interceptor (which
+// all call `preventDefault` before awaiting `scanContent`).
+//
+// There is no portable way to re-inject a `File` into a page's
+// drop target or to programmatically re-construct `input.files`
+// (most browsers make it read-only; the `DataTransfer.items`
+// trick is Chromium-only and inconsistent in Safari). So a clean
+// scan does NOT resume the gesture — the user must re-drag /
+// re-pick if they're sure. This matches the privacy-first default
+// and the existing drag-interceptor behaviour on Tier-2 pages
+// without a focusable text insertion point.
+//
+//   - `<input type="file">` change events at capture phase: we
+//     stop further dispatch via `stopImmediatePropagation` +
+//     `stopPropagation`, snapshot `input.files`, clear
+//     `input.value` so any later page logic that re-reads
+//     `input.files` sees an empty selection, and only then scan.
+//     On a clean verdict we don't resume — see above.
+//   - `drop` events with `dataTransfer.files`: we call
+//     `preventDefault` + `stopPropagation` synchronously, then
+//     scan to surface the right toast.
 //
 // Privacy invariant: file contents are read into a string only for
 // the scan. The string is never persisted, never logged, and is
@@ -51,8 +78,15 @@ if (typeof document !== "undefined") {
  * `<input type="file">` change handler. Fires when the user picks a
  * file via the system file-picker dialog. The selected files sit on
  * `input.files`; the page typically reads them inside its own
- * change-event listener, so this capture-phase handler races ahead
- * and scans the file content first.
+ * change-event listener, so this capture-phase handler races ahead.
+ *
+ * Sync-first contract (see header comment): we MUST suppress the
+ * page's view of the selection synchronously, before any `await`.
+ * `stopImmediatePropagation` blocks every later listener (including
+ * other capture-phase listeners on `document`); clearing
+ * `input.value` makes any later code that re-reads `input.files`
+ * see an empty selection. We snapshot the files first so the async
+ * scan can still inspect them.
  */
 export async function onChange(ev: Event): Promise<void> {
     const input = ev.target as HTMLInputElement | null;
@@ -61,26 +95,39 @@ export async function onChange(ev: Event): Promise<void> {
     const files = input.files;
     if (!files || files.length === 0) return;
 
-    const verdict = await scanFileList(files, "upload");
-    if (verdict === "blocked") {
-        // Clear the selection and re-emit `change` so React-managed
-        // forms notice the cleared input. Without the synthetic
-        // event the page's internal state would still believe the
-        // file was selected.
-        try {
-            input.value = "";
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-        } catch {
-            /* read-only / detached input — nothing we can do. */
-        }
-        // The toast was already rendered by scanFileList.
+    // Snapshot BEFORE clearing input.value, because setting
+    // `input.value = ""` mutates `input.files` to an empty FileList
+    // in the same tick.
+    const snapshot: File[] = Array.from(files);
+
+    // Synchronous suppression — see header comment. Order matters:
+    // stopImmediatePropagation prevents the page's own change
+    // handler from running in this same dispatch; clearing the
+    // input.value means any code that re-reads input.files later
+    // gets [] back.
+    ev.stopImmediatePropagation();
+    ev.stopPropagation();
+    try {
+        input.value = "";
+    } catch {
+        /* read-only / detached input — nothing we can do. */
     }
+
+    // Now scan async purely for the toast UX. We don't act on the
+    // verdict — the suppression is already in effect, and a clean
+    // scan does not resume (see header comment on why
+    // re-constructing input.files is not portable).
+    await scanFileList(snapshot, "upload");
 }
 
 /**
  * Drop handler for file payloads. Plain-text drops are handled by
  * the drag interceptor (`drag-interceptor.ts`); we only act when
  * `dataTransfer.files` is non-empty.
+ *
+ * Sync-first contract (see header comment): `preventDefault` and
+ * `stopPropagation` must run before the first `await`, otherwise
+ * the page has already received the drop by the time we get back.
  */
 export async function onDrop(ev: DragEvent): Promise<void> {
     const data = ev.dataTransfer;
@@ -88,18 +135,18 @@ export async function onDrop(ev: DragEvent): Promise<void> {
     const files = data.files;
     if (!files || files.length === 0) return;
 
-    // We need to make the block decision before the page consumes
-    // the drop. preventDefault + stopPropagation prevent the page's
-    // own listeners from firing; we don't resume the drop because
-    // there's no portable way to re-inject a File into an arbitrary
-    // page's drop target (different from text drops which we re-
-    // insert via execCommand). The user is told via toast and can
-    // re-drag if they choose.
-    const verdict = await scanFileList(files, "upload");
-    if (verdict === "blocked") {
-        ev.preventDefault();
-        ev.stopPropagation();
-    }
+    // Synchronous suppression. By the time the awaited scan
+    // resolves, the page's drop listeners have already run during
+    // this dispatch, so a deferred preventDefault / stopPropagation
+    // would be a no-op. Re-injecting a File into the page's drop
+    // target is not portable, so we never resume — the user
+    // re-drags if they're sure.
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    // Scan async for the toast. The verdict doesn't drive any
+    // further action — the drop is already suppressed above.
+    await scanFileList(files, "upload");
 }
 
 type ScanVerdict = "blocked" | "allowed";
@@ -108,8 +155,11 @@ type ScanVerdict = "blocked" | "allowed";
  * Read up to `MAX_SCAN_BYTES` cumulative text from `files`, scan it,
  * and surface the appropriate toast. Returns "blocked" when the
  * caller should suppress / clear the upload, "allowed" otherwise.
+ * Accepts a `FileList` (from `input.files` / `dataTransfer.files`)
+ * or a plain `File[]` (used by `onChange` after snapshotting and
+ * clearing the input).
  */
-async function scanFileList(files: FileList, kind: "upload"): Promise<ScanVerdict> {
+async function scanFileList(files: ArrayLike<File>, kind: "upload"): Promise<ScanVerdict> {
     const { text, truncated } = await readFilesText(files, MAX_SCAN_BYTES);
     if (text.length === 0) {
         // Empty / unreadable files (e.g. system file picker handed
@@ -160,7 +210,7 @@ async function scanFileList(files: FileList, kind: "upload"): Promise<ScanVerdic
  * patterns like `AKIA[0-9A-Z]{16}` can match.
  */
 async function readFilesText(
-    files: FileList,
+    files: ArrayLike<File>,
     cap: number,
 ): Promise<{ text: string; truncated: boolean }> {
     const parts: string[] = [];

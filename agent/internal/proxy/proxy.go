@@ -348,6 +348,20 @@ func readScanBody(req *http.Request) ([]byte, io.ReadCloser, error) {
 				tail := make([]byte, n-keep)
 				copy(tail, tmp[keep:n])
 
+				// Aliasing invariant (do NOT break this): `buf` is
+				// returned to the caller AND simultaneously handed
+				// to bytes.NewReader inside the MultiReader below.
+				// This is safe today because the only caller
+				// (handleRequest) hands buf to bytesToString — which
+				// produces an independent string copy (see the doc
+				// comment on bytesToString) — for the DLP scanner,
+				// and then drops its reference by setting body = nil
+				// before goproxy starts draining the replacement.
+				// Neither side mutates buf. A future maintainer
+				// tempted to zero or reuse buf for privacy must
+				// either deep-copy buf into the bytes.NewReader
+				// here, or guarantee the scan path no longer races
+				// the forwarding path.
 				replacement := &bodyChainCloser{
 					Reader: io.MultiReader(
 						bytes.NewReader(buf),
@@ -452,9 +466,15 @@ func stripPort(host string) string {
 	return host
 }
 
-// bytesToString does what its name says without allocating. Used on
-// hot scan paths where the slice is only read by string-accepting
-// APIs (json.Marshal, strings.NewReader).
+// bytesToString returns a string view of b. The result is an
+// independent allocation: string(b) only avoids a copy in narrow
+// compiler-optimised contexts (map key lookups, etc.), and in this
+// package the result always escapes to a method call (s.dlp.Scan),
+// so a copy is made. That copy is the load-bearing piece — see the
+// aliasing invariant in readScanBody: the same backing array is
+// also wired into the replacement io.MultiReader, so the DLP scan
+// path and the upstream-forwarding path must not be able to mutate
+// each other's view. The copy here guarantees that.
 func bytesToString(b []byte) string { return string(b) }
 
 // noopLogger silences goproxy's per-CONNECT host logging. Calls that

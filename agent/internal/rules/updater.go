@@ -141,15 +141,14 @@ func (u *Updater) Status() Status {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
 	// Defensive copy so a caller can't mutate the updater's internal
-	// slice through the returned Status value.
+	// slice through the returned Status value. make([]string, 0)
+	// returns a non-nil empty slice when u.tier2Hosts is nil, so the
+	// JSON encoder renders it as `[]` (which the extension's
+	// `body?.tier2_hosts ?? []` shortcut depends on — see
+	// extension/src/background/dynamic-hosts.ts and the contract test
+	// TestStatus_JSONShape below).
 	hosts := make([]string, len(u.tier2Hosts))
 	copy(hosts, u.tier2Hosts)
-	// Always return a non-nil slice — encoding/json renders nil as
-	// `null`, but the extension expects `[]` when no Tier-2 hosts are
-	// configured (see extension/src/background/dynamic-hosts.ts).
-	if hosts == nil {
-		hosts = []string{}
-	}
 	return Status{
 		CurrentVersion: u.currentVersion,
 		RuleVersion:    u.currentVersion,
@@ -166,8 +165,11 @@ func (u *Updater) Status() Status {
 // rule reload / profile update changes the tier mapping.
 //
 // hosts is copied — callers may mutate the input slice after this
-// returns. A nil or zero-length input is stored as an empty slice so
-// Status() always returns a non-nil JSON array.
+// returns. A nil or zero-length input is stored as nil internally
+// (saves one allocation when no hosts are configured); the
+// non-nil-empty-slice guarantee that the extension and TestStatus_JSONShape
+// rely on is enforced on the read side via make([]string, len(...))
+// in Status(), not here.
 func (u *Updater) SetTier2Hosts(hosts []string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()

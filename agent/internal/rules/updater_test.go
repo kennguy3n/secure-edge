@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -617,5 +618,32 @@ func TestStatus_JSONShape(t *testing.T) {
 	hosts[0] = "evil.example"
 	if u.Status().Tier2Hosts[0] == "evil.example" {
 		t.Fatal("SetTier2Hosts must copy its input")
+	}
+
+	// Resetting via SetTier2Hosts(nil) and SetTier2Hosts([]string{})
+	// must round-trip through JSON as `[]`, not `null`. The internal
+	// representation stores nil (to save an allocation when no hosts
+	// are configured), and Status() must materialise that as a
+	// non-nil empty slice so the JSON encoder produces `[]` — without
+	// this the extension's `body?.tier2_hosts ?? []` would correctly
+	// treat null as "use default", but the contract test pins the
+	// stronger guarantee that the agent never emits null in the
+	// first place.
+	for _, reset := range [][]string{nil, {}} {
+		u.SetTier2Hosts(reset)
+		st := u.Status()
+		if st.Tier2Hosts == nil {
+			t.Fatalf("Status().Tier2Hosts is nil after SetTier2Hosts(%v); want non-nil empty slice", reset)
+		}
+		if len(st.Tier2Hosts) != 0 {
+			t.Fatalf("Status().Tier2Hosts = %v after SetTier2Hosts(%v); want empty", st.Tier2Hosts, reset)
+		}
+		raw, err := json.Marshal(st)
+		if err != nil {
+			t.Fatalf("marshal reset status: %v", err)
+		}
+		if !strings.Contains(string(raw), `"tier2_hosts":[]`) {
+			t.Fatalf(`reset status JSON does not contain "tier2_hosts":[] : %s`, raw)
+		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -303,6 +304,67 @@ func TestLoadOrCreateAPIToken_RegeneratesWhenFileEmpty(t *testing.T) {
 	raw, _ := os.ReadFile(path)
 	if strings.TrimSpace(string(raw)) != tok {
 		t.Errorf("file content not refreshed")
+	}
+}
+
+// TestLoadOrCreateAPIToken_ConcurrentCreatorsAgree races N goroutines
+// on the same missing path. The contract is: exactly one token ever
+// lands on disk, and every caller (winner + losers) returns that
+// same string. Before the O_EXCL fix, two callers could each get a
+// different in-memory token and the loser would later 401 against
+// the daemon — that's the TOCTOU between the daemon and the Native
+// Messaging host on first install.
+func TestLoadOrCreateAPIToken_ConcurrentCreatorsAgree(t *testing.T) {
+	const goroutines = 16
+	dir := t.TempDir()
+	path := filepath.Join(dir, "api-token")
+
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		results = make([]string, 0, goroutines)
+		errs    []error
+	)
+	start := make(chan struct{})
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			tok, err := LoadOrCreateAPIToken(path)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+				return
+			}
+			results = append(results, tok)
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for _, err := range errs {
+		t.Errorf("goroutine returned error: %v", err)
+	}
+	if len(results) != goroutines {
+		t.Fatalf("got %d results, want %d", len(results), goroutines)
+	}
+	first := results[0]
+	if len(first) != 2*tokenByteLength {
+		t.Fatalf("token length = %d, want %d", len(first), 2*tokenByteLength)
+	}
+	for i, r := range results {
+		if r != first {
+			t.Errorf("goroutine %d returned %q, want %q (every concurrent caller must converge on the on-disk token)", i, r, first)
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read after race: %v", err)
+	}
+	if strings.TrimSpace(string(raw)) != first {
+		t.Errorf("on-disk token %q != in-memory %q", strings.TrimSpace(string(raw)), first)
 	}
 }
 

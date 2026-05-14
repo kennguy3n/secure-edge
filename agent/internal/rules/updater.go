@@ -2,12 +2,14 @@ package rules
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,9 +22,18 @@ import (
 // Manifest is the on-disk + over-the-wire description of a rule
 // bundle. The agent fetches one of these from RuleUpdateURL on every
 // poll and compares it against the locally-installed version.
+//
+// Signature is the hex-encoded Ed25519 signature over the JSON
+// serialisation of the body — i.e. the manifest with the
+// `signature` field omitted (see CanonicalForSigning). It's
+// optional: when an operator has not configured a public key, the
+// updater falls back to per-file SHA-256 checks only. The field is
+// always emitted on the wire so signed and unsigned manifests share
+// one struct.
 type Manifest struct {
-	Version string         `json:"version"`
-	Files   []ManifestFile `json:"files"`
+	Version   string         `json:"version"`
+	Files     []ManifestFile `json:"files"`
+	Signature string         `json:"signature,omitempty"`
 }
 
 // ManifestFile is a single rule file. Either an explicit URL or a path
@@ -71,6 +82,14 @@ type Options struct {
 	// Reload is invoked after any file was replaced. May be nil.
 	Reload ReloadFunc
 
+	// PublicKey is the Ed25519 public key the updater verifies the
+	// manifest signature against. When nil, the updater accepts
+	// unsigned manifests (logging a one-time warning on first
+	// fetch) and falls back to per-file SHA-256 checks only. When
+	// non-nil, an unsigned or mis-signed manifest is rejected
+	// outright before any file is downloaded.
+	PublicKey ed25519.PublicKey
+
 	// Now returns the current time; injected for tests. Defaults to time.Now.
 	Now func() time.Time
 }
@@ -87,6 +106,7 @@ type Updater struct {
 	currentVersion string
 	lastCheck      time.Time
 	nextCheck      time.Time
+	unsignedWarned bool
 	// tier2Hosts is the resolved set of Tier-2 (DLP-inspected) hosts
 	// that the engine is currently treating as paste / fetch targets.
 	// The extension's dynamic-hosts updater reads this list from
@@ -307,7 +327,72 @@ func (u *Updater) fetchManifest(ctx context.Context) (Manifest, error) {
 	if len(m.Files) == 0 {
 		return Manifest{}, errors.New("manifest: no files")
 	}
+	if err := u.verifyManifestSignature(m); err != nil {
+		return Manifest{}, err
+	}
 	return m, nil
+}
+
+// verifyManifestSignature enforces the configured trust posture on
+// the freshly-fetched manifest.
+//
+//   - When a PublicKey is configured: the manifest MUST carry a
+//     well-formed Ed25519 signature over its canonical body and
+//     that signature must verify. Either an empty signature or a
+//     verification failure is rejected before any file is
+//     downloaded — an unverified manifest could replace every rule
+//     on disk with attacker-chosen content.
+//   - When no PublicKey is configured: the manifest is accepted
+//     even without a signature. We log one warning per Updater
+//     instance on the first such fetch so an operator who forgot
+//     to wire the key sees a breadcrumb in the agent logs without
+//     us spamming the log on every poll.
+func (u *Updater) verifyManifestSignature(m Manifest) error {
+	if len(u.opts.PublicKey) == 0 {
+		if strings.TrimSpace(m.Signature) == "" {
+			u.mu.Lock()
+			warned := u.unsignedWarned
+			u.unsignedWarned = true
+			u.mu.Unlock()
+			if !warned {
+				log.Printf("rules: rule_update_public_key not configured " +
+					"and manifest is unsigned; falling back to per-file " +
+					"SHA-256 checks only (configure a public key to enable " +
+					"end-to-end manifest verification)")
+			}
+		}
+		return nil
+	}
+	if strings.TrimSpace(m.Signature) == "" {
+		return errors.New("manifest: signature required (rule_update_public_key configured)")
+	}
+	sig, err := hex.DecodeString(m.Signature)
+	if err != nil {
+		return fmt.Errorf("manifest: invalid signature encoding: %w", err)
+	}
+	if len(sig) != ed25519.SignatureSize {
+		return fmt.Errorf("manifest: invalid signature length: got %d, want %d", len(sig), ed25519.SignatureSize)
+	}
+	body, err := CanonicalForSigning(m)
+	if err != nil {
+		return fmt.Errorf("manifest: canonicalize: %w", err)
+	}
+	if !ed25519.Verify(u.opts.PublicKey, body, sig) {
+		return errors.New("manifest: signature verification failed")
+	}
+	return nil
+}
+
+// CanonicalForSigning returns the byte sequence that the manifest
+// signer signs over and that the updater verifies. The signature
+// field itself is omitted from the canonical body — otherwise the
+// signer would have to fixed-point its own input. Field order is
+// fixed by Go's encoding/json (declaration order on the struct) so
+// a signer and verifier built from the same Manifest type agree
+// without an explicit "canonicalisation" library.
+func CanonicalForSigning(m Manifest) ([]byte, error) {
+	copy := Manifest{Version: m.Version, Files: m.Files}
+	return json.Marshal(copy)
 }
 
 // applyManifest iterates manifest.Files, compares each against the

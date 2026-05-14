@@ -408,6 +408,21 @@ func run(configPath string) error {
 				cfg.DLPPatternsPath, cfg.DLPExclusionsPath); err != nil {
 				return fmt.Errorf("rule_update_url is set but %w", err)
 			}
+			// Decode the optional rule-manifest verification key.
+			// We accept this only when explicitly configured;
+			// leaving it blank keeps the per-file SHA-256 path
+			// (with a one-time warning logged by the updater).
+			var rulePubKey ed25519.PublicKey
+			if strings.TrimSpace(cfg.RuleUpdatePublicKey) != "" {
+				pubBytes, err := hex.DecodeString(cfg.RuleUpdatePublicKey)
+				if err != nil {
+					return fmt.Errorf("rule_update_public_key: %w", err)
+				}
+				if len(pubBytes) != ed25519.PublicKeySize {
+					return fmt.Errorf("rule_update_public_key: expected %d bytes, got %d", ed25519.PublicKeySize, len(pubBytes))
+				}
+				rulePubKey = ed25519.PublicKey(pubBytes)
+			}
 			// Forward-declared so the Reload closure below can
 			// reach the freshly-built updater without a circular
 			// reference. Assigned to the real updater once
@@ -417,6 +432,7 @@ func run(configPath string) error {
 				ManifestURL:  cfg.RuleUpdateURL,
 				PollInterval: cfg.RuleUpdateInterval,
 				RulesDir:     rulesDir,
+				PublicKey:    rulePubKey,
 				Store:        s,
 				Reload: func(ctx context.Context) error {
 					if err := engine.Reload(ctx); err != nil {

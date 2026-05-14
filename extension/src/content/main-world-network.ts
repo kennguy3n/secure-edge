@@ -367,11 +367,24 @@ function decodeBufferText(
 }
 
 /** Walk a FormData object encoding each text field and the contents
- *  of each File / Blob entry into a single `k=v&k=v` string, capped
- *  at `cap` cumulative bytes. Files past the cap contribute their
- *  key but not their contents — the cap is hit, the scanner sees
- *  enough material to fire patterns, and the policy layer treats
- *  the truncated result as oversize. */
+ *  of each File / Blob entry into a single `k=v&k=v` string.
+ *
+ *  The raw-read budget per entry is `cap - used`: we never read more
+ *  bytes from a Blob than the remaining budget. Entries past the cap
+ *  contribute their key but not their contents — the cap is hit, the
+ *  scanner sees enough material to fire patterns, and the policy
+ *  layer treats the truncated result as oversize.
+ *
+ *  Caveat: `encodeURIComponent` inflates special characters by up to
+ *  3x (e.g. one byte ` ` -> three bytes `%20`), so the joined output
+ *  string can exceed `MAX_SCAN_BYTES` even though every raw read
+ *  respected the per-entry remaining budget. This is caught downstream
+ *  by `network-interceptor.ts`'s isolated-world oversize check
+ *  (`content.length > MAX_SCAN_BYTES` -> `policyForOversize`), so it
+ *  cannot bypass the policy. For ASCII payloads (the common DLP
+ *  target — API keys, tokens, credit cards) `encodeURIComponent` is
+ *  effectively a no-op and the cap holds tightly.
+ */
 async function readFormDataText(fd: FormData, cap: number): Promise<string> {
     const parts: string[] = [];
     let used = 0;

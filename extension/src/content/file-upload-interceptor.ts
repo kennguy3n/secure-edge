@@ -78,15 +78,37 @@ if (typeof document !== "undefined") {
  * `<input type="file">` change handler. Fires when the user picks a
  * file via the system file-picker dialog. The selected files sit on
  * `input.files`; the page typically reads them inside its own
- * change-event listener, so this capture-phase handler races ahead.
+ * change-event listener.
  *
  * Sync-first contract (see header comment): we MUST suppress the
  * page's view of the selection synchronously, before any `await`.
- * `stopImmediatePropagation` blocks every later listener (including
- * other capture-phase listeners on `document`); clearing
- * `input.value` makes any later code that re-reads `input.files`
- * see an empty selection. We snapshot the files first so the async
- * scan can still inspect them.
+ * In a single event dispatch the order is
+ *   capture (window, document, parents...) -> target -> bubble.
+ * Calling `stopPropagation()` at the capture phase prevents the
+ * target / bubble phases from running at all, AND
+ * `stopImmediatePropagation()` prevents any subsequent same-phase
+ * listener on the same node from firing. So a page listener
+ * registered on the input itself (target phase) or on any
+ * ancestor (capture or bubble phase) WILL NOT fire in this
+ * dispatch.
+ *
+ * The narrow gap that remains: a page that registers its OWN
+ * capture-phase listener on `document` BEFORE this content script
+ * loads (e.g. a page-bundled script that runs before our
+ * registered `document_start` injection settles) sits earlier in
+ * the listener list on the same target/phase. That listener will
+ * have already fired by the time ours runs. We cannot prevent it.
+ * The network interceptor (`main-world-network.ts`) re-scans the
+ * file when it's actually shipped via fetch/XHR, which closes the
+ * remaining exfil path even when the page held a File reference
+ * from that earlier dispatch.
+ *
+ * Clearing `input.value` is the secondary defence: it empties
+ * `input.files` so any deferred page logic that re-reads the
+ * input later (e.g. a setTimeout or a microtask) gets an empty
+ * FileList. We snapshot first because `input.value = ""` mutates
+ * `input.files` synchronously, and we still want the async scan
+ * to inspect the original selection.
  */
 export async function onChange(ev: Event): Promise<void> {
     const input = ev.target as HTMLInputElement | null;
@@ -125,9 +147,29 @@ export async function onChange(ev: Event): Promise<void> {
  * the drag interceptor (`drag-interceptor.ts`); we only act when
  * `dataTransfer.files` is non-empty.
  *
- * Sync-first contract (see header comment): `preventDefault` and
- * `stopPropagation` must run before the first `await`, otherwise
- * the page has already received the drop by the time we get back.
+ * Sync-first contract (see header comment): `preventDefault`,
+ * `stopPropagation`, and `stopImmediatePropagation` must all run
+ * before the first `await`, otherwise the page has already
+ * received the drop by the time we get back.
+ *
+ * `stopImmediatePropagation` also matters for our own multi-listener
+ * coexistence on Chrome: `drag-interceptor.ts` registers its own
+ * capture-phase `drop` listener on `document`. Manifest load order
+ * puts it earlier in the listener list, so it runs before this
+ * handler. Its early-return on `getData("text/plain") === ""` keeps
+ * it benign for the common file-drop case (no text payload). But
+ * some OS file managers attach the file path as `text/plain`
+ * alongside the File. In that case drag-interceptor would scan and
+ * potentially `resumeDrop` the path text. The eventual file exfil
+ * is still caught by network-interceptor, but the dual-listener
+ * dance is surprising UX (a stale path string can end up inserted
+ * into a focusable field). Calling `stopImmediatePropagation` here
+ * does not help against earlier-registered listeners on the same
+ * phase + target. Instead, we keep the call for completeness against
+ * later-registered listeners and rely on drag-interceptor's own
+ * `files.length > 0` short-circuit (added in `drag-interceptor.ts`,
+ * tested in `drag-interceptor.test.ts`) to handle the dual-drop
+ * case correctly.
  */
 export async function onDrop(ev: DragEvent): Promise<void> {
     const data = ev.dataTransfer;
@@ -141,6 +183,7 @@ export async function onDrop(ev: DragEvent): Promise<void> {
     // would be a no-op. Re-injecting a File into the page's drop
     // target is not portable, so we never resume — the user
     // re-drags if they're sure.
+    ev.stopImmediatePropagation();
     ev.preventDefault();
     ev.stopPropagation();
 

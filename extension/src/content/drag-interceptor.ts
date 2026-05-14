@@ -27,13 +27,23 @@ if (typeof document !== "undefined") {
 
 /**
  * Handle a drop event. We only care about plain-text payloads — file
- * drops are out of scope for the DLP companion (and are usually
- * uploaded over the page's own fetch path which the network-interceptor
- * already covers).
+ * drops are handled by `file-upload-interceptor.ts` (which fires for
+ * the same dispatch but reads `dataTransfer.files` instead of
+ * `text/plain`).
+ *
+ * Short-circuit on file drops: some OS file managers attach the file
+ * path string as `text/plain` alongside the File entry. Without this
+ * guard we'd scan the file path and potentially `resumeDrop` it into
+ * the focused element, even though `file-upload-interceptor` is
+ * simultaneously suppressing the file half of the drop. The visible
+ * effect would be a stale path string inserted into a textarea while
+ * the actual file gets blocked. Returning early when files are
+ * present cedes the event to file-upload-interceptor.
  */
 export async function onDrop(ev: DragEvent): Promise<void> {
     const data = ev.dataTransfer;
     if (!data) return;
+    if (data.files && data.files.length > 0) return;
     const text = data.getData("text/plain");
     if (!text || text.length === 0) return;
 

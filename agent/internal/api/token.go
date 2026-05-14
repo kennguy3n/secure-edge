@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -18,6 +19,76 @@ import (
 // same width the agent self-updater's Ed25519 verification keys use,
 // and well above the 128-bit floor for capability tokens.
 const tokenByteLength = 32
+
+// DefaultAPITokenPath returns the recommended on-disk location for
+// the per-install API capability token (work item A2) on the current
+// OS, or "" when the home directory is not discoverable (e.g. some
+// container init scenarios where HOME is unset).
+//
+// The Electron tray's DEFAULT_API_TOKEN_PATH (electron/main.ts)
+// computes the same path so a fresh install — with `api_token_path`
+// pointing here on the agent side — needs no extra environment
+// variable on the tray launcher. Operators who deliberately pick a
+// non-default location (e.g. an OS-managed StateDirectory under
+// /var/lib/secure-edge/) still need to point the tray at it via
+// SECURE_EDGE_API_TOKEN_PATH; this function only addresses the
+// default-path mismatch the PR #18 review flagged.
+//
+// The agent's config.Default() returns "" (feature off); this helper
+// is used by main to print a startup hint pointing at the canonical
+// per-OS location so operators see exactly what to put in config.yaml
+// when they're ready to flip the feature on. It does not change the
+// default itself — the staged-rollout posture from PR #18 stays:
+//   - api_token_path: ""           => feature disabled, no token file
+//   - api_token_path: <this path>  => generated + advertised on /hello
+//                                     and recognised by the tray with
+//                                     zero further configuration.
+func DefaultAPITokenPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return ""
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "secure-edge", "api-token")
+	case "windows":
+		// Use LookupEnv (not Getenv) so APPDATA set to "" is honoured
+		// verbatim — the Electron tray's DEFAULT_API_TOKEN_PATH does
+		// `process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming')`
+		// and JavaScript's `??` only falls back on null/undefined, NOT
+		// on empty string. Treating "" as "unset" here (the old
+		// os.Getenv("APPDATA") != "" check) would silently disagree
+		// with the tray when APPDATA is explicitly empty (Go would
+		// fall back to ~/AppData/Roaming, Electron would use the empty
+		// string verbatim) — same byte-identity violation the XDG
+		// branch below was tightened against. APPDATA="" doesn't
+		// occur on real Windows installs (the OS always populates it),
+		// so this is a contract-correctness fix rather than an
+		// operator-visible failure mode, but keeping the two
+		// implementations literally identical is the only sustainable
+		// invariant for a path operators are expected to copy-paste.
+		if appData, ok := os.LookupEnv("APPDATA"); ok {
+			return filepath.Join(appData, "secure-edge", "api-token")
+		}
+		return filepath.Join(home, "AppData", "Roaming", "secure-edge", "api-token")
+	default:
+		// XDG Base Directory: $XDG_CONFIG_HOME or ~/.config.
+		// No TrimSpace on the env value — the Electron tray's
+		// DEFAULT_API_TOKEN_PATH (electron/main.ts) does a plain
+		// length check (`xdg && xdg.length > 0`) and the two
+		// computations are documented to stay byte-identical so
+		// the agent's startup-hint output and the tray's runtime
+		// discovery resolve to the same file. Trimming here would
+		// silently disagree on whitespace-only XDG_CONFIG_HOME
+		// values (Go would fall back to ~/.config/, Electron would
+		// use the whitespace string verbatim) — exactly the
+		// failure mode the helper was added to prevent.
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "secure-edge", "api-token")
+		}
+		return filepath.Join(home, ".config", "secure-edge", "api-token")
+	}
+}
 
 // LoadOrCreateAPIToken reads the API capability token from path,
 // generating a new 32-byte hex token and writing it with mode 0600

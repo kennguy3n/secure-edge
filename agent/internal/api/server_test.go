@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -396,5 +397,122 @@ func TestTokenFromRequest(t *testing.T) {
 		if got != c.want {
 			t.Errorf("Authorization=%q: got %q, want %q", c.header, got, c.want)
 		}
+	}
+}
+
+// TestDefaultAPITokenPath_PerOS confirms the helper resolves the
+// canonical per-OS location the Electron tray's DEFAULT_API_TOKEN_PATH
+// (electron/main.ts) also computes. The two implementations are the
+// source-of-truth alignment fix for the PR #18 review finding about
+// the tray and the agent looking at different paths by default.
+func TestDefaultAPITokenPath_PerOS(t *testing.T) {
+	// The test pins HOME / XDG_CONFIG_HOME / APPDATA per-OS so the
+	// outcome is independent of the runner's environment. Restore
+	// the original values via t.Setenv on exit.
+	switch runtime.GOOS {
+	case "darwin":
+		t.Setenv("HOME", "/Users/op")
+		want := filepath.Join("/Users/op", "Library", "Application Support", "secure-edge", "api-token")
+		if got := DefaultAPITokenPath(); got != want {
+			t.Errorf("darwin: got %q, want %q", got, want)
+		}
+	case "windows":
+		t.Setenv("USERPROFILE", `C:\Users\op`)
+		t.Setenv("APPDATA", `C:\Users\op\AppData\Roaming`)
+		want := filepath.Join(`C:\Users\op\AppData\Roaming`, "secure-edge", "api-token")
+		if got := DefaultAPITokenPath(); got != want {
+			t.Errorf("windows: got %q, want %q", got, want)
+		}
+	default:
+		// Linux / *bsd: XDG_CONFIG_HOME wins when set; ~/.config
+		// otherwise. Exercise both paths to keep them in sync with
+		// the Electron tray.
+		t.Setenv("HOME", "/home/op")
+		t.Setenv("XDG_CONFIG_HOME", "/home/op/.cfg-override")
+		want := filepath.Join("/home/op/.cfg-override", "secure-edge", "api-token")
+		if got := DefaultAPITokenPath(); got != want {
+			t.Errorf("linux XDG override: got %q, want %q", got, want)
+		}
+		t.Setenv("XDG_CONFIG_HOME", "")
+		want = filepath.Join("/home/op", ".config", "secure-edge", "api-token")
+		if got := DefaultAPITokenPath(); got != want {
+			t.Errorf("linux ~/.config: got %q, want %q", got, want)
+		}
+	}
+}
+
+// TestDefaultAPITokenPath_EmptyHomeReturnsEmpty confirms the helper
+// degrades gracefully when no home directory is discoverable (the
+// shape of `os.UserHomeDir() -> "", err` under a container init that
+// has not yet set HOME). The agent treats "" the same as "feature
+// disabled" so an empty return must not crash main.
+func TestDefaultAPITokenPath_EmptyHomeReturnsEmpty(t *testing.T) {
+	// os.UserHomeDir reads HOME on Unix and USERPROFILE on Windows;
+	// unset both so the lookup fails on every platform.
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	if got := DefaultAPITokenPath(); got != "" {
+		t.Errorf("with empty home env, got %q, want \"\"", got)
+	}
+}
+
+// TestDefaultAPITokenPath_XDGWhitespacePreserved pins the byte-identity
+// contract between Go's DefaultAPITokenPath and Electron's
+// DEFAULT_API_TOKEN_PATH for whitespace-only XDG_CONFIG_HOME values.
+//
+// The Electron tray treats $XDG_CONFIG_HOME as "set" whenever the
+// string has non-zero length (a plain `xdg && xdg.length > 0` check)
+// and joins it into the path verbatim. The agent MUST agree: a prior
+// strings.TrimSpace here would silently fall back to ~/.config when
+// the env value was whitespace-only, while the tray would still
+// resolve to the whitespace-prefixed path — exactly the
+// agent-and-tray-look-at-different-files failure the helper exists
+// to prevent.
+//
+// This test only runs on Linux/*bsd since the XDG branch is gated on
+// runtime.GOOS in DefaultAPITokenPath; on darwin/windows the env
+// variable is not consulted.
+func TestDefaultAPITokenPath_XDGWhitespacePreserved(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("XDG_CONFIG_HOME branch only runs on linux/*bsd; got %s", runtime.GOOS)
+	}
+	t.Setenv("HOME", "/home/op")
+	t.Setenv("XDG_CONFIG_HOME", " ")
+	want := filepath.Join(" ", "secure-edge", "api-token")
+	if got := DefaultAPITokenPath(); got != want {
+		t.Errorf("XDG_CONFIG_HOME=\" \": got %q, want %q (whitespace must be preserved to match Electron)", got, want)
+	}
+}
+
+// TestDefaultAPITokenPath_APPDATAEmptyPreserved pins the byte-identity
+// contract between Go's DefaultAPITokenPath and Electron's
+// DEFAULT_API_TOKEN_PATH on Windows when APPDATA is explicitly set to
+// the empty string.
+//
+// The Electron tray's `process.env.APPDATA ?? path.join(home, …)` only
+// falls back when the value is null/undefined (i.e. the env var is
+// unset); an APPDATA="" set explicitly is kept verbatim, producing a
+// relative path like `secure-edge/api-token`. The agent MUST agree —
+// the older `os.Getenv("APPDATA") != ""` check treated unset and
+// explicit-empty identically and fell back to ~/AppData/Roaming/...,
+// disagreeing with the tray on this corner. The fix is os.LookupEnv,
+// whose `ok` bool mirrors the `set vs unset` distinction `??` makes.
+//
+// APPDATA="" doesn't happen on real Windows installs (the OS always
+// populates it), so this test is contract-correctness only, but it
+// is the only way to keep future maintainers from re-introducing the
+// divergence the older Getenv shape silently encoded.
+//
+// Only runs on windows since the APPDATA branch is gated on
+// runtime.GOOS in DefaultAPITokenPath.
+func TestDefaultAPITokenPath_APPDATAEmptyPreserved(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skipf("APPDATA branch only runs on windows; got %s", runtime.GOOS)
+	}
+	t.Setenv("USERPROFILE", `C:\Users\op`)
+	t.Setenv("APPDATA", "")
+	want := filepath.Join("", "secure-edge", "api-token")
+	if got := DefaultAPITokenPath(); got != want {
+		t.Errorf("APPDATA=\"\": got %q, want %q (empty string must be preserved to match Electron)", got, want)
 	}
 }

@@ -93,6 +93,19 @@ proxy_pinning_bypass: []
 # extension over Native Messaging "hello") and attach it as
 # "Authorization: Bearer <token>" on every API call.
 #
+# The Electron tray's DEFAULT_API_TOKEN_PATH (and the agent's Go
+# helper api.DefaultAPITokenPath) auto-discover a per-OS location:
+#   - linux:   $XDG_CONFIG_HOME/secure-edge/api-token (default ~/.config/secure-edge/api-token)
+#   - darwin:  ~/Library/Application Support/secure-edge/api-token
+#   - windows: %APPDATA%/secure-edge/api-token
+# Point api_token_path at that location and a fresh install needs
+# zero extra env-vars on the tray launcher. The agent prints the
+# resolved value on startup when api_token_path is empty so you can
+# copy/paste it. Packaged installs that run the agent as a system
+# service typically choose a different location (e.g. systemd
+# StateDirectory /var/lib/secure-edge/api-token) and point the tray
+# at it via SECURE_EDGE_API_TOKEN_PATH.
+#
 # api_token_required gates enforcement: when false the middleware
 # runs in staged mode (wrong tokens are rejected with 401, missing
 # headers fall through to origin-based auth) so operators can roll

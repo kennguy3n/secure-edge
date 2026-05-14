@@ -24,6 +24,26 @@ may introduce breaking changes between feature releases.
   from the same file. `api_token_required` toggles enforcement
   between staged (wrong tokens 401, missing header falls through)
   and full (missing header also 401).
+- **A2 follow-up**: Added `api.DefaultAPITokenPath()` in the Go
+  agent so the per-OS default matches the Electron tray's
+  `DEFAULT_API_TOKEN_PATH` byte-for-byte (XDG / Application
+  Support / APPDATA). The agent prints the resolved value as a
+  startup hint when `api_token_path` is empty so operators see
+  exactly what to drop into `config.yaml` to enable bearer-token
+  auth without any further tray configuration. Clarified the
+  `NativeMessagingOptions.APIToken` doc comment to match the
+  actual hello-without-token behaviour (successful reply with the
+  `api_token` field stripped, no protocol-level error).
+- **C2 follow-up**: `paste-interceptor.ts` now reuses the shared
+  `MAX_SCAN_BYTES` constant instead of its own local
+  `MAX_PASTE_BYTES`. The two were already 1 MiB so this is not a
+  behavioural change, but it removes the only remaining interceptor
+  that could drift from the shared threshold a future PR might
+  retune. Pinned `/api/config/enforcement-mode` in
+  `TestCORS_AIPageOriginsAllowedOnReadEndpoints` so a future
+  attempt to add the endpoint to `isControlPath` fails at CI
+  rather than silently breaking the extension service-worker's
+  auth-free poll.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

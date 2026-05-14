@@ -276,6 +276,45 @@ func TestUpdater_AcceptsUnsignedManifestWhenNoKeyConfigured(t *testing.T) {
 	}
 }
 
+func TestUpdater_AcceptsSignedManifestWhenNoKeyConfigured(t *testing.T) {
+	// Mixed-deployment path: the upstream IS signing manifests
+	// but THIS agent has no rule_update_public_key configured.
+	// The updater must still apply the manifest (matching the
+	// unsigned-no-key backwards-compat path) so a partial rollout
+	// of public keys across a fleet doesn't break rule updates
+	// on the agents that haven't received the key yet. The
+	// updater logs a one-time WARN noting verification is being
+	// skipped despite the signature being present — that signal
+	// is the operator's only breadcrumb that some agents are
+	// running unverified while others aren't.
+	dir := t.TempDir()
+	_, priv := mustKeypair(t)
+	_, srv := newSignedServer(t, map[string]string{
+		"ai_allowed.txt": "openai.com\n",
+	}, "1.2.3", priv)
+
+	u, err := New(Options{
+		ManifestURL:  srv.URL + "/manifest.json",
+		PollInterval: time.Hour,
+		RulesDir:     dir,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	res, err := u.CheckNow(context.Background())
+	if err != nil {
+		t.Fatalf("CheckNow: %v", err)
+	}
+	if !res.Updated || res.Version != "1.2.3" {
+		t.Fatalf("first run = %+v", res)
+	}
+	// Second call should not return an error either — the warn
+	// flag is set, but the verification still passes.
+	if _, err := u.CheckNow(context.Background()); err != nil {
+		t.Fatalf("CheckNow (second): %v", err)
+	}
+}
+
 func TestCanonicalForSigning_OmitsSignatureField(t *testing.T) {
 	body, err := CanonicalForSigning(Manifest{
 		Version:   "1.0.0",

@@ -102,11 +102,12 @@ const DefaultPollInterval = 6 * time.Hour
 type Updater struct {
 	opts Options
 
-	mu             sync.RWMutex
-	currentVersion string
-	lastCheck      time.Time
-	nextCheck      time.Time
-	unsignedWarned bool
+	mu                   sync.RWMutex
+	currentVersion       string
+	lastCheck            time.Time
+	nextCheck            time.Time
+	unsignedWarned       bool
+	signedButNoKeyWarned bool
 	// tier2Hosts is the resolved set of Tier-2 (DLP-inspected) hosts
 	// that the engine is currently treating as paste / fetch targets.
 	// The extension's dynamic-hosts updater reads this list from
@@ -360,6 +361,25 @@ func (u *Updater) verifyManifestSignature(m Manifest) error {
 					"SHA-256 checks only (configure a public key to enable " +
 					"end-to-end manifest verification)")
 			}
+			return nil
+		}
+		// Signed-but-no-key configured: the upstream is signing
+		// manifests but this agent has not been told what to verify
+		// against, so verification is skipped on the trust path the
+		// publisher already set up. Without this log an operator who
+		// deployed signatures to most agents but forgot the key on
+		// some would see no breadcrumb that those agents are still
+		// running unverified. One warning per Updater instance.
+		u.mu.Lock()
+		warned := u.signedButNoKeyWarned
+		u.signedButNoKeyWarned = true
+		u.mu.Unlock()
+		if !warned {
+			log.Printf("rules: manifest carries a signature but " +
+				"rule_update_public_key is not configured on this " +
+				"agent; signature verification is being skipped " +
+				"(configure the matching public key to enable " +
+				"verification)")
 		}
 		return nil
 	}
@@ -391,8 +411,15 @@ func (u *Updater) verifyManifestSignature(m Manifest) error {
 // a signer and verifier built from the same Manifest type agree
 // without an explicit "canonicalisation" library.
 func CanonicalForSigning(m Manifest) ([]byte, error) {
-	copy := Manifest{Version: m.Version, Files: m.Files}
-	return json.Marshal(copy)
+	// Note on the shallow copy: stripped.Files shares its backing
+	// array with m.Files. Safe here because json.Marshal only
+	// reads the slice and CanonicalForSigning is never called on
+	// a Manifest that is being mutated concurrently (the only
+	// writers are deserialisation in fetchManifest and the signer
+	// tool, both of which finish before this is called). A deep
+	// copy would defeat the point of the function being cheap.
+	stripped := Manifest{Version: m.Version, Files: m.Files}
+	return json.Marshal(stripped)
 }
 
 // applyManifest iterates manifest.Files, compares each against the

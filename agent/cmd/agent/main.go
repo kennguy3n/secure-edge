@@ -413,8 +413,15 @@ func run(configPath string) error {
 			// leaving it blank keeps the per-file SHA-256 path
 			// (with a one-time warning logged by the updater).
 			var rulePubKey ed25519.PublicKey
-			if strings.TrimSpace(cfg.RuleUpdatePublicKey) != "" {
-				pubBytes, err := hex.DecodeString(cfg.RuleUpdatePublicKey)
+			// Trim before the empty-check AND before hex.DecodeString.
+			// Quoted YAML strings can carry stray whitespace that
+			// would pass an untrimmed `!= ""` check but fail hex
+			// decoding with an opaque "invalid byte" error at startup.
+			// Matches the signer tool's input handling (strings.TrimSpace
+			// in agent/cmd/sign-rule-manifest/main.go) so config and
+			// signer accept the same set of well-formed keys.
+			if trimmed := strings.TrimSpace(cfg.RuleUpdatePublicKey); trimmed != "" {
+				pubBytes, err := hex.DecodeString(trimmed)
 				if err != nil {
 					return fmt.Errorf("rule_update_public_key: %w", err)
 				}

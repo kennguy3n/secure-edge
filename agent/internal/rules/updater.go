@@ -55,10 +55,21 @@ type Manifest struct {
 //     added to Manifest without `omitempty` would silently change
 //     the canonical form and invalidate every previously-signed
 //     manifest. Reviewers flagged this on PR #20.
-//   - With a dedicated body type, the compiler tells us when
-//     Manifest and manifestBody drift apart: every new field needs
-//     to be mirrored here (or explicitly chosen not to participate
-//     in the signature).
+//   - With a dedicated body type, drift between Manifest and
+//     manifestBody is caught loudly at run time by
+//     TestManifestBody_MirrorsManifestMinusSignature (in
+//     updater_signing_test.go), which uses reflection to compare
+//     the two structs field-by-field. Note: this is a test-time
+//     check, not a compile-time check — Manifest and manifestBody
+//     are independent struct types, so the Go compiler does NOT
+//     report missing fields here. Skipping the rules signing tests
+//     would let the drift land silently. CI must run the full
+//     `make test` target (which exercises this test) before any
+//     change to Manifest is merged.
+//   - Every new field added to Manifest must be mirrored here (or
+//     explicitly chosen not to participate in the signature, in
+//     which case the test must be updated to mark it
+//     non-canonical).
 //   - Field order MUST match Manifest's declaration order because
 //     `encoding/json` emits fields in source order, and the signed
 //     byte sequence is order-sensitive.

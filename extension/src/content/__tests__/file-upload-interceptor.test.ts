@@ -114,9 +114,11 @@ function makeDropEvent(files: File[]): {
     ev: DragEvent;
     preventCalls: { n: number };
     stopCalls: { n: number };
+    stopImmediateCalls: { n: number };
 } {
     const preventCalls = { n: 0 };
     const stopCalls = { n: 0 };
+    const stopImmediateCalls = { n: 0 };
     const fileList = {
         length: files.length,
         item: (i: number) => files[i] ?? null,
@@ -129,8 +131,9 @@ function makeDropEvent(files: File[]): {
         dataTransfer: { files: fileList } as unknown as DataTransfer,
         preventDefault: () => { preventCalls.n++; },
         stopPropagation: () => { stopCalls.n++; },
+        stopImmediatePropagation: () => { stopImmediateCalls.n++; },
     } as unknown as DragEvent;
-    return { ev, preventCalls, stopCalls };
+    return { ev, preventCalls, stopCalls, stopImmediateCalls };
 }
 
 /**
@@ -349,6 +352,32 @@ test("onDrop preventDefault + stopPropagation fire synchronously on every file d
     await onDrop(ev);
     assert.equal(preventCalls.n, 1, "preventDefault must fire");
     assert.equal(stopCalls.n, 1, "stopPropagation must fire");
+});
+
+test("onDrop calls stopImmediatePropagation synchronously (same-target / same-phase listeners suppressed)", async () => {
+    // The drop-event dispatch sequence on `document` is
+    //   capture-phase listeners (in registration order) ->
+    //   target / bubble.
+    // If a later capture-phase listener is registered on `document`
+    // (e.g. a hypothetical future drop interceptor added after
+    // file-upload-interceptor in manifest order), we must prevent it
+    // from running on a file drop too — only file-upload-interceptor
+    // owns the verdict for file payloads. stopImmediatePropagation
+    // is what enforces that contract; calling preventDefault +
+    // stopPropagation alone would still let same-phase / same-target
+    // listeners fire.
+    const blocker = blockingFetch();
+    const file = new File(["payload " + "X".repeat(50)], "drop.txt");
+    const { ev, stopImmediateCalls } = makeDropEvent([file]);
+    const pending = onDrop(ev);
+    await Promise.resolve();
+    assert.equal(
+        stopImmediateCalls.n,
+        1,
+        "stopImmediatePropagation MUST fire synchronously before the scan resolves so same-target capture listeners do not run",
+    );
+    blocker.release({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    await pending;
 });
 
 test("onDrop preventDefault is observable on a real Event after the sync wrapper returns", async () => {

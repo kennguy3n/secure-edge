@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import { __test__ as mainWorld } from "../main-world-network.js";
 import { __test__ as iso } from "../network-interceptor.js";
+import { MAX_SCAN_BYTES as ISO_MAX_SCAN_BYTES } from "../scan-client.js";
 import type { ScanResult } from "../../shared.js";
 import type { BridgeDoc, BridgeRuntime } from "../network-interceptor.js";
 
@@ -58,6 +59,27 @@ function makeBridgedWindow(onRequest: (content: string) => ScanResult | null) {
     };
     return win;
 }
+
+test("MAX_SCAN_BYTES is identical between scan-client (isolated world) and main-world-network (main world)", () => {
+    // The constant is defined twice because the MAIN-world bridge
+    // (`main-world-network.ts`) is injected into the page and cannot
+    // import from the extension bundle, whereas the isolated-world
+    // scan-client (`scan-client.ts`) lives in the extension bundle.
+    // Both literals must agree, otherwise the oversize policy would
+    // trigger at different thresholds in the two scan paths (fetch /
+    // XHR / FormData go through MAIN; paste / form / drag /
+    // file-upload go through isolated). A divergence would silently
+    // shift the DLP cap.
+    assert.equal(
+        MAX_SCAN_BYTES,
+        ISO_MAX_SCAN_BYTES,
+        "MAX_SCAN_BYTES in main-world-network.ts MUST equal MAX_SCAN_BYTES in scan-client.ts — both must be edited in lockstep",
+    );
+    // Pin the absolute value too so a coordinated edit that bumps both
+    // sites still gets a second look in code review. 1 MiB matches the
+    // documented contract in PROPOSAL.md.
+    assert.equal(MAX_SCAN_BYTES, 1 * 1024 * 1024, "MAX_SCAN_BYTES must remain 1 MiB; coordinate any bump with the documented DLP contract");
+});
 
 test("extractFetchBody pulls string init.body", () => {
     assert.equal(

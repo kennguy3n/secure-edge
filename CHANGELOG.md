@@ -61,6 +61,32 @@ may introduce breaking changes between feature releases.
   fall open (no safe tee without rewriting `init.body`); the
   agent-unavailable + oversize policy hooks from C2 cover the
   fall-open path in managed mode.
+- **B1 follow-up**: Review-pass tightening on the file-upload
+  path. `drag-interceptor.ts` now short-circuits on
+  `dataTransfer.files.length > 0` so it cedes file drops to
+  `file-upload-interceptor.ts` cleanly — previously, OS file
+  managers that attach a `text/plain` path string alongside the
+  File could trick drag-interceptor into `resumeDrop`-ing a stale
+  path string into the focused textarea while file-upload-interceptor
+  was simultaneously blocking the file. `file-upload-interceptor`'s
+  `onDrop` now also calls `stopImmediatePropagation` synchronously
+  for parity with `onChange`'s same-phase suppression. Added a
+  `MAX_SCAN_BYTES` parity test that fails CI if the constant ever
+  drifts between `scan-client.ts` (isolated world) and
+  `main-world-network.ts` (MAIN world). Tightened the JSDoc on
+  `readFormDataText` to document `encodeURIComponent` inflation (up
+  to 3× on special characters) — the raw read budget holds, the
+  encoded output is caught downstream by the oversize policy hook.
+  Clarified the `onChange` header comment to accurately describe
+  what capture-phase `stopPropagation` / `stopImmediatePropagation`
+  do and do not prevent (the only remaining race is a page's own
+  document-level capture listener registered before our
+  `document_start` injection; the network interceptor closes the
+  exfil path in that case). Re-framed the `manifestBody` doc
+  comment to make clear that drift between `Manifest` and
+  `manifestBody` is enforced by the run-time
+  `TestManifestBody_MirrorsManifestMinusSignature` reflection test,
+  not by the compiler (the two structs are independent types).
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

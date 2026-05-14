@@ -82,3 +82,50 @@ test("onDrop ignores empty drops", async () => {
     await onDrop(ev);
     assert.equal(calls.length, 0, "no scan should be issued for an empty drop");
 });
+
+test("onDrop cedes to file-upload-interceptor when files are present", async () => {
+    // OS file managers can attach a `text/plain` path string alongside
+    // the File. Without the short-circuit, drag-interceptor would scan
+    // the path and resumeDrop it into the focused element while
+    // file-upload-interceptor blocks the file. Net result: a stale path
+    // string in the textarea — surprising UX. The short-circuit makes
+    // drag-interceptor a no-op whenever dataTransfer.files is non-empty.
+    const calls = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const insertedText: string[] = [];
+    const target = {
+        focus: () => {},
+    } as unknown as HTMLElement;
+    (globalThis as { document?: unknown }).document = {
+        queryCommandSupported: () => true,
+        execCommand: (_cmd: string, _ui: boolean, value: string) => {
+            insertedText.push(value);
+            return true;
+        },
+        activeElement: target,
+    } as unknown as Document;
+
+    const fakeFile = { name: "secret.txt" } as unknown as File;
+    const dataTransfer = {
+        files: { length: 1, 0: fakeFile } as unknown as FileList,
+        getData: (kind: string) => (kind === "text/plain" ? "/tmp/secret.txt" : ""),
+    } as unknown as DataTransfer;
+    const preventCalls = { count: 0 };
+    const stopCalls = { count: 0 };
+    const ev = {
+        dataTransfer,
+        target,
+        preventDefault: () => {
+            preventCalls.count++;
+        },
+        stopPropagation: () => {
+            stopCalls.count++;
+        },
+    } as unknown as DragEvent;
+
+    await onDrop(ev);
+
+    assert.equal(calls.length, 0, "drag-interceptor MUST NOT scan a file drop");
+    assert.equal(insertedText.length, 0, "drag-interceptor MUST NOT resume the path string");
+    assert.equal(preventCalls.count, 0, "drag-interceptor MUST NOT preventDefault a file drop");
+    assert.equal(stopCalls.count, 0, "drag-interceptor MUST NOT stopPropagation a file drop");
+});

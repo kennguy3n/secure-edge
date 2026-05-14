@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestParseAndValidate(t *testing.T) {
@@ -233,6 +235,113 @@ func TestLoadFromURL_RejectsHostnameResolvingToPrivate(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "private/loopback") {
 		t.Fatalf("error %q must mention private/loopback", err)
+	}
+}
+
+// TestLoadFromURL_RejectsHTTPRedirect pins the redirect half of the
+// SSRF guard. Before this guard existed, an attacker-controlled HTTPS
+// origin could return a 302 to http://169.254.169.254/… (cloud IMDS)
+// or any RFC1918 host and the agent's default http.Client would
+// happily follow it — bypassing both the HTTPS scheme check and the
+// initial hostCheck. We assert two properties here:
+//
+//  1. A redirect that downgrades to http:// is rejected.
+//  2. A redirect whose target host resolves to a private/loopback IP
+//     is rejected even though the initial host passed the guard.
+func TestLoadFromURL_RejectsHTTPRedirect(t *testing.T) {
+	// The httptest TLS server's cert SAN is `example.com, *.example.com`,
+	// so we use "example.com" as the initial host (which the cert
+	// validates) and rewrite the dial below to point at the loopback
+	// listener. The redirect targets ("attacker.controlled" and
+	// "internal.invalid") are deliberately different so the
+	// hostCheck stub can tell the initial hop apart from the redirect
+	// hop — only the redirect hop must be rejected.
+	orig := hostCheck
+	hostCheck = func(_ context.Context, host string) error {
+		if host == "example.com" {
+			return nil // initial fetch passes the guard
+		}
+		// Anything else (the redirect target) must be rejected.
+		return errors.New("profile: private/loopback IP not allowed")
+	}
+	t.Cleanup(func() { hostCheck = orig })
+
+	cases := []struct {
+		name        string
+		location    string
+		errContains string
+	}{
+		{
+			name:        "http downgrade",
+			location:    "http://attacker.controlled/anything",
+			errContains: "non-https scheme",
+		},
+		{
+			name:        "redirect to private host",
+			location:    "https://internal.invalid/path",
+			errContains: "private/loopback IP not allowed",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			redirector := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, tc.location, http.StatusFound)
+			}))
+			t.Cleanup(redirector.Close)
+
+			// Use "example.com" so the test cert validates, then
+			// hijack the dial to point at the loopback test server.
+			// This lets us exercise the redirect logic without a real
+			// public endpoint or InsecureSkipVerify.
+			tr := redirector.Client().Transport.(*http.Transport).Clone()
+			tr.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, redirector.Listener.Addr().String())
+			}
+			client := &http.Client{Transport: tr, Timeout: 5 * time.Second}
+
+			_, err := LoadFromURL(context.Background(), client, "https://example.com/profile.json")
+			if err == nil {
+				t.Fatalf("expected redirect to be rejected; got nil")
+			}
+			if !strings.Contains(err.Error(), tc.errContains) {
+				t.Fatalf("error %q must contain %q", err, tc.errContains)
+			}
+		})
+	}
+}
+
+// TestLoadFromURL_RedirectGuardEnforcesChainCap pins the redirect-
+// depth cap. Even when every hop has a "valid" https + non-private
+// target, a deep chain is suspicious and must be cut short — the
+// guard returns an error rather than silently following Go's
+// default 10-hop limit.
+func TestLoadFromURL_RedirectGuardEnforcesChainCap(t *testing.T) {
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	var srv *httptest.Server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Always redirect back to /next so the chain never terminates;
+		// the depth cap (not a redirect loop in net/http) must be what
+		// returns the error.
+		http.Redirect(w, r, srv.URL+"/next", http.StatusFound)
+	})
+	srv = httptest.NewTLSServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := srv.Client()
+	client.Timeout = 5 * time.Second
+
+	_, err := LoadFromURL(context.Background(), client, srv.URL+"/start")
+	if err == nil {
+		t.Fatalf("expected redirect chain to be cut short; got nil")
+	}
+	if !strings.Contains(err.Error(), "redirect chain too long") {
+		t.Fatalf("error %q must mention chain length", err)
 	}
 }
 

@@ -63,7 +63,22 @@ func LoadFromURL(ctx context.Context, client *http.Client, rawURL string) (*Prof
 	}
 
 	if client == nil {
-		client = &http.Client{Timeout: DefaultHTTPTimeout}
+		client = &http.Client{
+			Timeout:       DefaultHTTPTimeout,
+			CheckRedirect: redirectGuard(ctx),
+		}
+	} else if client.CheckRedirect == nil {
+		// Defensive: a caller-supplied client without its own redirect
+		// hook is the common case (config.Load, tests, etc.). Without
+		// this, the Go default follows up to 10 hops with no per-hop
+		// validation — see redirectGuard for the bypass it closes.
+		// We don't overwrite a caller's own CheckRedirect because that
+		// would clobber custom policies (e.g. tests that intentionally
+		// short-circuit redirects); the contract is "this loader
+		// guards redirects unless you bring your own policy".
+		clone := *client
+		clone.CheckRedirect = redirectGuard(ctx)
+		client = &clone
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -144,6 +159,34 @@ func checkProfileHost(ctx context.Context, host string) error {
 		}
 	}
 	return nil
+}
+
+// redirectGuard returns a CheckRedirect function that re-runs the
+// SSRF guard on every hop and rejects scheme downgrades. The default
+// http.Client follows up to 10 redirects with no per-hop validation,
+// so an attacker-controlled HTTPS origin could 302 to
+// http://169.254.169.254/… (cloud IMDS) or any RFC1918 address and
+// the agent would still fire the request — exactly what the initial
+// hostCheck call was meant to prevent.
+//
+// We use the LoadFromURL caller's ctx (rather than req.Context()) so
+// the DNS lookup for the redirect target is bounded by the same
+// deadline that bounds the overall fetch.
+func redirectGuard(ctx context.Context) func(req *http.Request, via []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		// Cap the chain length defensively. Go's default is 10 but we
+		// don't trust attacker-controlled redirects to ever be deep.
+		if len(via) >= 5 {
+			return fmt.Errorf("profile: redirect chain too long (%d hops)", len(via))
+		}
+		if req.URL.Scheme != "https" {
+			return fmt.Errorf("profile: redirect to non-https scheme %q is not allowed", req.URL.Scheme)
+		}
+		if err := hostCheck(ctx, req.URL.Hostname()); err != nil {
+			return err
+		}
+		return nil
+	}
 }
 
 // isBlockedIP reports whether ip falls inside one of the address

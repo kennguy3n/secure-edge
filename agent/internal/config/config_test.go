@@ -353,3 +353,43 @@ func TestDefault_EnforcementModeIsPersonal(t *testing.T) {
 		t.Errorf("Default().EnforcementMode = %q, want \"personal\"", got)
 	}
 }
+
+// TestLoad_RuleUpdatePublicKey ensures the new opt-in field round-trips
+// through the YAML loader. The value is hex-decoded by main.go before
+// being passed to the rules updater; config-layer validation only
+// confirms the key is parsed off the YAML at all.
+func TestLoad_RuleUpdatePublicKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rules-key.yaml")
+	// 64 hex chars = 32 bytes = Ed25519 public key size. The
+	// config layer doesn't actually verify length (main.go does);
+	// pass a realistic value so the test mirrors real usage.
+	content := `rule_update_public_key: "` +
+		"deadbeef00000000000000000000000000000000000000000000000000000000" +
+		"\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	const want = "deadbeef00000000000000000000000000000000000000000000000000000000"
+	if cfg.RuleUpdatePublicKey != want {
+		t.Errorf("RuleUpdatePublicKey = %q, want %q", cfg.RuleUpdatePublicKey, want)
+	}
+}
+
+// TestLoad_RuleUpdatePublicKey_DefaultEmpty pins the backwards-compat
+// default: a deployment that hasn't enabled manifest signing must see
+// an empty key string, which the rules updater treats as "skip
+// verification, log a warning".
+func TestLoad_RuleUpdatePublicKey_DefaultEmpty(t *testing.T) {
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RuleUpdatePublicKey != "" {
+		t.Errorf("default RuleUpdatePublicKey = %q, want empty", cfg.RuleUpdatePublicKey)
+	}
+}

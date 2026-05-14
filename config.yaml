@@ -46,6 +46,17 @@ rule_update_url: ""
 rule_update_interval: 6h
 rules_dir: rules
 
+# Phase 7 / A3 — Ed25519 public key the agent verifies rule-manifest
+# signatures against. When set, an unsigned or mis-signed manifest
+# is rejected before any rule file is downloaded. When left empty,
+# the agent falls back to per-file SHA-256 checks only and logs a
+# one-time warning on the first fetch — kept for backwards
+# compatibility with existing deployments. Sign manifests with
+# `go run ./agent/cmd/sign-rule-manifest -in rules/manifest.json
+# -key <ed25519-priv.hex>`. Recommended for any deployment that
+# pulls rule updates over an untrusted CDN or mirror.
+# rule_update_public_key: ""
+
 # Phase 4 local MITM proxy. proxy_enabled=false (default) leaves the
 # listener stopped — /api/proxy/enable can start it at runtime.
 proxy_listen: "127.0.0.1:8443"

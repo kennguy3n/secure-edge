@@ -185,6 +185,15 @@ type Config struct {
 	// enforced on the browser side. /api/status echoes the mode
 	// so the Electron tray can display the active posture.
 	EnforcementMode string `yaml:"enforcement_mode"`
+
+	// RuleUpdatePublicKey is the hex-encoded Ed25519 public key
+	// used to verify rule-manifest signatures. When set, the rule
+	// updater rejects any manifest whose signature does not
+	// verify. When empty, the updater falls back to per-file
+	// SHA-256 checks only and logs a one-time warning on first
+	// fetch — preserving backwards compatibility with existing
+	// deployments while making the upgrade path opt-in.
+	RuleUpdatePublicKey string `yaml:"rule_update_public_key"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -371,6 +380,9 @@ func merge(defaults, override Config) Config {
 	out.APITokenRequired = override.APITokenRequired
 	if override.EnforcementMode != "" {
 		out.EnforcementMode = override.EnforcementMode
+	}
+	if override.RuleUpdatePublicKey != "" {
+		out.RuleUpdatePublicKey = override.RuleUpdatePublicKey
 	}
 	return out
 }

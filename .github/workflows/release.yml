@@ -222,11 +222,24 @@ jobs:
         run: |
           $bin = "agent-bins/secure-edge-agent-windows-amd64.exe"
           $version = "${{ github.ref_name }}" -replace '^v',''
-          # WiX v4 ships on hosted runners; fall back to dotnet tool restore.
+          # Install the WiX dotnet tool, pinned to v5.0.2 (the last
+          # release in the v4/v5 line before WiX v6 introduced the
+          # Open Source Maintenance Fee EULA — WiX v7 actively rejects
+          # `wix build` runs that have not accepted the OSMF terms with
+          # error WIX7015). v5.0.2 still supports the v4 wxs schema
+          # namespace and the native <Files> element used by
+          # secure-edge.wxs to harvest the rules folder at build time.
+          $wixVersion = '5.0.2'
           if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
-              dotnet tool install --global wix
+              dotnet tool install --global wix --version $wixVersion
               $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+          } else {
+              # Replace any pre-installed image-shipped wix with the
+              # pinned version so the EULA check is deterministic
+              # across runner image rolls.
+              dotnet tool update --global wix --version $wixVersion
           }
+          wix --version
           ./scripts/windows/build-msi.ps1 -AgentExePath $bin -Version $version
 
       - uses: actions/upload-artifact@v4

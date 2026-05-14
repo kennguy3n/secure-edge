@@ -24,6 +24,16 @@ may introduce breaking changes between feature releases.
   from the same file. `api_token_required` toggles enforcement
   between staged (wrong tokens 401, missing header falls through)
   and full (missing header also 401).
+- **A2 follow-up**: Added `api.DefaultAPITokenPath()` in the Go
+  agent so the per-OS default matches the Electron tray's
+  `DEFAULT_API_TOKEN_PATH` byte-for-byte (XDG / Application
+  Support / APPDATA). The agent prints the resolved value as a
+  startup hint when `api_token_path` is empty so operators see
+  exactly what to drop into `config.yaml` to enable bearer-token
+  auth without any further tray configuration. Clarified the
+  `NativeMessagingOptions.APIToken` doc comment to match the
+  actual hello-without-token behaviour (successful reply with the
+  `api_token` field stripped, no protocol-level error).
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

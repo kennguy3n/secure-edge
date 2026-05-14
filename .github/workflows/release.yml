@@ -222,11 +222,24 @@ jobs:
         run: |
           $bin = "agent-bins/secure-edge-agent-windows-amd64.exe"
           $version = "${{ github.ref_name }}" -replace '^v',''
-          # WiX v4 ships on hosted runners; fall back to dotnet tool restore.
+          # Install the WiX dotnet tool, pinned to v5.0.2 (the last
+          # release in the v4/v5 line before WiX v6 introduced the
+          # Open Source Maintenance Fee EULA — WiX v7 actively rejects
+          # `wix build` runs that have not accepted the OSMF terms with
+          # error WIX7015). v5.0.2 still supports the v4 wxs schema
+          # namespace and the native <Files> element used by
+          # secure-edge.wxs to harvest the rules folder at build time.
+          $wixVersion = '5.0.2'
           if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
-              dotnet tool install --global wix
+              dotnet tool install --global wix --version $wixVersion
               $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+          } else {
+              # Replace any pre-installed image-shipped wix with the
+              # pinned version so the EULA check is deterministic
+              # across runner image rolls.
+              dotnet tool update --global wix --version $wixVersion
           }
+          wix --version
           ./scripts/windows/build-msi.ps1 -AgentExePath $bin -Version $version
 
       - uses: actions/upload-artifact@v4
@@ -243,7 +256,20 @@ jobs:
     name: GitHub Release
     needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
     runs-on: ubuntu-latest
+    # id-token + attestations are required for cosign keyless signing and
+    # actions/attest-build-provenance. contents:write was already implied
+    # by the workflow-level permissions block.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
+      # Source checkout is required so anchore/sbom-action can read
+      # agent/go.mod, electron/package-lock.json, and
+      # extension/package-lock.json. The original release job had no
+      # checkout because it only flattened pre-built artefacts.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artefacts
@@ -257,10 +283,147 @@ jobs:
             -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
 
+      # ----------------------------------------------------------------
+      # D1a: release-artifact hardening — SHA256SUMS + SBOM + cosign
+      # keyless + SLSA build provenance. Platform-native code signing
+      # (Apple codesign, Microsoft signtool, dpkg-sig, rpm --addsign,
+      # GPG) is deferred to PR5b once the respective certificates are
+      # provisioned (see PHASES.md:156).
+      # ----------------------------------------------------------------
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: SBOM for Go agent (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./agent
+          format: cyclonedx-json
+          output-file: release/secure-edge-agent.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: SBOM for Electron tray (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./electron
+          format: cyclonedx-json
+          output-file: release/secure-edge-electron.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: SBOM for browser extension (CycloneDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./extension
+          format: cyclonedx-json
+          output-file: release/secure-edge-extension.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate SHA256SUMS
+        working-directory: release
+        run: |
+          # Generate SHA256SUMS over every file currently in release/,
+          # including the just-written SBOMs, but excluding SHA256SUMS
+          # itself AND the .manifest temp file (which is created by this
+          # very pipeline before `find` traverses the directory, and
+          # would otherwise be included in the listing and then removed,
+          # producing a SHA256SUMS line that always fails verification).
+          #
+          # NUL-separated piping (find -print0 | sort -z | xargs -0) is
+          # required because electron-builder's default productName is
+          # 'Secure Edge', so several release artefacts have filenames
+          # containing spaces (e.g. 'Secure Edge Setup 0.1.0.exe',
+          # 'Secure Edge-0.1.0-arm64.dmg'). The previous
+          # `sha256sum -- $(cat .manifest)` invocation word-split on
+          # whitespace and tried to hash 'Secure', 'Edge', 'Setup', ...
+          # as separate files, all of which failed with
+          # 'No such file or directory'.
+          find . -maxdepth 1 -type f \
+            ! -name 'SHA256SUMS' \
+            ! -name '.manifest' \
+            -printf '%f\0' | sort -z > .manifest
+          xargs -0 -a .manifest sha256sum -- > SHA256SUMS
+          rm .manifest
+          echo "--- SHA256SUMS ---"
+          cat SHA256SUMS
+
+      - name: cosign sign-blob each artefact
+        working-directory: release
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          # Sign every artefact in release/ EXCEPT signature/certificate
+          # metadata and SHA256SUMS itself (signed in the next step so it
+          # covers the SBOMs but not the freshly-emitted .sig/.pem files).
+          shopt -s nullglob
+          for f in *; do
+            case "$f" in
+              *.sig|*.pem|SHA256SUMS) continue ;;
+            esac
+            echo "Signing $f"
+            cosign sign-blob \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.pem" \
+              "$f"
+          done
+
+      - name: cosign sign-blob SHA256SUMS
+        working-directory: release
+        env:
+          COSIGN_YES: 'true'
+        run: |
+          # Sign SHA256SUMS after individual artefacts so its sha256 lines
+          # already cover all SBOMs. The .sig/.pem files generated above
+          # are NOT in SHA256SUMS by design — they are individually
+          # verifiable via cosign without the manifest.
+          cosign sign-blob \
+            --output-signature SHA256SUMS.sig \
+            --output-certificate SHA256SUMS.pem \
+            SHA256SUMS
+
+      - name: SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          # Attest the agent binaries, installers, extension/electron
+          # bundles, and SBOMs. We deliberately do NOT attest the cosign
+          # .sig/.pem files (they are themselves signature material) or
+          # the SHA256SUMS manifest (which is already cosign-signed).
+          # Agent binaries are enumerated explicitly per OS/arch so the
+          # `secure-edge-agent-*` wildcard does not over-match the
+          # `secure-edge-agent-<os>-<arch>.sig` / `.pem` files written by
+          # the preceding `cosign sign-blob` step. Installer / bundle
+          # patterns use extension-anchored globs (`*.pkg`, `*.exe`,
+          # `*.cdx.json`, ...) which by construction never match
+          # `<artefact>.sig` / `<artefact>.pem`, so those are safe.
+          subject-path: |
+            release/secure-edge-agent-linux-amd64
+            release/secure-edge-agent-linux-arm64
+            release/secure-edge-agent-darwin-amd64
+            release/secure-edge-agent-darwin-arm64
+            release/secure-edge-agent-windows-amd64.exe
+            release/*.pkg
+            release/*.msi
+            release/*.deb
+            release/*.rpm
+            release/*.dmg
+            release/*.AppImage
+            release/*.exe
+            release/*.zip
+            release/*.xpi
+            release/*.cdx.json
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: release/*
           generate_release_notes: true
+          # Mark D1a dry-run tags (v0.0.0-d1a-dryrun and any other
+          # v0.0.0-* tag) as prereleases so they do not steal the
+          # "Latest" badge on the releases page during validation.
+          prerelease: ${{ contains(github.ref_name, 'dryrun') || startsWith(github.ref_name, 'v0.0.0') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

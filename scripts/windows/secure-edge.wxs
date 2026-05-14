@@ -54,11 +54,15 @@
 
     <ComponentGroup Id="RuleFiles" Directory="RULESFOLDER">
       <!--
-        Rule files are added by `heat dir` at build time and referenced
-        by ComponentGroupRef above. Keeping the harvested file separate
-        avoids manually maintaining hundreds of <File> elements as the
-        rules grow.
+        Rule files are globbed at build time by WiX v4+'s native
+        <Files> element. The previous pipeline used `wix heat dir` to
+        pre-generate a wxs fragment, but heat was removed in WiX v4+
+        and the dotnet `wix` tool installed in CI ships v7. Switching
+        to <Files Include="...\*" /> keeps the manual-maintenance-free
+        property of the old heat invocation without requiring a
+        separate harvest step.
       -->
+      <Files Include="$(var.RulesSourceDir)\*" />
     </ComponentGroup>
 
     <Component Id="ServiceRegistration" Directory="BIN" Guid="*">

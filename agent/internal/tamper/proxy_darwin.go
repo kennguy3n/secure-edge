@@ -8,10 +8,10 @@ import (
 	"strings"
 )
 
-// proxyCheckDarwin shells out to `networksetup -getwebproxy` and
+// platformProxyCheckImpl shells out to `networksetup -getwebproxy` and
 // `-getsecurewebproxy` for the active service. It returns true as
 // soon as either reports expected as Enabled.
-func proxyCheckDarwin(ctx context.Context, expected string) (bool, error) {
+func platformProxyCheckImpl(ctx context.Context, expected string) (bool, error) {
 	host, port, ok := splitHostPort(expected)
 	if !ok {
 		// Fall back to the env-var heuristic so unit tests on

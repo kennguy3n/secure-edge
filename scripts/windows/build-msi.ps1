@@ -1,8 +1,9 @@
 # Build a Secure Edge MSI installer using WiX Toolset.
 #
-# This script is intended to run inside a GitHub Actions
-# `windows-latest` runner (which already ships with WiX) but works on
-# any Windows host with `wix` (v4) or candle/light (v3) on PATH.
+# This script targets WiX v4+ (currently v7 on hosted runners) and
+# uses the native <Files Include="..."> element in secure-edge.wxs to
+# pick up the rules folder, so no separate `heat` harvest step is
+# required (heat was removed in WiX v4).
 #
 # Inputs (environment or parameters):
 #   -AgentExePath  Path to the freshly-built secure-edge-agent.exe.
@@ -17,51 +18,33 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Native commands (wix.exe etc.) propagate non-zero exit codes as
+# terminating errors when this is set, matching $ErrorActionPreference.
+$PSNativeCommandUseErrorActionPreference = $true
 
 if (-not (Test-Path $AgentExePath)) {
     throw "secure-edge-agent.exe not found at: $AgentExePath"
 }
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$buildDir = Join-Path $repoRoot 'build\windows'
 $wxsPath  = Join-Path $PSScriptRoot 'secure-edge.wxs'
 $rulesDir = Join-Path $repoRoot 'rules'
 
-# Stage the rules folder so heat can harvest a stable component group.
-New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 New-Item -ItemType Directory -Force -Path $OutputPath | Out-Null
-$rulesHarvest = Join-Path $buildDir 'rules.wxs'
 
-if (Test-Path $rulesDir) {
-    # `wix heat dir` generates a wxs fragment referencing every rule
-    # file under rules/. The output is wired into RuleFiles by the main
-    # wxs's ComponentGroupRef.
-    wix heat dir $rulesDir `
-        -srd `
-        -gg `
-        -sfrag `
-        -cg RuleFiles `
-        -dr RULESFOLDER `
-        -var var.RulesSourceDir `
-        -out $rulesHarvest
-} else {
-    Set-Content -Path $rulesHarvest -Encoding UTF8 -Value @'
-<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Fragment>
-    <ComponentGroup Id="RuleFiles" />
-  </Fragment>
-</Wix>
-'@
+if (-not (Test-Path $rulesDir)) {
+    throw "rules directory not found at: $rulesDir"
 }
 
 $msiPath = Join-Path $OutputPath "secure-edge-$Version.msi"
 
-wix build $wxsPath $rulesHarvest `
+# No -ext is required: secure-edge.wxs only uses the core WiX schema
+# (Package, ComponentGroup, Files, StandardDirectory, ServiceInstall,
+# ServiceControl) — no util: / fw: / etc. namespace elements.
+wix build $wxsPath `
     -d "ProductVersion=$Version" `
     -d "AgentExePath=$AgentExePath" `
     -d "RulesSourceDir=$rulesDir" `
-    -ext WixToolset.Util.wixext `
     -out $msiPath
 
 Write-Host "Wrote $msiPath"

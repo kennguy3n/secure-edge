@@ -332,11 +332,21 @@ jobs:
           # very pipeline before `find` traverses the directory, and
           # would otherwise be included in the listing and then removed,
           # producing a SHA256SUMS line that always fails verification).
+          #
+          # NUL-separated piping (find -print0 | sort -z | xargs -0) is
+          # required because electron-builder's default productName is
+          # 'Secure Edge', so several release artefacts have filenames
+          # containing spaces (e.g. 'Secure Edge Setup 0.1.0.exe',
+          # 'Secure Edge-0.1.0-arm64.dmg'). The previous
+          # `sha256sum -- $(cat .manifest)` invocation word-split on
+          # whitespace and tried to hash 'Secure', 'Edge', 'Setup', ...
+          # as separate files, all of which failed with
+          # 'No such file or directory'.
           find . -maxdepth 1 -type f \
             ! -name 'SHA256SUMS' \
             ! -name '.manifest' \
-            -printf '%f\n' | sort > .manifest
-          sha256sum -- $(cat .manifest) > SHA256SUMS
+            -printf '%f\0' | sort -z > .manifest
+          xargs -0 -a .manifest sha256sum -- > SHA256SUMS
           rm .manifest
           echo "--- SHA256SUMS ---"
           cat SHA256SUMS

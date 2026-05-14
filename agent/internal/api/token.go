@@ -52,7 +52,22 @@ func DefaultAPITokenPath() string {
 	case "darwin":
 		return filepath.Join(home, "Library", "Application Support", "secure-edge", "api-token")
 	case "windows":
-		if appData := os.Getenv("APPDATA"); appData != "" {
+		// Use LookupEnv (not Getenv) so APPDATA set to "" is honoured
+		// verbatim — the Electron tray's DEFAULT_API_TOKEN_PATH does
+		// `process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming')`
+		// and JavaScript's `??` only falls back on null/undefined, NOT
+		// on empty string. Treating "" as "unset" here (the old
+		// os.Getenv("APPDATA") != "" check) would silently disagree
+		// with the tray when APPDATA is explicitly empty (Go would
+		// fall back to ~/AppData/Roaming, Electron would use the empty
+		// string verbatim) — same byte-identity violation the XDG
+		// branch below was tightened against. APPDATA="" doesn't
+		// occur on real Windows installs (the OS always populates it),
+		// so this is a contract-correctness fix rather than an
+		// operator-visible failure mode, but keeping the two
+		// implementations literally identical is the only sustainable
+		// invariant for a path operators are expected to copy-paste.
+		if appData, ok := os.LookupEnv("APPDATA"); ok {
 			return filepath.Join(appData, "secure-edge", "api-token")
 		}
 		return filepath.Join(home, "AppData", "Roaming", "secure-edge", "api-token")

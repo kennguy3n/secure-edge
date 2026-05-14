@@ -483,3 +483,36 @@ func TestDefaultAPITokenPath_XDGWhitespacePreserved(t *testing.T) {
 		t.Errorf("XDG_CONFIG_HOME=\" \": got %q, want %q (whitespace must be preserved to match Electron)", got, want)
 	}
 }
+
+// TestDefaultAPITokenPath_APPDATAEmptyPreserved pins the byte-identity
+// contract between Go's DefaultAPITokenPath and Electron's
+// DEFAULT_API_TOKEN_PATH on Windows when APPDATA is explicitly set to
+// the empty string.
+//
+// The Electron tray's `process.env.APPDATA ?? path.join(home, …)` only
+// falls back when the value is null/undefined (i.e. the env var is
+// unset); an APPDATA="" set explicitly is kept verbatim, producing a
+// relative path like `secure-edge/api-token`. The agent MUST agree —
+// the older `os.Getenv("APPDATA") != ""` check treated unset and
+// explicit-empty identically and fell back to ~/AppData/Roaming/...,
+// disagreeing with the tray on this corner. The fix is os.LookupEnv,
+// whose `ok` bool mirrors the `set vs unset` distinction `??` makes.
+//
+// APPDATA="" doesn't happen on real Windows installs (the OS always
+// populates it), so this test is contract-correctness only, but it
+// is the only way to keep future maintainers from re-introducing the
+// divergence the older Getenv shape silently encoded.
+//
+// Only runs on windows since the APPDATA branch is gated on
+// runtime.GOOS in DefaultAPITokenPath.
+func TestDefaultAPITokenPath_APPDATAEmptyPreserved(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skipf("APPDATA branch only runs on windows; got %s", runtime.GOOS)
+	}
+	t.Setenv("USERPROFILE", `C:\Users\op`)
+	t.Setenv("APPDATA", "")
+	want := filepath.Join("", "secure-edge", "api-token")
+	if got := DefaultAPITokenPath(); got != want {
+		t.Errorf("APPDATA=\"\": got %q, want %q (empty string must be preserved to match Electron)", got, want)
+	}
+}

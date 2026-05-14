@@ -44,6 +44,23 @@ may introduce breaking changes between feature releases.
   attempt to add the endpoint to `isControlPath` fails at CI
   rather than silently breaking the extension service-worker's
   auth-free poll.
+- **B1**: File upload DLP scanning. The MAIN-world fetch / XHR
+  hook now reads Blob, File, ArrayBuffer, and ArrayBufferView
+  bodies asynchronously (up to `MAX_SCAN_BYTES`), and walks
+  FormData File entries so file uploads are scanned alongside
+  text fields. A new `file-upload-interceptor.ts` content script
+  closes the remaining gap by snooping `<input type="file">`
+  change events and file-drop events at capture phase. The
+  interceptor suppresses the gesture SYNCHRONOUSLY before any
+  await (`preventDefault` / `stopPropagation` /
+  `stopImmediatePropagation` / clearing `input.value`) so the
+  page's own handlers never see the file; the scan runs after to
+  drive the toast UX. Clean scans do not resume the gesture
+  (re-injecting a `File` into `input.files` / a drop target is
+  not portable across browsers). ReadableStream bodies still
+  fall open (no safe tee without rewriting `init.body`); the
+  agent-unavailable + oversize policy hooks from C2 cover the
+  fall-open path in managed mode.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

@@ -7,7 +7,7 @@
 // The toast displays the matched pattern *name* only — never the
 // matched content — and disappears after NOTIFICATION_TTL_MS.
 
-export type BlockedKind = "paste" | "submission" | "request" | "drop" | "clipboard";
+export type BlockedKind = "paste" | "submission" | "request" | "drop" | "clipboard" | "upload";
 
 const NOTIFICATION_TTL_MS = 5000;
 const TOAST_ID = "secure-edge-blocked-toast";

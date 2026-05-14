@@ -455,3 +455,31 @@ func TestDefaultAPITokenPath_EmptyHomeReturnsEmpty(t *testing.T) {
 		t.Errorf("with empty home env, got %q, want \"\"", got)
 	}
 }
+
+// TestDefaultAPITokenPath_XDGWhitespacePreserved pins the byte-identity
+// contract between Go's DefaultAPITokenPath and Electron's
+// DEFAULT_API_TOKEN_PATH for whitespace-only XDG_CONFIG_HOME values.
+//
+// The Electron tray treats $XDG_CONFIG_HOME as "set" whenever the
+// string has non-zero length (a plain `xdg && xdg.length > 0` check)
+// and joins it into the path verbatim. The agent MUST agree: a prior
+// strings.TrimSpace here would silently fall back to ~/.config when
+// the env value was whitespace-only, while the tray would still
+// resolve to the whitespace-prefixed path — exactly the
+// agent-and-tray-look-at-different-files failure the helper exists
+// to prevent.
+//
+// This test only runs on Linux/*bsd since the XDG branch is gated on
+// runtime.GOOS in DefaultAPITokenPath; on darwin/windows the env
+// variable is not consulted.
+func TestDefaultAPITokenPath_XDGWhitespacePreserved(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("XDG_CONFIG_HOME branch only runs on linux/*bsd; got %s", runtime.GOOS)
+	}
+	t.Setenv("HOME", "/home/op")
+	t.Setenv("XDG_CONFIG_HOME", " ")
+	want := filepath.Join(" ", "secure-edge", "api-token")
+	if got := DefaultAPITokenPath(); got != want {
+		t.Errorf("XDG_CONFIG_HOME=\" \": got %q, want %q (whitespace must be preserved to match Electron)", got, want)
+	}
+}

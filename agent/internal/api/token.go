@@ -58,7 +58,17 @@ func DefaultAPITokenPath() string {
 		return filepath.Join(home, "AppData", "Roaming", "secure-edge", "api-token")
 	default:
 		// XDG Base Directory: $XDG_CONFIG_HOME or ~/.config.
-		if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
+		// No TrimSpace on the env value — the Electron tray's
+		// DEFAULT_API_TOKEN_PATH (electron/main.ts) does a plain
+		// length check (`xdg && xdg.length > 0`) and the two
+		// computations are documented to stay byte-identical so
+		// the agent's startup-hint output and the tray's runtime
+		// discovery resolve to the same file. Trimming here would
+		// silently disagree on whitespace-only XDG_CONFIG_HOME
+		// values (Go would fall back to ~/.config/, Electron would
+		// use the whitespace string verbatim) — exactly the
+		// failure mode the helper was added to prevent.
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 			return filepath.Join(xdg, "secure-edge", "api-token")
 		}
 		return filepath.Join(home, ".config", "secure-edge", "api-token")

@@ -4,3 +4,4 @@
 .claude.ai
 .gemini.google.com
 .copilot.microsoft.com
+.chatgpt.com

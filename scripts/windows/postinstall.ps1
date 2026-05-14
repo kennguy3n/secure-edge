@@ -30,7 +30,7 @@ try {
 }
 
 try {
-    & (Join-Path $PSScriptRoot 'configure-dns.ps1') -Action apply
+    & (Join-Path $PSScriptRoot 'configure-dns.ps1') -Mode apply
     Write-Log 'postinstall: DNS applied'
 } catch {
     Write-Log "postinstall: configure-dns apply failed: $_"

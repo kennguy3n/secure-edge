@@ -353,6 +353,11 @@ func run(configPath string) error {
 				cfg.DLPPatternsPath, cfg.DLPExclusionsPath); err != nil {
 				return fmt.Errorf("rule_update_url is set but %w", err)
 			}
+			// Forward-declared so the Reload closure below can
+			// reach the freshly-built updater without a circular
+			// reference. Assigned to the real updater once
+			// rules.New() succeeds.
+			var updaterRef *rules.Updater
 			updater, err := rules.New(rules.Options{
 				ManifestURL:  cfg.RuleUpdateURL,
 				PollInterval: cfg.RuleUpdateInterval,
@@ -374,12 +379,27 @@ func run(configPath string) error {
 						}
 					}
 					pipeline.Rebuild(p, ex)
+					// Refresh the Tier-2 host list surfaced through
+					// GET /api/rules/status. The extension polls that
+					// endpoint to keep its content_scripts.matches in
+					// sync with the agent's resolved AllowWithDLP set,
+					// so a rule push that adds / removes Tier-2 hosts
+					// has to be reflected here as well as in the engine.
+					if updaterRef != nil {
+						updaterRef.SetTier2Hosts(engine.Tier2Hosts())
+					}
 					return nil
 				},
 			})
 			if err != nil {
 				return fmt.Errorf("build updater: %w", err)
 			}
+			updaterRef = updater
+			// Seed the Tier-2 host list once at startup so the very
+			// first GET /api/rules/status the extension makes returns
+			// a populated list, even if the rule manifest hasn't
+			// polled yet.
+			updater.SetTier2Hosts(engine.Tier2Hosts())
 			apiServer.SetRuleUpdater(updater)
 			go updater.Start(ctx)
 		}

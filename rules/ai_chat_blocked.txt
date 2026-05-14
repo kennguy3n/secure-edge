@@ -8,3 +8,17 @@
 .character.ai
 .pi.ai
 .bard.google.com
+.grok.com
+.x.ai
+.mistral.ai
+.chat.mistral.ai
+.together.ai
+.groq.com
+.openrouter.ai
+.jan.ai
+.lmsys.org
+.chat.lmsys.org
+.aistudio.google.com
+.notebooklm.google.com
+.cohere.com
+.dashboard.cohere.com

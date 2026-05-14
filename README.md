@@ -238,6 +238,19 @@ so the Safari port uses the HTTP fallback exclusively; the agent's CORS
 allowlist accepts `chrome-extension://`, `moz-extension://`, and
 `safari-web-extension://` origins.
 
+> **Enforcement boundary.** The browser extension provides best-effort
+> DLP coaching for interactive AI tool usage — it patches `fetch` /
+> `XMLHttpRequest` in the page's MAIN world and signals intent over
+> `window.postMessage`, which the page itself can observe and ignore.
+> Treat the extension as a usability layer, not a hard enforcement
+> boundary. For hard enforcement (mandatory, page-script-resistant
+> inspection of outbound traffic), enable the local MITM proxy
+> (`POST /api/proxy/enable`) so Tier-2 traffic is decrypted and
+> inspected outside the page's reach, or deploy managed browser
+> policies (e.g. Chrome Enterprise `URLBlocklist`,
+> `ManagedConfigurationPerOrigin`, or Firefox enterprise policies) to
+> restrict which AI domains the browser can reach in the first place.
+
 ## Enterprise Features (Phase 5)
 
 Optional features for managed deployments — every one of them
@@ -304,22 +317,17 @@ for the DLP pipeline, DNS resolver, and stats counter live in
 
 ## DLP Coverage
 
-Secure Edge ships **139** real-world detection patterns across **20**
-categories: cloud providers (AWS, Azure, GCP, Google Services),
-cloud infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify,
-Supabase, Pulumi, Helm, Terraform, Docker, K8s), version control
-(GitHub, GitLab, Bitbucket), AI/ML platforms (OpenAI, Anthropic,
-HuggingFace, Cohere, Replicate, Pinecone, Mistral, W&B, LangSmith,
-Together, Groq), payment processors (Stripe, PayPal, Square,
-Braintree, Adyen, Plaid, Coinbase), CI/CD (CircleCI, Travis,
-Jenkins), messaging (Slack, Discord, Telegram, Twilio, SendGrid,
-Vonage, Mailchimp), auth/identity (Auth0, Okta, OneLogin, Keycloak,
-Firebase Admin, Supabase JWT, Clerk), language ecosystems (Java,
-Rust, JS/TS, Swift, Kotlin, Dart, Go, Python), mobile (iOS APNs,
-Android signing, Flutter / React Native), databases (Postgres,
-MySQL, MongoDB, Redis, MSSQL, SQLite, Cassandra, Elasticsearch),
-PEM/private keys, JWTs, generic password-in-code, and PII (SSN,
-credit cards, emails, phones).
+Secure Edge ships **163** real-world detection patterns across **13**
+categories (counted directly from `rules/dlp_patterns.json`): cloud
+providers (`cloud`), cloud infrastructure (`infra_secret`), code-hosting
+and version-control tokens (`code_secret`), AI/ML platforms (`ai_ml`),
+payment processors (`payments`), CI/CD pipelines (`ci_cd`), messaging
+and notification services (`messaging`), auth/identity (`auth`),
+package-manager and language-ecosystem tokens (`package_manager`),
+mobile / desktop signing material (`mobile_desktop`), database and
+registry credentials (`database_registry`), infrastructure-as-code
+provider tokens (`iac`), and PII (`pii`, including SSN, credit cards,
+emails, and phones).
 
 See [SECURITY_RULES.md](./SECURITY_RULES.md) for the complete per-pattern
 table (name, severity, prefix, hotword requirement).

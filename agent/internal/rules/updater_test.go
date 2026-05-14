@@ -565,3 +565,57 @@ func TestUpdater_StartCallsInitialCheck(t *testing.T) {
 // Mute unused import on systems where filepath is not referenced
 // anywhere else; this is required by some -lint passes.
 var _ = fmt.Sprintf
+
+// TestStatus_JSONShape pins the GET /api/rules/status JSON contract
+// for the extension's dynamic-hosts updater. The extension reads
+// `rule_version` and `tier2_hosts`; the original Electron tray reads
+// `current_version`. All three keys must be present, with the
+// rule_version mirroring current_version and tier2_hosts always being
+// a JSON array (never `null`) so the extension's
+// `body?.tier2_hosts ?? []` doesn't quietly mask a regression.
+func TestStatus_JSONShape(t *testing.T) {
+	u, err := New(Options{
+		ManifestURL: "https://example.test/manifest.json",
+		RulesDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Zero-value: no tier2 hosts seeded, no manifest fetched yet.
+	raw, err := json.Marshal(u.Status())
+	if err != nil {
+		t.Fatalf("marshal zero status: %v", err)
+	}
+	asMap := map[string]any{}
+	if err := json.Unmarshal(raw, &asMap); err != nil {
+		t.Fatalf("unmarshal zero status: %v", err)
+	}
+	for _, key := range []string{"current_version", "rule_version", "tier2_hosts", "update_url", "last_check", "next_check"} {
+		if _, ok := asMap[key]; !ok {
+			t.Errorf("status missing key %q (got %v)", key, asMap)
+		}
+	}
+	if got := asMap["tier2_hosts"]; got == nil {
+		t.Errorf("tier2_hosts is null; extension expects empty array, got %v", got)
+	}
+
+	// After SetTier2Hosts the list should round-trip through the
+	// JSON encoder and the two version fields should agree.
+	hosts := []string{"chatgpt.com", "claude.ai"}
+	u.SetTier2Hosts(hosts)
+	st := u.Status()
+	if st.CurrentVersion != st.RuleVersion {
+		t.Errorf("CurrentVersion=%q, RuleVersion=%q; must match", st.CurrentVersion, st.RuleVersion)
+	}
+	if len(st.Tier2Hosts) != len(hosts) {
+		t.Fatalf("Tier2Hosts = %v, want %v", st.Tier2Hosts, hosts)
+	}
+
+	// Mutating the input slice after SetTier2Hosts must not leak
+	// into the updater's stored list — the spec calls for a copy.
+	hosts[0] = "evil.example"
+	if u.Status().Tier2Hosts[0] == "evil.example" {
+		t.Fatal("SetTier2Hosts must copy its input")
+	}
+}

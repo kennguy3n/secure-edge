@@ -171,24 +171,56 @@ export function patchXHR(
 }
 
 /** Pull a string body out of fetch()'s argument tuple. Returns "" when
- *  the body is not extractable (FormData / Blob / ReadableStream). */
+ *  the body is not extractable (Blob / ReadableStream / ArrayBuffer —
+ *  see comment in `bodyValueToText`). */
 export function extractFetchBody(args: Parameters<typeof fetch>): string {
     const init = args[1];
     if (!init || init.body === undefined || init.body === null) return "";
-    const body = init.body;
-    if (typeof body === "string") return body;
-    if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {
-        return body.toString();
-    }
-    return "";
+    return bodyValueToText(init.body);
 }
 
 /** Convert an XHR body argument into a scannable string. */
 export function bodyToText(body: unknown): string {
     if (body === undefined || body === null) return "";
+    return bodyValueToText(body);
+}
+
+/** Shared body → text converter for the fetch and XHR hooks.
+ *
+ *  Supported synchronously:
+ *    - string         → returned as-is
+ *    - URLSearchParams → form-encoded
+ *    - FormData       → text fields only, encoded as `k=v&k=v` so the
+ *                       scanner sees both keys and values (file fields
+ *                       are intentionally skipped — uploading a file
+ *                       is a separate exfil path that needs its own
+ *                       hook, and reading the file would block the
+ *                       page).
+ *
+ *  Intentionally unsupported (returns ""):
+ *    - Blob, File, ArrayBuffer, ArrayBufferView, ReadableStream
+ *      Reading these requires an async path (Blob.text(),
+ *      reader.read()) and the fetch / XHR hook runs synchronously to
+ *      decide whether to block. Pulling the body asynchronously would
+ *      either let the request through unscanned or require
+ *      restructuring the hook to suspend fetch — both are larger
+ *      changes than the P1-5 scope.
+ */
+function bodyValueToText(body: unknown): string {
     if (typeof body === "string") return body;
     if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {
         return body.toString();
+    }
+    if (typeof FormData !== "undefined" && body instanceof FormData) {
+        const parts: string[] = [];
+        body.forEach((value, key) => {
+            // value is a string for text fields; File / Blob entries
+            // are skipped because reading them is async (see above).
+            if (typeof value === "string") {
+                parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+            }
+        });
+        return parts.join("&");
     }
     return "";
 }

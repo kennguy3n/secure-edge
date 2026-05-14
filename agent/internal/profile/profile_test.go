@@ -91,7 +91,15 @@ func TestLoadFromFile(t *testing.T) {
 }
 
 func TestLoadFromURL(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// httptest.NewTLSServer binds to 127.0.0.1, which the production
+	// SSRF guard rejects. Stub the hook out for the duration of this
+	// test so we can exercise the happy / error paths through HTTPS
+	// without standing up a non-loopback TLS endpoint.
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/ok":
 			w.Header().Set("Content-Type", "application/json")
@@ -135,6 +143,96 @@ func TestLoadFromURL(t *testing.T) {
 	}
 	if _, err := LoadFromURL(ctx, srv.Client(), "ftp://example.com/p.json"); err == nil {
 		t.Fatalf("expected error on non-http scheme")
+	}
+}
+
+// TestLoadFromURL_RejectsHTTPScheme pins the P0-2 HTTPS-only guard.
+// A profile document is a load-bearing security artefact (it can flip
+// the agent into managed mode, lock the device, and rewrite category
+// policies) and must not be subject to in-flight modification by a
+// network attacker. A plain http:// scheme is rejected unconditionally.
+func TestLoadFromURL_RejectsHTTPScheme(t *testing.T) {
+	orig := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = orig })
+
+	cases := []string{
+		"http://mdm.example.com/profile.json",
+		"http://127.0.0.1/profile.json",
+		"http://[::1]/profile.json",
+	}
+	for _, rawURL := range cases {
+		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		if err == nil {
+			t.Errorf("%s: expected scheme error, got nil", rawURL)
+			continue
+		}
+		if !strings.Contains(err.Error(), "https") {
+			t.Errorf("%s: error %q must mention https", rawURL, err)
+		}
+	}
+}
+
+// TestLoadFromURL_RejectsPrivateOrLoopbackHosts pins the P0-2 SSRF
+// guard. A managed profile is fetched on agent startup as well as on
+// every rule update; without this guard a hostile `profile_url` (or a
+// fleet operator whose own MDM has been compromised) could trick the
+// agent into talking to internal services on the same host or LAN.
+//
+// We exercise literal IP rejection here so the test doesn't depend on
+// the host's DNS being able to resolve a public name; the resolver
+// path is covered by TestLoadFromURL_RejectsHostnameResolvingToPrivate.
+func TestLoadFromURL_RejectsPrivateOrLoopbackHosts(t *testing.T) {
+	cases := []string{
+		"https://127.0.0.1/profile.json",
+		"https://127.1.2.3/profile.json",
+		"https://[::1]/profile.json",
+		"https://10.0.0.1/profile.json",
+		"https://10.255.255.255/profile.json",
+		"https://172.16.0.1/profile.json",
+		"https://172.31.255.254/profile.json",
+		"https://192.168.0.1/profile.json",
+		"https://192.168.255.254/profile.json",
+		"https://169.254.169.254/profile.json", // AWS / Azure IMDS
+		"https://[fc00::1]/profile.json",       // unique-local IPv6
+		"https://[fe80::1]/profile.json",       // link-local IPv6
+		"https://0.0.0.0/profile.json",
+		"https://[::]/profile.json",
+	}
+	for _, rawURL := range cases {
+		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		if err == nil {
+			t.Errorf("%s: expected SSRF rejection, got nil", rawURL)
+			continue
+		}
+		if !strings.Contains(err.Error(), "private/loopback") {
+			t.Errorf("%s: error %q must mention private/loopback", rawURL, err)
+		}
+	}
+}
+
+// TestLoadFromURL_RejectsHostnameResolvingToPrivate exercises the
+// resolver branch of the SSRF guard: a benign-looking hostname whose
+// DNS resolution happens to return a loopback / RFC1918 address is
+// still rejected. This is the DNS-rebinding flavour of SSRF — without
+// it, a public hostname could legitimately return 127.0.0.1 and the
+// agent would happily POST a profile fetch through localhost.
+func TestLoadFromURL_RejectsHostnameResolvingToPrivate(t *testing.T) {
+	origResolver := profileResolver
+	profileResolver = func(_ context.Context, host string) ([]string, error) {
+		if host == "mdm-rebinder.example.com" {
+			return []string{"127.0.0.1"}, nil
+		}
+		return nil, errors.New("unexpected host")
+	}
+	t.Cleanup(func() { profileResolver = origResolver })
+
+	_, err := LoadFromURL(context.Background(), nil, "https://mdm-rebinder.example.com/profile.json")
+	if err == nil {
+		t.Fatalf("expected SSRF rejection for hostname resolving to 127.0.0.1, got nil")
+	}
+	if !strings.Contains(err.Error(), "private/loopback") {
+		t.Fatalf("error %q must mention private/loopback", err)
 	}
 }
 

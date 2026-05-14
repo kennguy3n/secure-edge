@@ -85,9 +85,9 @@ and supply-chain provenance **before** running any installer:
 | `SHA256SUMS`                      | SHA-256 of every other file in the release.                      |
 | `SHA256SUMS.sig` / `.pem`         | Sigstore keyless signature + certificate over `SHA256SUMS`.      |
 | `<artefact>.sig` / `.pem`         | Sigstore keyless signature + certificate over each artefact.     |
-| `secure-edge-agent.cdx.json`      | CycloneDX 1.5 SBOM for the Go agent.                             |
-| `secure-edge-electron.cdx.json`   | CycloneDX 1.5 SBOM for the Electron tray app.                    |
-| `secure-edge-extension.cdx.json`  | CycloneDX 1.5 SBOM for the browser extension.                    |
+| `secure-edge-agent.cdx.json`      | CycloneDX SBOM for the Go agent (produced by syft).              |
+| `secure-edge-electron.cdx.json`   | CycloneDX SBOM for the Electron tray app (produced by syft).     |
+| `secure-edge-extension.cdx.json`  | CycloneDX SBOM for the browser extension (produced by syft).     |
 
 In addition, each artefact has a SLSA Build Level 3 provenance
 attestation stored in GitHub's [attestation store][gh-attest] and

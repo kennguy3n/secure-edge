@@ -92,7 +92,7 @@ may introduce breaking changes between feature releases.
   every release: a `SHA256SUMS` manifest of every artefact; per-
   artefact and SHA256SUMS-level Sigstore keyless signatures
   (`.sig` + `.pem`) issued under the workflow's GitHub OIDC
-  identity (no maintainer-held private keys); CycloneDX 1.5 SBOMs
+  identity (no maintainer-held private keys); CycloneDX 1.6 SBOMs
   for the Go agent, Electron tray, and browser extension; and a
   SLSA Build Level 3 provenance attestation via
   `actions/attest-build-provenance@v2`. `SECURITY.md` gains a new
@@ -103,6 +103,25 @@ may introduce breaking changes between feature releases.
   (Apple Developer ID, Windows Authenticode, Linux GPG) remains
   deferred to D1b until the respective certificates are provisioned
   (`PHASES.md:156`).
+
+  Adjacent release-pipeline fixes uncovered while validating the
+  D1a signing workflow end-to-end (the first time `release.yml`
+  ran on a tag push to completion): refactored
+  `agent/internal/tamper/proxy_check.go` from a `switch
+  runtime.GOOS` against per-platform stubs into a per-platform
+  dispatch (`proxyCheckImpl` in each `proxy_{darwin,windows,other}.go`
+  under its own build tag) so the agent cross-compiles cleanly for
+  darwin and windows targets; added `homepage` + `author{name,email}`
+  to `electron/package.json` for electron-builder Linux `.deb`
+  packaging; set `directories.output: dist-electron` and a dotless
+  `artifactName` in `electron/electron-builder.yml` so installer
+  filenames survive GitHub's release-upload "spaces→dots"
+  normalisation; replaced WiX v3 `heat dir` with the native v4+
+  `<Files Include="…">` element in `scripts/windows/secure-edge.wxs`
+  and pinned the WiX dotnet tool to v5.0.2 (the last release before
+  v6's Open Source Maintenance Fee EULA gate); and switched the
+  `SHA256SUMS` pipeline to NUL-separated piping so artefacts whose
+  names contain spaces hash correctly.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

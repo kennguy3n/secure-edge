@@ -105,12 +105,31 @@ async function baseURL(): Promise<string> {
   return DEFAULT_BASE;
 }
 
+// authHeader resolves the optional per-install API capability token
+// (work item A2) via the Electron preload bridge. When no bridge or
+// no token exists we return an empty object — the agent's pre-A2
+// build then accepts the request based on origin alone, and a post-
+// A2 build with api_token_required=true correctly returns 401.
+async function authHeader(): Promise<Record<string, string>> {
+  if (typeof window === 'undefined' || !window.secureEdge?.getAPIToken) {
+    return {};
+  }
+  try {
+    const token = await window.secureEdge.getAPIToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${await baseURL()}${path}`;
+  const auth = await authHeader();
   const res = await fetch(url, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...auth,
       ...(init?.headers ?? {}),
     },
   });

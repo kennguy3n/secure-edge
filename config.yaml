@@ -64,3 +64,28 @@ proxy_pinning_bypass: []
 # Agent self-update. Both fields are required to enable.
 # agent_update_manifest_url: ""
 # agent_update_public_key: ""
+
+# A1: allowed extension IDs for control-path callers. When non-empty
+# the local API server only honours chrome-extension:// / moz-extension:// /
+# safari-web-extension:// origins whose ID appears in this list for
+# state-changing endpoints. An empty list keeps the legacy "any
+# installed extension" behaviour and logs a startup warning.
+# allowed_extension_ids:
+#   - your-chrome-extension-id
+#   - 01234567-89ab-cdef-0123-456789abcdef
+
+# A2: per-install API capability token.
+#
+# api_token_path is the on-disk location where the agent persists a
+# crypto/rand 32-byte hex token (created with mode 0600 if missing).
+# The Electron tray and the browser extension read that file (the
+# extension over Native Messaging "hello") and attach it as
+# "Authorization: Bearer <token>" on every API call.
+#
+# api_token_required gates enforcement: when false the middleware
+# runs in staged mode (wrong tokens are rejected with 401, missing
+# headers fall through to origin-based auth) so operators can roll
+# out the matching Electron / extension builds before flipping the
+# knob to true. Leave api_token_path empty to disable the feature.
+# api_token_path: ""
+# api_token_required: false

@@ -25,12 +25,23 @@ interface PendingRequest {
 interface NativeMessage {
     id?: number;
     result?: ScanResult;
+    // api_token is populated on a successful "hello" reply (work
+    // item A2). Empty / undefined means "agent did not provide a
+    // token" and the extension falls back to its pre-A2 HTTP
+    // posture (no Authorization header).
+    api_token?: string;
     error?: string;
+}
+
+interface PendingHello {
+    resolve: (token: string | null) => void;
+    timer: ReturnType<typeof setTimeout>;
 }
 
 let port: chrome.runtime.Port | null = null;
 let nextId = 1;
 const pending = new Map<number, PendingRequest>();
+const pendingHello = new Map<number, PendingHello>();
 let portUnsupported = false;
 
 function ensurePort(): chrome.runtime.Port | null {
@@ -50,6 +61,26 @@ function ensurePort(): chrome.runtime.Port | null {
     port.onMessage.addListener((raw: unknown) => {
         const msg = raw as NativeMessage;
         if (typeof msg.id !== "number") return;
+        // Hello replies are routed first because their id space is
+        // shared with scans — a hello reply with a matching id
+        // would otherwise be silently discarded by the scan path.
+        const helloReq = pendingHello.get(msg.id);
+        if (helloReq) {
+            pendingHello.delete(msg.id);
+            clearTimeout(helloReq.timer);
+            if (msg.error) {
+                helloReq.resolve(null);
+                return;
+            }
+            // An empty string from the agent means "no token
+            // configured" — surface that as null so callers can
+            // distinguish "feature off" from "have a token".
+            const token = typeof msg.api_token === "string" && msg.api_token.length > 0
+                ? msg.api_token
+                : null;
+            helloReq.resolve(token);
+            return;
+        }
         const req = pending.get(msg.id);
         if (!req) return;
         pending.delete(msg.id);
@@ -67,6 +98,11 @@ function ensurePort(): chrome.runtime.Port | null {
             r.resolve(null);
         }
         pending.clear();
+        for (const r of pendingHello.values()) {
+            clearTimeout(r.timer);
+            r.resolve(null);
+        }
+        pendingHello.clear();
     });
     return port;
 }
@@ -93,6 +129,32 @@ export function scanViaNativeMessaging(content: string): Promise<ScanResult | nu
     });
 }
 
+/** Send a "hello" handshake to the Native Messaging host and
+ *  resolve with the per-install API capability token the agent
+ *  hands back (work item A2). Returns null when the host is
+ *  unavailable, replies with an error, replies with an empty token,
+ *  or exceeds REQUEST_TIMEOUT_MS. Never throws. The token returned
+ *  here is then attached as "Authorization: Bearer <token>" on the
+ *  service worker's HTTP fallback path. */
+export function helloViaNativeMessaging(): Promise<string | null> {
+    const p = ensurePort();
+    if (!p) return Promise.resolve(null);
+    const id = nextId++;
+    return new Promise<string | null>((resolve) => {
+        const timer = setTimeout(() => {
+            if (pendingHello.delete(id)) resolve(null);
+        }, REQUEST_TIMEOUT_MS);
+        pendingHello.set(id, { resolve, timer });
+        try {
+            p.postMessage({ id, kind: "hello" });
+        } catch {
+            pendingHello.delete(id);
+            clearTimeout(timer);
+            resolve(null);
+        }
+    });
+}
+
 /** Test-only helpers. Reset the singleton state between cases. */
 export const __test__ = {
     reset(): void {
@@ -104,6 +166,12 @@ export const __test__ = {
             r.resolve(null);
         }
         pending.clear();
+        for (const r of pendingHello.values()) {
+            clearTimeout(r.timer);
+            r.resolve(null);
+        }
+        pendingHello.clear();
     },
     pendingSize: (): number => pending.size,
+    pendingHelloSize: (): number => pendingHello.size,
 };

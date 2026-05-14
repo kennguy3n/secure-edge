@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -364,5 +365,76 @@ func TestCanonicalForSigning_StableAcrossSigningAndVerifying(t *testing.T) {
 	}
 	if !ed25519.Verify(pub, again, sig) {
 		t.Fatalf("verify failed on round-tripped canonical body")
+	}
+}
+
+// TestManifestBody_MirrorsManifestMinusSignature locks in the
+// invariant that the dedicated `manifestBody` struct used by
+// CanonicalForSigning has exactly the same fields as Manifest,
+// in the same order, with the same JSON tags, minus the Signature
+// field. If a future contributor adds a new field to Manifest
+// without mirroring it on manifestBody, this test fails — making
+// the silent-canonical-form-drift footgun unreachable.
+func TestManifestBody_MirrorsManifestMinusSignature(t *testing.T) {
+	mt := reflect.TypeOf(Manifest{})
+	bt := reflect.TypeOf(manifestBody{})
+
+	// Build a slice of (name, type, jsonTag) for every field in
+	// Manifest that is NOT the Signature field.
+	type field struct {
+		Name string
+		Type reflect.Type
+		Tag  string
+	}
+	var want []field
+	for i := 0; i < mt.NumField(); i++ {
+		f := mt.Field(i)
+		if f.Name == "Signature" {
+			continue
+		}
+		want = append(want, field{
+			Name: f.Name,
+			Type: f.Type,
+			Tag:  f.Tag.Get("json"),
+		})
+	}
+
+	if bt.NumField() != len(want) {
+		t.Fatalf("manifestBody has %d fields; expected %d (Manifest minus Signature). "+
+			"Did you add a field to Manifest without mirroring it on manifestBody?",
+			bt.NumField(), len(want))
+	}
+	for i, w := range want {
+		got := bt.Field(i)
+		if got.Name != w.Name || got.Type != w.Type || got.Tag.Get("json") != w.Tag {
+			t.Fatalf("manifestBody field %d = {%s, %s, json=%q}; want {%s, %s, json=%q}. "+
+				"Field order and JSON tags MUST match Manifest exactly so existing "+
+				"signatures over the canonical form remain valid.",
+				i, got.Name, got.Type, got.Tag.Get("json"),
+				w.Name, w.Type, w.Tag)
+		}
+	}
+}
+
+// TestCanonicalForSigning_BytesUnchangedByRefactor pins the exact
+// canonical byte sequence so we'd notice if the refactor (or any
+// future change) accidentally altered the bytes a previously-valid
+// signature was computed over. Updating this test means breaking
+// every previously-signed manifest in the wild — do not change the
+// expected literal lightly.
+func TestCanonicalForSigning_BytesUnchangedByRefactor(t *testing.T) {
+	body, err := CanonicalForSigning(Manifest{
+		Version: "1.2.3",
+		Files: []ManifestFile{
+			{Name: "a.txt", SHA256: strings.Repeat("0", 64)},
+		},
+		Signature: "any-signature-here-must-not-affect-bytes",
+	})
+	if err != nil {
+		t.Fatalf("CanonicalForSigning: %v", err)
+	}
+	want := `{"version":"1.2.3","files":[{"name":"a.txt","sha256":"` + strings.Repeat("0", 64) + `"}]}`
+	if string(body) != want {
+		t.Fatalf("canonical bytes drifted:\n  got:  %s\n  want: %s", body, want)
 	}
 }

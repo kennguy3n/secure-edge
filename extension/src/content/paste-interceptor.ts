@@ -12,14 +12,13 @@
 // user's workflow. The popup surfaces an offline indicator.
 
 import {
+    MAX_SCAN_BYTES,
     ensureEnforcementModeBootstrapped,
     policyForOversize,
     policyForUnavailable,
     scanContent,
 } from "./scan-client.js";
 import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
-
-const MAX_PASTE_BYTES = 1 * 1024 * 1024; // 1 MiB.
 
 if (typeof document !== "undefined") {
     // Kick off a single enforcement-mode fetch on first script load so
@@ -36,7 +35,7 @@ export async function onPaste(ev: ClipboardEvent): Promise<void> {
     const text = data.getData("text/plain");
     if (!text || text.length === 0) return;
 
-    if (text.length > MAX_PASTE_BYTES) {
+    if (text.length > MAX_SCAN_BYTES) {
         // Oversize handling depends on the enforcement mode. In
         // personal/team mode the paste proceeds silently (current
         // behaviour); in managed mode we block + surface a policy

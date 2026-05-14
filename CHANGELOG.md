@@ -34,6 +34,16 @@ may introduce breaking changes between feature releases.
   `NativeMessagingOptions.APIToken` doc comment to match the
   actual hello-without-token behaviour (successful reply with the
   `api_token` field stripped, no protocol-level error).
+- **C2 follow-up**: `paste-interceptor.ts` now reuses the shared
+  `MAX_SCAN_BYTES` constant instead of its own local
+  `MAX_PASTE_BYTES`. The two were already 1 MiB so this is not a
+  behavioural change, but it removes the only remaining interceptor
+  that could drift from the shared threshold a future PR might
+  retune. Pinned `/api/config/enforcement-mode` in
+  `TestCORS_AIPageOriginsAllowedOnReadEndpoints` so a future
+  attempt to add the endpoint to `isControlPath` fails at CI
+  rather than silently breaking the extension service-worker's
+  auth-free poll.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

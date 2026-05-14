@@ -1174,6 +1174,15 @@ func TestCORS_AIPageOriginsAllowedOnReadEndpoints(t *testing.T) {
 		{http.MethodGet, "/api/tamper/status"},
 		{http.MethodGet, "/api/rules/status"},
 		{http.MethodGet, "/api/policies"},
+		// /api/config/enforcement-mode is intentionally outside
+		// isControlPath because the response is one of three enum
+		// strings — no scoring thresholds, no classifier mappings —
+		// and AI pages already learn agent reachability empirically.
+		// Pinning it here prevents a future "tighten everything"
+		// change from quietly demoting the read endpoint to a
+		// control path and breaking the extension service-worker's
+		// auth-free poll (`service-worker.ts: fetchEnforcementMode`).
+		{http.MethodGet, "/api/config/enforcement-mode"},
 		{http.MethodOptions, "/api/dlp/scan"},
 	}
 	for _, c := range readPaths {

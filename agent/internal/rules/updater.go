@@ -165,8 +165,11 @@ func (u *Updater) Status() Status {
 // rule reload / profile update changes the tier mapping.
 //
 // hosts is copied — callers may mutate the input slice after this
-// returns. A nil or zero-length input is stored as an empty slice so
-// Status() always returns a non-nil JSON array.
+// returns. A nil or zero-length input is stored as nil internally
+// (saves one allocation when no hosts are configured); the
+// non-nil-empty-slice guarantee that the extension and TestStatus_JSONShape
+// rely on is enforced on the read side via make([]string, len(...))
+// in Status(), not here.
 func (u *Updater) SetTier2Hosts(hosts []string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()

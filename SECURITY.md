@@ -65,6 +65,19 @@ guarantees that we consider in-scope for this policy are:
    (false: warn, still serve; true: reject mismatched / missing
    MAC). Bypasses of the MAC verification when
    `bridge_mac_required=true` are **high-severity**.
+6. **Risky-extension upload block** — the browser extension's
+   `file-upload-interceptor` content script blocks uploads of
+   files whose extension is on a policy-controlled risky list
+   (default: 31 executable, installer, script, disk-image, and
+   Java-archive extensions; `.js` intentionally excluded). The
+   check runs synchronously before any content is read or sent
+   to the agent, so the filename and contents never leave the
+   page when a B2 match fires. Operators may override the
+   baked-in list via the agent's `risky_file_extensions` config
+   key. A bypass that lets a file with a listed extension reach
+   the page's upload handler (or a misuse that leaks the
+   filename / contents to the agent before the local check fires)
+   is **medium-severity**.
 
 The following are explicitly **out of scope**:
 

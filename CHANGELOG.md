@@ -141,6 +141,35 @@ may introduce breaking changes between feature releases.
   byte-for-byte in both `agent/internal/api/bridge_mac_test.go`
   and `extension/src/background/__tests__/bridge-mac.test.ts`
   so any drift in the HMAC input layout is caught on both sides.
+- **B2**: Block risky file extensions at the upload gesture. The
+  `file-upload-interceptor` content script now matches every
+  selected / dropped file's extension against a baked-in 31-entry
+  blocklist (Windows / macOS / Linux executables, installers,
+  scripts, disk images, Java archives; `.js` intentionally
+  excluded) BEFORE any content is read or sent to the agent. The
+  check runs in the same synchronous prelude as the existing
+  suppression (`preventDefault` / `stopImmediatePropagation` /
+  clearing `input.value`), so a blocked upload short-circuits the
+  async content scan entirely — the filename and contents never
+  leave the page for the B2 verdict. A risky-extension match
+  always blocks, regardless of enforcement mode (`personal` /
+  `team` / `managed` all see the same outcome); B2 is a policy
+  lever to remove a class of file from the upload surface, not a
+  fall-open ladder. Operators may override the baked-in list via
+  a new `risky_file_extensions` config key on the agent, surfaced
+  to the extension over a new `GET /api/config/risky-extensions`
+  endpoint. The wire shape distinguishes three states: field
+  absent (`{}`) means the extension uses its baked-in default;
+  explicit empty array (`{"extensions": []}`) opts out of risky-
+  extension blocking entirely; explicit list
+  (`{"extensions": ["exe",...]}`) replaces the baked-in default
+  verbatim. Entries are normalised on the agent side (trim,
+  strip leading dot, lowercase, drop blanks). The extension
+  service worker caches the override on cold start with a 5-min
+  TTL and mirrors it into `chrome.storage.session` so a content
+  script can fall back after a worker eviction. Toast: a new
+  `risky-extension` `PolicyReason` variant surfaces `Secure Edge
+  blocked this upload — .exe files are blocked by policy.`
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

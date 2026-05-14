@@ -305,6 +305,14 @@ func run(configPath string) error {
 	// coerce-to-personal branch is purely belt-and-suspenders.
 	apiServer.SetEnforcementMode(cfg.EnforcementMode)
 
+	// B2 risky-file-extension blocklist (Phase 7). The agent only
+	// owns the canonical override list and serves it through
+	// /api/config/risky-extensions; the extension hard-blocks
+	// matching uploads at the gesture. nil (the privacy-first
+	// default at load time) tells the extension to use its built-in
+	// list; an explicit empty list opts out of blocking entirely.
+	apiServer.SetRiskyFileExtensions(cfg.RiskyFileExtensions)
+
 	// Expose rule-file mtimes through /api/status (Phase 6 Task 17).
 	// Missing files are tolerated by collectRuleFileInfo on the server
 	// side, so we can pass the configured paths unfiltered.

@@ -267,6 +267,29 @@ type Server struct {
 	// /api/config/enforcement-mode so every client agrees on the
 	// active posture. Mutated only via SetEnforcementMode at startup.
 	enforcementMode string
+
+	// riskyFileExtensions is the B2 (Phase 7) override list of
+	// lowercase dot-less file extensions the browser extension
+	// hard-blocks at the upload gesture. Three possible values:
+	//
+	//   nil   — operator did not opt in; the extension uses its
+	//           built-in baked-in default list. Served as a JSON
+	//           document where the `extensions` field is omitted
+	//           so the wire format mirrors the absent-key
+	//           semantics.
+	//   []    — operator explicitly opted out of blocking. Served
+	//           as `{"extensions": []}` (an empty array) so the
+	//           extension knows to disable enforcement rather than
+	//           fall back to its default.
+	//   [...] — operator override. Served verbatim.
+	//
+	// The agent itself does not scan filenames; it only owns this
+	// canonical list and serves it through GET
+	// /api/config/risky-extensions so every extension build agrees
+	// on the policy. Mutated only via SetRiskyFileExtensions at
+	// startup.
+	riskyFileExtensions    []string
+	riskyFileExtensionsSet bool
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -401,6 +424,56 @@ func (s *Server) EnforcementMode() string {
 	return s.enforcementMode
 }
 
+// SetRiskyFileExtensions records the B2 risky-extension blocklist
+// the agent advertises to browser extension clients. The argument
+// distinguishes three states:
+//
+//	nil   — operator did not opt in; the extension uses its
+//	        built-in baked-in default. The agent advertises this
+//	        by omitting the `extensions` field from the response.
+//	[]    — operator explicitly opted out; the extension disables
+//	        enforcement. The agent advertises this by serving an
+//	        empty array.
+//	[...] — operator override; served verbatim.
+//
+// Callers should pass cfg.RiskyFileExtensions through unchanged —
+// config.Load normalises entries to lowercase dot-less form and
+// preserves the nil-vs-empty-vs-populated distinction.
+//
+// Idempotent: a server that never had this setter called returns
+// the same "use default" wire shape as one that called
+// SetRiskyFileExtensions(nil).
+func (s *Server) SetRiskyFileExtensions(exts []string) {
+	if exts == nil {
+		s.riskyFileExtensions = nil
+		s.riskyFileExtensionsSet = false
+		return
+	}
+	// Defensive copy: the caller may keep the slice and mutate
+	// it later; the server's view must be stable across reads.
+	cp := make([]string, len(exts))
+	copy(cp, exts)
+	s.riskyFileExtensions = cp
+	s.riskyFileExtensionsSet = true
+}
+
+// RiskyFileExtensions returns (list, configured). list is a defensive
+// copy of the configured override list (nil when the operator
+// did not opt in, or empty when they explicitly opted out).
+// configured is true when SetRiskyFileExtensions was called with
+// a non-nil argument; false when nothing was configured. The
+// handler uses the bool to decide whether to emit the `extensions`
+// field at all on the wire — absent field tells the extension to
+// fall back to its baked-in default.
+func (s *Server) RiskyFileExtensions() ([]string, bool) {
+	if !s.riskyFileExtensionsSet {
+		return nil, false
+	}
+	cp := make([]string, len(s.riskyFileExtensions))
+	copy(cp, s.riskyFileExtensions)
+	return cp, true
+}
+
 
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
@@ -426,6 +499,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/agent/update-check", s.handleAgentUpdateCheck)
 	mux.HandleFunc("/api/agent/update", s.handleAgentUpdate)
 	mux.HandleFunc("/api/config/enforcement-mode", s.handleEnforcementMode)
+	mux.HandleFunc("/api/config/risky-extensions", s.handleRiskyExtensions)
 	return s.withCORS(mux)
 }
 

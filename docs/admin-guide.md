@@ -113,6 +113,62 @@ agent also enforces a strict-monotonic request id and rejects a
 second `hello` on the same connection; both are unconditional and
 not gated by `bridge_mac_required`.
 
+### 2.2 Risky file extensions (`risky_file_extensions`)
+
+Phase 7 (B2) added a policy lever that hard-blocks file uploads
+whose extension is on a configurable risky list. The block is
+evaluated **on the page**, inside the browser extension's
+`file-upload-interceptor` content script, **before** any content is
+read or sent to the agent — so the filename and contents never
+leave the page for a B2 verdict.
+
+The extension ships with a baked-in default list of 31 extensions
+covering Windows / macOS / Linux executables, installers (`.msi`,
+`.pkg`, `.deb`, `.rpm`), scripts (`.ps1`, `.vbs`, `.bat`, `.cmd`,
+`.sh`, `.psm1`, `.psd1`, `.wsf`, `.wsh`, `.vbe`), disk images
+(`.iso`, `.img`, `.vhd`, `.vhdx`, `.dmg`), Java archives (`.jar`,
+`.class`), and a small set of platform binaries (`.app`, `.com`,
+`.pif`, `.reg`, `.dll`, `.sys`, `.appx`, `.appxbundle`, `.msix`,
+`.msp`, `.mst`). `.js` is **intentionally excluded** to avoid
+breaking developer workflows; if your fleet requires it, add it
+via the override below. Archive formats (`.zip`, `.7z`, `.rar`,
+`.tar`, `.gz`) are also intentionally excluded — they are too
+common for legitimate business use.
+
+Operators override the baked-in list via a single config key:
+
+```yaml
+# Optional risky-extension override. Three states:
+#   1) Omit the key entirely    → extension uses the baked-in 31-entry default.
+#   2) Empty list `[]`          → opts out of B2 entirely (no extension is
+#                                 blocked at this layer; content scan still runs).
+#   3) Populated list           → replaces the baked-in default verbatim.
+# Entries are case-insensitive; leading dots are stripped; blanks are dropped.
+risky_file_extensions:
+  - exe
+  - scr
+  - ps1
+  - msi
+```
+
+The agent surfaces the resolved list (or its absence) to the
+extension over `GET /api/config/risky-extensions`. The extension's
+service worker caches the result for 5 minutes and mirrors it to
+`chrome.storage.session` so content scripts can fall back after a
+worker eviction without a re-fetch. The wire shape distinguishes
+the three states above:
+
+- `{}` (no `extensions` field) — extension uses the baked-in default
+- `{"extensions": []}` — opt-out, no B2 blocking
+- `{"extensions": ["exe", ...]}` — operator override
+
+A risky-extension block fires **regardless of enforcement mode**.
+B2 is a policy lever to remove a class of file from the upload
+surface entirely; it does not fall open in `personal` or `team`
+modes the way the content scan does. The toast reads
+`Secure Edge blocked this upload — .exe files are blocked by
+policy.` (with the matched extension substituted in).
+
 ## 3. Enterprise Profiles (managed mode)
 
 Phase 5 added managed-mode profiles for enrolled fleets. A profile is a YAML

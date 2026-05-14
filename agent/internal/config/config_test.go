@@ -436,3 +436,97 @@ func TestLoad_RuleUpdatePublicKey_DefaultEmpty(t *testing.T) {
 		t.Errorf("default RuleUpdatePublicKey = %q, want empty", cfg.RuleUpdatePublicKey)
 	}
 }
+
+// TestLoad_RiskyFileExtensions_AbsentMeansBakedInDefault pins the
+// privacy-first product stance: a deployment that doesn't opt in to
+// a list keeps the extension's baked-in default by leaving the
+// field nil. The browser extension treats nil as "use default
+// list".
+func TestLoad_RiskyFileExtensions_AbsentMeansBakedInDefault(t *testing.T) {
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RiskyFileExtensions != nil {
+		t.Errorf("default RiskyFileExtensions = %#v, want nil", cfg.RiskyFileExtensions)
+	}
+}
+
+// TestLoad_RiskyFileExtensions_ExplicitOverride confirms an
+// operator can swap the extension's baked-in default for a custom
+// list, and that entries are normalised to lowercase dot-less form
+// so the on-the-wire contract is unambiguous.
+func TestLoad_RiskyFileExtensions_ExplicitOverride(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := `risky_file_extensions:
+  - exe
+  - .SCR
+  - "  pS1  "
+  - ""
+`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{"exe", "scr", "ps1"}
+	if !reflect.DeepEqual(cfg.RiskyFileExtensions, want) {
+		t.Errorf("RiskyFileExtensions = %#v, want %#v", cfg.RiskyFileExtensions, want)
+	}
+}
+
+// TestLoad_RiskyFileExtensions_ExplicitEmptyOptsOut confirms an
+// operator can opt out of risky-extension blocking entirely by
+// writing `risky_file_extensions: []`. The empty-but-non-nil
+// distinction is what the API surface uses to tell "use default"
+// (nil) apart from "explicitly disabled" ([]) — both at the
+// agent <-> extension wire and the agent <-> operator config.
+func TestLoad_RiskyFileExtensions_ExplicitEmptyOptsOut(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := "risky_file_extensions: []\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RiskyFileExtensions == nil {
+		t.Fatalf("RiskyFileExtensions = nil, want empty-but-non-nil slice")
+	}
+	if len(cfg.RiskyFileExtensions) != 0 {
+		t.Errorf("RiskyFileExtensions = %#v, want []", cfg.RiskyFileExtensions)
+	}
+}
+
+// TestLoad_RiskyFileExtensions_OnlyBlankEntriesYieldsEmpty ensures a
+// list of empty / whitespace-only entries collapses to an explicit
+// empty list (opt-out) rather than dropping silently back to the
+// default. An operator who wrote `["  ", ""]` clearly intended to
+// disable the policy, not to keep the default.
+func TestLoad_RiskyFileExtensions_OnlyBlankEntriesYieldsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := `risky_file_extensions:
+  - ""
+  - "   "
+  - "."
+`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RiskyFileExtensions == nil {
+		t.Fatalf("RiskyFileExtensions = nil, want empty-but-non-nil slice")
+	}
+	if len(cfg.RiskyFileExtensions) != 0 {
+		t.Errorf("RiskyFileExtensions = %#v, want []", cfg.RiskyFileExtensions)
+	}
+}

@@ -135,3 +135,29 @@ proxy_pinning_bypass: []
 # committed to a fail-closed posture; the privacy-first default
 # stays at "personal".
 # enforcement_mode: personal
+
+# Phase 7 / B2 — block risky file extensions at the upload gesture
+# (browser extension). The browser-extension's file-upload-interceptor
+# matches the selected/dropped filename's extension against this list
+# BEFORE any content is read or sent to the agent, so the filename
+# never leaves the page for a B2 verdict. A risky-extension match
+# always blocks, regardless of `enforcement_mode`. Three states:
+#
+#   - Key omitted (default)         → extension uses its baked-in
+#                                     31-entry default (Windows /
+#                                     macOS / Linux executables,
+#                                     installers, scripts, disk
+#                                     images, Java archives;
+#                                     `.js` is NOT in the default).
+#   - Empty list `[]`               → opts out of B2 entirely.
+#   - Populated list                → replaces the baked-in default
+#                                     verbatim.
+#
+# Entries are case-insensitive; leading dots are stripped; blanks
+# are dropped. See docs/admin-guide.md §2.2 for the full default
+# list + rollout guidance.
+# risky_file_extensions:
+#   - exe
+#   - scr
+#   - ps1
+#   - msi

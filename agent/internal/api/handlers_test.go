@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1183,6 +1184,11 @@ func TestCORS_AIPageOriginsAllowedOnReadEndpoints(t *testing.T) {
 		// control path and breaking the extension service-worker's
 		// auth-free poll (`service-worker.ts: fetchEnforcementMode`).
 		{http.MethodGet, "/api/config/enforcement-mode"},
+		// /api/config/risky-extensions (B2) follows the same
+		// reasoning as enforcement-mode: a small read-only JSON
+		// body, no DLP-scoring information leakage, and the
+		// extension service worker fetches it on cold start.
+		{http.MethodGet, "/api/config/risky-extensions"},
 		{http.MethodOptions, "/api/dlp/scan"},
 	}
 	for _, c := range readPaths {
@@ -1341,5 +1347,163 @@ func TestEnforcementMode_RejectsNonGET(t *testing.T) {
 		if w.Code != http.StatusMethodNotAllowed {
 			t.Errorf("%s: code = %d, want 405", method, w.Code)
 		}
+	}
+}
+
+// TestRiskyExtensions_DefaultOmitsField pins the B2 backwards-compat
+// wire shape: a server constructed without SetRiskyFileExtensions
+// (or called with nil) must serve a JSON body where the
+// `extensions` field is *absent*, not `null` or `[]`. The
+// extension's service worker treats the absent field as "use my
+// baked-in default list"; both `null` and `[]` would be
+// indistinguishable from the opt-out wire shape and would silently
+// disable risky-extension blocking on every fresh install.
+func TestRiskyExtensions_DefaultOmitsField(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	r := newLocalRequest(http.MethodGet, "/api/config/risky-extensions", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	// Trim trailing newline that json.Encoder.Encode adds so the
+	// equality check tolerates the encoder's behaviour without
+	// reparsing.
+	if got, want := strings.TrimRight(body, "\n"), `{}`; got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+// TestRiskyExtensions_ExplicitEmptyArrayOptOut pins the opt-out
+// wire shape: when the operator wrote `risky_file_extensions: []`
+// in config.yaml (and main wired that through
+// SetRiskyFileExtensions([]string{})), the response body must
+// carry an explicit empty array so the extension knows to disable
+// enforcement rather than fall back to its built-in default.
+func TestRiskyExtensions_ExplicitEmptyArrayOptOut(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRiskyFileExtensions([]string{})
+
+	r := newLocalRequest(http.MethodGet, "/api/config/risky-extensions", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	if got, want := strings.TrimRight(w.Body.String(), "\n"), `{"extensions":[]}`; got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+}
+
+// TestRiskyExtensions_OverrideRoundTrip walks a populated override
+// list through SetRiskyFileExtensions and asserts the JSON body
+// surfaces the list verbatim. The slice is also order-preserving so
+// the extension's cached copy looks identical to what the operator
+// wrote in config.yaml.
+func TestRiskyExtensions_OverrideRoundTrip(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRiskyFileExtensions([]string{"exe", "scr", "ps1"})
+
+	r := newLocalRequest(http.MethodGet, "/api/config/risky-extensions", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	var got RiskyExtensionsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Extensions == nil {
+		t.Fatalf("extensions = nil, want populated slice")
+	}
+	want := []string{"exe", "scr", "ps1"}
+	if len(*got.Extensions) != len(want) {
+		t.Fatalf("len = %d, want %d", len(*got.Extensions), len(want))
+	}
+	for i, e := range want {
+		if (*got.Extensions)[i] != e {
+			t.Errorf("[%d] = %q, want %q", i, (*got.Extensions)[i], e)
+		}
+	}
+}
+
+// TestRiskyExtensions_DefensiveCopy pins the contract that the
+// caller can mutate the slice they handed to SetRiskyFileExtensions
+// and the server's view stays stable. The first response captures
+// the original list; the post-mutation response must surface the
+// same list unchanged. Without the defensive copy a hostile
+// invocation could swap the active list out from under in-flight
+// requests.
+func TestRiskyExtensions_DefensiveCopy(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	src := []string{"exe", "scr"}
+	srv.SetRiskyFileExtensions(src)
+	src[0] = "POISONED"
+	src[1] = "POISONED"
+
+	r := newLocalRequest(http.MethodGet, "/api/config/risky-extensions", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	var got RiskyExtensionsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Extensions == nil || len(*got.Extensions) != 2 {
+		t.Fatalf("extensions = %#v, want [exe scr]", got.Extensions)
+	}
+	if (*got.Extensions)[0] != "exe" || (*got.Extensions)[1] != "scr" {
+		t.Errorf("server view mutated by caller: got %q, %q",
+			(*got.Extensions)[0], (*got.Extensions)[1])
+	}
+}
+
+// TestRiskyExtensions_RejectsNonGET confirms PUT/POST/DELETE return
+// 405. Like /api/config/enforcement-mode the endpoint is read-only by
+// design — mutation must go through config.yaml + restart so the
+// policy is rooted in the operator-controlled config rather than any
+// runtime API surface that a compromised AI page or hostile Tier-2
+// tool could reach.
+func TestRiskyExtensions_RejectsNonGET(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+		r := newLocalRequest(method, "/api/config/risky-extensions", nil)
+		w := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(w, r)
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s: code = %d, want 405", method, w.Code)
+		}
+	}
+}
+
+// TestRiskyExtensions_AIPageOriginAllowed locks in that the endpoint
+// is reachable from AI page origins (chatgpt.com, claude.ai, etc.).
+// The browser extension's service worker fetches the list on cold
+// start; a CORS regression that demoted the endpoint to control-only
+// would break risky-extension blocking on every fresh navigation to
+// a Tier-2 page. The endpoint's body is one of three small wire
+// shapes — no scoring thresholds, no classifier mappings — so the
+// disclosure surface is identical to /api/config/enforcement-mode.
+func TestRiskyExtensions_AIPageOriginAllowed(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetRiskyFileExtensions([]string{"exe", "scr"})
+
+	r := newLocalRequest(http.MethodGet, "/api/config/risky-extensions", nil)
+	r.Header.Set("Origin", "https://chatgpt.com")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code == http.StatusForbidden {
+		t.Fatalf("AI origin returned 403 — control-path regression")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://chatgpt.com" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want chatgpt.com", got)
 	}
 }

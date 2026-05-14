@@ -11,8 +11,9 @@ import assert from "node:assert/strict";
 
 import { __test__ } from "../file-upload-interceptor.js";
 import { __test__ as scanClientTest } from "../scan-client.js";
+import { __test__ as riskyExtTest } from "../risky-extensions.js";
 
-const { onChange, onDrop, readFilesText } = __test__;
+const { onChange, onDrop, readFilesText, firstRiskyExtensionMatch } = __test__;
 
 type MockResponse = { ok: boolean; body?: unknown; err?: unknown };
 
@@ -167,11 +168,13 @@ function blockingFetch(): {
 
 beforeEach(() => {
     scanClientTest.resetEnforcementMode();
+    riskyExtTest.reset();
     stubDocument();
 });
 
 afterEach(() => {
     scanClientTest.resetEnforcementMode();
+    riskyExtTest.reset();
     delete (globalThis as { document?: unknown }).document;
     delete (globalThis as { fetch?: unknown }).fetch;
 });
@@ -462,4 +465,139 @@ test("onChange skips zero-byte files (no scan request) but still clears the inpu
     // even attempt the scan, so a zero-byte selection is still
     // suppressed (the user must re-pick a non-empty file).
     assert.equal(input.valueAssignments, 1, "sync-first: input cleared regardless of file contents");
+});
+
+// --- B2 / risky-file-extension policy --------------------------------------
+//
+// PR7 / B2: the interceptor short-circuits the content scan when any
+// file in the selection / drop matches the active risky-extension
+// blocklist. Suppression (preventDefault / stopImmediatePropagation
+// / input.value = "") still fires synchronously — the B2 branch
+// only affects whether the *async scan* is dispatched after the
+// sync prelude. The toast surfaces the matched extension instead
+// of a pattern-name verdict.
+
+test("firstRiskyExtensionMatch returns the matched extension for a risky file", () => {
+    const fileList = {
+        length: 2,
+        0: new File(["x"], "ok.txt"),
+        1: new File(["x"], "evil.exe"),
+    } as unknown as ArrayLike<File>;
+    assert.equal(firstRiskyExtensionMatch(fileList), "exe");
+});
+
+test("firstRiskyExtensionMatch returns null when no file is risky", () => {
+    const fileList = {
+        length: 2,
+        0: new File(["x"], "ok.txt"),
+        1: new File(["x"], "report.pdf"),
+    } as unknown as ArrayLike<File>;
+    assert.equal(firstRiskyExtensionMatch(fileList), null);
+});
+
+test("firstRiskyExtensionMatch returns null when operator opted out (empty cache)", () => {
+    // The opt-out wire shape ({"extensions": []}) materialises in
+    // the cache as an empty array. The matcher MUST return null so
+    // the interceptor falls through to the content scan path even
+    // for an .exe upload.
+    riskyExtTest.setCachedRiskyExtensions([]);
+    const fileList = {
+        length: 1,
+        0: new File(["x"], "evil.exe"),
+    } as unknown as ArrayLike<File>;
+    assert.equal(firstRiskyExtensionMatch(fileList), null);
+});
+
+test("onChange blocks risky-extension upload and does NOT call the scan endpoint", async () => {
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const file = new File(["MZ payload"], "evil.exe");
+    const input = makeFileInput([file]);
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    // No HTTP scan request was issued — the extension check
+    // short-circuits before the async scan. This is what makes B2
+    // privacy-friendly: the filename and contents never leave the
+    // page.
+    assert.equal(calls.length, 0, "risky-extension upload MUST NOT trigger /api/dlp/scan");
+    // Sync-first suppression still fires.
+    assert.equal(input.valueAssignments, 1, "input.value MUST still be cleared on B2 block");
+    assert.equal(input.value, "");
+});
+
+test("onChange blocks risky-extension regardless of enforcement mode (always-block)", async () => {
+    // B2 is mode-independent. Walk every mode and confirm the
+    // block fires uniformly.
+    for (const mode of ["personal", "team", "managed"] as const) {
+        scanClientTest.resetEnforcementMode();
+        scanClientTest.setCachedEnforcementMode(mode);
+        const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+        const file = new File(["payload"], `evil.${mode === "managed" ? "scr" : "ps1"}`);
+        const input = makeFileInput([file]);
+        await onChange(makeChangeEvent(input) as unknown as Event);
+        assert.equal(calls.length, 0, `risky-extension upload MUST NOT scan in ${mode} mode`);
+        assert.equal(input.valueAssignments, 1, `input.value MUST still be cleared on B2 block in ${mode} mode`);
+    }
+});
+
+test("onChange blocks mixed selection (one risky + one benign) on the risky entry", async () => {
+    // The PR plan: a mixed drop or selection MUST block the whole
+    // gesture — re-constructing a FileList without the risky entry
+    // is not portable. The toast names the matched extension.
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const benign = new File(["safe"], "report.pdf");
+    const risky = new File(["x"], "evil.exe");
+    const input = makeFileInput([benign, risky]);
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    assert.equal(calls.length, 0, "mixed selection containing a risky entry MUST be blocked outright");
+    assert.equal(input.valueAssignments, 1);
+});
+
+test("onChange falls through to the content scan when the override list is empty (opt-out)", async () => {
+    // Operator opted out of B2 entirely — the interceptor must
+    // hand the file off to the content scanner exactly as it did
+    // before B2 shipped.
+    riskyExtTest.setCachedRiskyExtensions([]);
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const file = new File(["MZ"], "evil.exe");
+    const input = makeFileInput([file]);
+    await onChange(makeChangeEvent(input) as unknown as Event);
+    assert.equal(calls.length, 1, "opt-out: the content scan path MUST still fire");
+    assert.equal(calls[0].url, "http://127.0.0.1:8080/api/dlp/scan");
+});
+
+test("onDrop blocks risky-extension drop and does NOT call the scan endpoint", async () => {
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const file = new File(["MZ"], "trojan.scr");
+    const { ev, preventCalls, stopCalls, stopImmediateCalls } = makeDropEvent([file]);
+    await onDrop(ev);
+    assert.equal(calls.length, 0, "risky-extension drop MUST NOT trigger /api/dlp/scan");
+    // Sync-first suppression still fires.
+    assert.equal(preventCalls.n, 1, "preventDefault MUST fire on B2 block");
+    assert.equal(stopCalls.n, 1, "stopPropagation MUST fire on B2 block");
+    assert.equal(stopImmediateCalls.n, 1, "stopImmediatePropagation MUST fire on B2 block");
+});
+
+test("onDrop blocks risky-extension drop in mixed selection too", async () => {
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const benign = new File(["safe"], "notes.txt");
+    const risky = new File(["x"], "installer.msi");
+    const { ev } = makeDropEvent([benign, risky]);
+    await onDrop(ev);
+    assert.equal(calls.length, 0, "mixed drop with one risky entry MUST be blocked outright");
+});
+
+test("onDrop honours operator override list (custom extension blocks, .exe falls through)", async () => {
+    // Operator override: just "zip". The baked-in list is NOT
+    // consulted any more; .exe is no longer blocked at the
+    // extension layer (and is left to the content scan).
+    riskyExtTest.setCachedRiskyExtensions(["zip"]);
+    const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const zipDrop = makeDropEvent([new File(["x"], "archive.zip")]);
+    await onDrop(zipDrop.ev);
+    assert.equal(calls.length, 0, "override entry 'zip' MUST block .zip");
+
+    // Reset fetch mock for the next case.
+    const exe = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+    const exeDrop = makeDropEvent([new File(["x"], "installer.exe")]);
+    await onDrop(exeDrop.ev);
+    assert.equal(exe.calls.length, 1, "override does NOT include 'exe' so .exe MUST fall through to the scan");
 });

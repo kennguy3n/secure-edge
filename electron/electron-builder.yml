@@ -1,5 +1,14 @@
 appId: com.shieldnet.secureedge.tray
 productName: Secure Edge
+# `dist/` holds the renderer + main JS that vite/tsc emit (i.e. the
+# content packaged INTO the installer). `dist-electron/` is where
+# electron-builder writes its installer outputs (.dmg, .exe, .deb,
+# .AppImage, .yml, .blockmap). Keeping the two directories distinct
+# prevents electron-builder from packaging its own previous installer
+# on a re-run, and matches the upload-artifact globs in
+# .github/workflows/release.yml.
+directories:
+  output: dist-electron
 files:
   - dist/**/*
   - package.json

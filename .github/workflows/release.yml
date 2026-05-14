@@ -315,10 +315,14 @@ jobs:
         run: |
           # Generate SHA256SUMS over every file currently in release/,
           # including the just-written SBOMs, but excluding SHA256SUMS
-          # itself. Sort the file list for reproducible output.
-          # No shell globs are used to avoid the empty-file race against
-          # the shell's redirect creating SHA256SUMS before glob expansion.
-          find . -maxdepth 1 -type f ! -name 'SHA256SUMS' -printf '%f\n' | sort > .manifest
+          # itself AND the .manifest temp file (which is created by this
+          # very pipeline before `find` traverses the directory, and
+          # would otherwise be included in the listing and then removed,
+          # producing a SHA256SUMS line that always fails verification).
+          find . -maxdepth 1 -type f \
+            ! -name 'SHA256SUMS' \
+            ! -name '.manifest' \
+            -printf '%f\n' | sort > .manifest
           sha256sum -- $(cat .manifest) > SHA256SUMS
           rm .manifest
           echo "--- SHA256SUMS ---"
@@ -365,8 +369,19 @@ jobs:
           # bundles, and SBOMs. We deliberately do NOT attest the cosign
           # .sig/.pem files (they are themselves signature material) or
           # the SHA256SUMS manifest (which is already cosign-signed).
+          # Agent binaries are enumerated explicitly per OS/arch so the
+          # `secure-edge-agent-*` wildcard does not over-match the
+          # `secure-edge-agent-<os>-<arch>.sig` / `.pem` files written by
+          # the preceding `cosign sign-blob` step. Installer / bundle
+          # patterns use extension-anchored globs (`*.pkg`, `*.exe`,
+          # `*.cdx.json`, ...) which by construction never match
+          # `<artefact>.sig` / `<artefact>.pem`, so those are safe.
           subject-path: |
-            release/secure-edge-agent-*
+            release/secure-edge-agent-linux-amd64
+            release/secure-edge-agent-linux-arm64
+            release/secure-edge-agent-darwin-amd64
+            release/secure-edge-agent-darwin-arm64
+            release/secure-edge-agent-windows-amd64.exe
             release/*.pkg
             release/*.msi
             release/*.deb

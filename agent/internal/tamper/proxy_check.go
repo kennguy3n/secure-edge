@@ -4,35 +4,30 @@ import (
 	"context"
 	"errors"
 	"os"
-	"runtime"
 	"strings"
 )
 
 // platformProxyCheck reports whether the OS proxy configuration
-// includes the agent's local MITM proxy address. On Linux/BSD we
-// trust the standard http_proxy/https_proxy environment variables —
-// the agent's installer sets them in /etc/environment and refreshes
-// them in tests by re-reading the variables every check. On macOS
-// and Windows we shell out to the platform-native query tool.
+// includes the agent's local MITM proxy address. Each supported
+// platform provides its own platformProxyCheckImpl in a build-tagged
+// file (proxy_darwin.go, proxy_windows.go, proxy_other.go). This file
+// itself has no build tag so the wrapper, the shared expected-string
+// guard, and proxyCheckEnv are available on every target.
 func platformProxyCheck(ctx context.Context, expected string) (bool, error) {
 	expected = strings.TrimSpace(expected)
 	if expected == "" {
 		return false, errors.New("proxy_check: expected address empty")
 	}
-	switch runtime.GOOS {
-	case "darwin":
-		return proxyCheckDarwin(ctx, expected)
-	case "windows":
-		return proxyCheckWindows(ctx, expected)
-	default:
-		return proxyCheckEnv(expected), nil
-	}
+	return platformProxyCheckImpl(ctx, expected)
 }
 
 // proxyCheckEnv looks at the HTTP_PROXY / HTTPS_PROXY environment
 // vars. This is the dominant configuration on Linux desktops and the
 // only path we can inspect from inside the agent process without
-// shelling out to a desktop-specific helper.
+// shelling out to a desktop-specific helper. It is exported within
+// the package so the per-platform dispatch files can fall back to it
+// when their native query fails (e.g. when the macOS expected string
+// does not parse as host:port).
 func proxyCheckEnv(expected string) bool {
 	candidates := []string{
 		os.Getenv("HTTPS_PROXY"),

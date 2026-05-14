@@ -26,16 +26,44 @@ type NativeMessageRequest struct {
 	Content string `json:"content"`
 }
 
-// NativeMessageResponse is the wire shape returned on stdout. Either
-// Result or Error is populated, never both.
+// NativeMessageResponse is the wire shape returned on stdout.
+// Result, APIToken, and Error are mutually exclusive per response.
+// APIToken is populated on a successful "hello" reply so the
+// extension can cache the per-install token for its HTTP fallback
+// path (work item A2).
 type NativeMessageResponse struct {
-	ID     int             `json:"id"`
-	Result *dlp.ScanResult `json:"result,omitempty"`
-	Error  string          `json:"error,omitempty"`
+	ID       int             `json:"id"`
+	Result   *dlp.ScanResult `json:"result,omitempty"`
+	APIToken string          `json:"api_token,omitempty"`
+	Error    string          `json:"error,omitempty"`
 }
 
-// ServeNativeMessaging reads length-prefixed JSON messages from in,
-// dispatches scan requests through scanner, and writes JSON responses
+// NativeMessagingOptions carries optional dependencies the native
+// host handler may need. Adding fields to this struct is a backwards-
+// compatible change for callers, which is the reason the original
+// positional-argument ServeNativeMessaging() now delegates to
+// ServeNativeMessagingWithOptions().
+type NativeMessagingOptions struct {
+	// APIToken, when non-empty, is returned to the extension on a
+	// successful "hello" message so the extension can authenticate
+	// its loopback HTTP fallback. Empty means "no token configured"
+	// and the hello reply returns a clear error so callers know
+	// they're sitting on the legacy posture.
+	APIToken string
+}
+
+// ServeNativeMessaging is a backwards-compatible shim that delegates
+// to ServeNativeMessagingWithOptions with an empty options struct.
+// New callers should prefer ServeNativeMessagingWithOptions so they
+// can pass an APIToken; this shim exists so the existing test suite
+// and any third-party embedders don't have to change at the same
+// time as the agent main wiring.
+func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, statsStore *store.Store, in io.Reader, out io.Writer) error {
+	return ServeNativeMessagingWithOptions(ctx, scanner, statsStore, NativeMessagingOptions{}, in, out)
+}
+
+// ServeNativeMessagingWithOptions reads length-prefixed JSON messages
+// from in, dispatches scan / hello requests, and writes JSON responses
 // to out. It returns when in is closed (io.EOF), ctx is cancelled, or
 // a write fails. The function is intentionally synchronous: Chrome's
 // Native Messaging protocol is a half-duplex stream and the agent
@@ -45,7 +73,11 @@ type NativeMessageResponse struct {
 // successful scan so that the Status page's dlp_scans_total and
 // dlp_blocks_total stay correct in NM mode. Pass nil in tests that
 // don't care about counters; HTTP-only deployments are unaffected.
-func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, statsStore *store.Store, in io.Reader, out io.Writer) error {
+//
+// opts.APIToken, when non-empty, is the value returned on a "hello"
+// request. The extension caches it in chrome.storage.session and
+// attaches it to its HTTP-fallback requests.
+func ServeNativeMessagingWithOptions(ctx context.Context, scanner DLPScanner, statsStore *store.Store, opts NativeMessagingOptions, in io.Reader, out io.Writer) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil
@@ -82,6 +114,15 @@ func ServeNativeMessaging(ctx context.Context, scanner DLPScanner, statsStore *s
 					// hiccups must never break a scan reply.
 					_ = bumpDLPStats(ctx, statsStore, r.Blocked)
 				}
+			case "hello":
+				// A2 capability-token bootstrap: the extension
+				// asks for the per-install token, caches it in
+				// chrome.storage.session, and attaches it to
+				// every HTTP fallback. When no token is wired
+				// in we still reply 200-ish (no Error) so the
+				// extension treats it as "no token configured"
+				// rather than a protocol-level failure.
+				resp.APIToken = opts.APIToken
 			default:
 				resp.Error = fmt.Sprintf("unknown kind: %q", req.Kind)
 			}

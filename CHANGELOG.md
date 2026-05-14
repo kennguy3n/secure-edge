@@ -9,6 +9,22 @@ may introduce breaking changes between feature releases.
 
 ## [Unreleased]
 
+### Added — Phase 7: Security Posture
+
+- **A1**: Pin browser-extension IDs accepted by the API control
+  plane. New `allowed_extension_ids` config key restricts which
+  `chrome-extension://` / `moz-extension://` /
+  `safari-web-extension://` origins may drive state-changing
+  endpoints. Empty list keeps the legacy "any non-empty ID"
+  behaviour and logs a startup warning.
+- **A2**: Per-install API capability token. The agent generates a
+  32-byte hex token at `api_token_path` (mode 0600) on first
+  start, hands it to the browser extension over a new Native
+  Messaging `hello` handshake, and the Electron tray reads it
+  from the same file. `api_token_required` toggles enforcement
+  between staged (wrong tokens 401, missing header falls through)
+  and full (missing header also 401).
+
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 
 - Expanded the DLP pattern library by ~30 patterns across Terraform,

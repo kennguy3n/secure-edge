@@ -133,6 +133,38 @@ type Config struct {
 	// remain 503 — an unverified release path would defeat the
 	// entire self-update threat model.
 	AgentUpdatePublicKey string `yaml:"agent_update_public_key"`
+
+	// AllowedExtensionIDs is the list of pinned browser-extension
+	// IDs whose chrome-extension:// / moz-extension:// /
+	// safari-web-extension:// origins are accepted as "control"
+	// callers in the API CORS check. An empty list keeps the
+	// pre-existing behaviour (any installed extension whose origin
+	// has a non-empty ID is accepted) but the agent logs a warning
+	// at startup recommending operators populate this list. The
+	// match is exact and case-sensitive against the substring
+	// between "<scheme>://" and the next "/" (or end of string).
+	AllowedExtensionIDs []string `yaml:"allowed_extension_ids"`
+
+	// APITokenPath is the file path where the per-install API
+	// capability token is persisted. When non-empty the agent
+	// reads the file at startup; if the file is missing or empty
+	// it generates a 32-byte hex token and writes it with mode
+	// 0600. The Electron tray reads the same file to authenticate
+	// its admin calls; the browser extension receives the token
+	// via the Native Messaging handshake. An empty value (default)
+	// keeps the existing no-auth behaviour for backwards
+	// compatibility with installs that have not yet rolled out the
+	// matching Electron / extension builds.
+	APITokenPath string `yaml:"api_token_path"`
+
+	// APITokenRequired, when true, makes the API server reject
+	// state-changing ("control") requests that lack an
+	// "Authorization: Bearer <token>" header matching the loaded
+	// API token. When false (default) the middleware still issues
+	// a startup warning but does not enforce — letting an operator
+	// stage the token rollout, confirm clients have the new token,
+	// and flip enforcement on without an outage.
+	APITokenRequired bool `yaml:"api_token_required"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -306,6 +338,16 @@ func merge(defaults, override Config) Config {
 	if override.AgentUpdatePublicKey != "" {
 		out.AgentUpdatePublicKey = override.AgentUpdatePublicKey
 	}
+	if len(override.AllowedExtensionIDs) > 0 {
+		out.AllowedExtensionIDs = override.AllowedExtensionIDs
+	}
+	if override.APITokenPath != "" {
+		out.APITokenPath = override.APITokenPath
+	}
+	// APITokenRequired is a bool with no defaults-vs-explicit
+	// distinction; we always copy the override's value so the
+	// operator can explicitly flip it off in the YAML.
+	out.APITokenRequired = override.APITokenRequired
 	return out
 }
 

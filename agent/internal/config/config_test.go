@@ -212,3 +212,81 @@ func TestLoad_DLPIntFields_NegativeRejected(t *testing.T) {
 		}
 	}
 }
+
+// TestLoad_AllowedExtensionIDs confirms the new pinned-ID allowlist
+// round-trips through YAML and survives merge() unchanged.
+func TestLoad_AllowedExtensionIDs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := `allowed_extension_ids:
+  - abcdefghijklmnopabcdefghijklmnop
+  - 01234567-89ab-cdef-0123-456789abcdef
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{
+		"abcdefghijklmnopabcdefghijklmnop",
+		"01234567-89ab-cdef-0123-456789abcdef",
+	}
+	if !reflect.DeepEqual(cfg.AllowedExtensionIDs, want) {
+		t.Errorf("AllowedExtensionIDs = %#v, want %#v", cfg.AllowedExtensionIDs, want)
+	}
+}
+
+// TestLoad_APIToken confirms the api_token_path and api_token_required
+// fields round-trip cleanly. APITokenRequired is a bool so we cover
+// both explicit values.
+func TestLoad_APIToken(t *testing.T) {
+	dir := t.TempDir()
+	for _, tc := range []struct {
+		name     string
+		yaml     string
+		path     string
+		required bool
+	}{
+		{
+			name:     "off (defaults)",
+			yaml:     ``,
+			path:     "",
+			required: false,
+		},
+		{
+			name: "staged (path set, enforce off)",
+			yaml: `api_token_path: "/var/lib/secure-edge/api-token"
+api_token_required: false
+`,
+			path:     "/var/lib/secure-edge/api-token",
+			required: false,
+		},
+		{
+			name: "enforced",
+			yaml: `api_token_path: "/var/lib/secure-edge/api-token"
+api_token_required: true
+`,
+			path:     "/var/lib/secure-edge/api-token",
+			required: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := filepath.Join(dir, tc.name+".yaml")
+			if err := os.WriteFile(p, []byte(tc.yaml), 0o600); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+			cfg, err := Load(p)
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.APITokenPath != tc.path {
+				t.Errorf("APITokenPath = %q, want %q", cfg.APITokenPath, tc.path)
+			}
+			if cfg.APITokenRequired != tc.required {
+				t.Errorf("APITokenRequired = %v, want %v", cfg.APITokenRequired, tc.required)
+			}
+		})
+	}
+}

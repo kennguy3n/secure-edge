@@ -10,12 +10,66 @@
 
 import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as http from 'http';
 import { autoUpdater } from 'electron-updater';
 
 const AGENT_PORT = Number(process.env.SECURE_EDGE_AGENT_PORT ?? 8080);
 const AGENT_HOST = process.env.SECURE_EDGE_AGENT_HOST ?? '127.0.0.1';
 const HEALTH_INTERVAL_MS = 10_000;
+
+// SECURE_EDGE_API_TOKEN_PATH overrides the on-disk path where the
+// Go agent persists its API capability token (work item A2). When
+// the env var is unset we fall back to a per-OS default that mirrors
+// the agent's view of os.UserConfigDir() so the dev / source build
+// shares one token between the agent and the tray without any
+// operator setup. Packaged installs that run the agent as a system
+// service should set this env var on the tray launcher so it points
+// at the agent's StateDirectory token file.
+const DEFAULT_API_TOKEN_PATH: string = (() => {
+  const override = process.env.SECURE_EDGE_API_TOKEN_PATH;
+  if (override && override.length > 0) return override;
+  const home = app.getPath('home');
+  switch (process.platform) {
+    case 'darwin':
+      return path.join(home, 'Library', 'Application Support', 'secure-edge', 'api-token');
+    case 'win32': {
+      const appData = process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming');
+      return path.join(appData, 'secure-edge', 'api-token');
+    }
+    default: {
+      // XDG: ~/.config or $XDG_CONFIG_HOME
+      const xdg = process.env.XDG_CONFIG_HOME;
+      const base = xdg && xdg.length > 0 ? xdg : path.join(home, '.config');
+      return path.join(base, 'secure-edge', 'api-token');
+    }
+  }
+})();
+
+// readAPIToken returns the trimmed contents of the on-disk token
+// file, or null when the file does not exist or cannot be read.
+// The tray polls this on a slow cadence (re-read on every fetch)
+// rather than caching, so an operator who regenerates the token by
+// deleting and restarting the agent does not need to restart the
+// tray for it to pick up the new value.
+function readAPIToken(): string | null {
+  try {
+    const raw = fs.readFileSync(DEFAULT_API_TOKEN_PATH, { encoding: 'utf8' });
+    const token = raw.trim();
+    return token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+// authHeaders builds the optional Authorization header used by
+// every helper below. Returns an empty object when no token file
+// exists, preserving backwards compatibility with agents that have
+// not enabled the A2 token middleware yet.
+function authHeaders(): Record<string, string> {
+  const token = readAPIToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 type View = 'status' | 'settings' | 'proxy';
 
@@ -133,6 +187,7 @@ function pingAgent(): Promise<boolean> {
         path: '/api/status',
         method: 'GET',
         timeout: 2000,
+        headers: authHeaders(),
       },
       (res) => {
         res.resume();
@@ -160,6 +215,7 @@ function pingProxy(): Promise<boolean> {
         path: '/api/proxy/status',
         method: 'GET',
         timeout: 2000,
+        headers: authHeaders(),
       },
       (res) => {
         if (res.statusCode !== 200) {
@@ -202,6 +258,7 @@ function pingTamper(): Promise<number | null> {
         path: '/api/tamper/status',
         method: 'GET',
         timeout: 2000,
+        headers: authHeaders(),
       },
       (res) => {
         if (res.statusCode !== 200) {
@@ -281,6 +338,13 @@ app.whenReady().then(() => {
   ipcMain.handle('secure-edge:get-agent-base', () =>
     `http://${AGENT_HOST}:${AGENT_PORT}`,
   );
+
+  // Expose the optional API token to the renderer. The renderer
+  // then forwards it as a Bearer header on every fetch() to the
+  // agent. Returning null is the "no token configured" signal —
+  // the renderer drops the header in that case so the agent's
+  // pre-A2 behaviour is preserved.
+  ipcMain.handle('secure-edge:get-api-token', () => readAPIToken());
 
   startHealthPolling();
 

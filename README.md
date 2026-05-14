@@ -103,6 +103,21 @@ proxy_pinning_bypass: []                  # hostnames to tunnel even if Tier-2
 # Agent self-update. Both fields required to enable.
 # agent_update_manifest_url: ""    # e.g. https://github.com/.../manifest.json
 # agent_update_public_key: ""      # hex-encoded Ed25519 public key
+
+# A1 — pin extension IDs for control-path callers. Leave empty to
+# accept any non-empty extension origin (legacy posture).
+# allowed_extension_ids:
+#   - your-chrome-extension-id
+#   - "{01234567-89ab-cdef-0123-456789abcdef}"
+
+# A2 — per-install API capability token. Setting api_token_path
+# makes the agent generate a 32-byte hex token at that location
+# (mode 0600) and send it to the extension over Native Messaging
+# "hello". Set api_token_required=true once the matching Electron
+# tray and extension builds are in place to enforce the Bearer
+# header on control endpoints.
+# api_token_path: ""
+# api_token_required: false
 ```
 
 Leaving `dlp_patterns` blank disables the DLP pipeline and returns `503` from

@@ -150,7 +150,21 @@ func runNativeMessaging(configPath string) error {
 	applyDLPRuntimeConfig(pipeline, cfg)
 	pipeline.Rebuild(patterns, exclusions)
 
-	return api.ServeNativeMessaging(ctx, pipeline, statsStore, os.Stdin, os.Stdout)
+	// A2: when the agent has an api_token_path configured, the NM
+	// host loads (or generates) the same token the daemon uses and
+	// hands it to the extension on the "hello" handshake. The on-
+	// disk file is the rendezvous point — the daemon and the NM
+	// host are separate processes spawned at separate times by
+	// different parents (systemd vs Chrome) so they cannot share
+	// memory, but the file under api_token_path is read-write by
+	// the installing user only.
+	apiToken, err := api.LoadOrCreateAPIToken(cfg.APITokenPath)
+	if err != nil {
+		return fmt.Errorf("api token: %w", err)
+	}
+	return api.ServeNativeMessagingWithOptions(ctx, pipeline, statsStore,
+		api.NativeMessagingOptions{APIToken: apiToken},
+		os.Stdin, os.Stdout)
 }
 
 // applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
@@ -224,6 +238,40 @@ func run(configPath string) error {
 	defer func() { _ = resolver.Shutdown() }()
 
 	apiServer := api.NewServer(s, engine, counter)
+
+	// A1: pin the browser-extension ID allowlist that the API CORS
+	// layer consults for control-path callers. An empty list keeps
+	// the historical "any non-empty ID" behaviour; we emit a startup
+	// warning so operators know they're sitting on the legacy posture.
+	if len(cfg.AllowedExtensionIDs) > 0 {
+		apiServer.SetAllowedExtensionIDs(cfg.AllowedExtensionIDs)
+		fmt.Fprintf(os.Stderr, "agent: API control-origin: pinned %d extension IDs\n", len(cfg.AllowedExtensionIDs))
+	} else {
+		fmt.Fprintln(os.Stderr, "agent: API control-origin: allowed_extension_ids is empty; any installed extension can reach control endpoints. Populate it with your Web Store / AMO / App Store IDs to tighten this.")
+	}
+
+	// A2: load (or generate) the per-install API capability token.
+	// Empty path -> feature disabled, no Bearer enforcement. A
+	// non-empty path always generates+writes if the file is missing
+	// or empty; the Bearer middleware then either enforces (when
+	// api_token_required is true) or runs in "staged" mode where
+	// wrong tokens are rejected but missing-header callers fall
+	// through to the existing origin-only authorisation.
+	apiTokenPath := cfg.APITokenPath
+	apiToken, err := api.LoadOrCreateAPIToken(apiTokenPath)
+	if err != nil {
+		return fmt.Errorf("api token: %w", err)
+	}
+	if apiToken != "" {
+		apiServer.SetAPIToken(apiToken, cfg.APITokenRequired)
+		if cfg.APITokenRequired {
+			fmt.Fprintf(os.Stderr, "agent: API auth: bearer token required for control endpoints (token file: %s)\n", apiTokenPath)
+		} else {
+			fmt.Fprintf(os.Stderr, "agent: API auth: bearer token loaded but enforcement is OFF (api_token_required=false); flip the knob once your Electron tray and extension builds are using the token. token file: %s\n", apiTokenPath)
+		}
+	} else if cfg.APITokenRequired {
+		fmt.Fprintln(os.Stderr, "agent: API auth: api_token_required=true but api_token_path is empty; control endpoints will NOT enforce a token until api_token_path is configured.")
+	}
 
 	// Apply configured /api/dlp/scan rate limit (Phase 6 Task 18).
 	// Explicit 0 disables the limiter entirely so operators can opt

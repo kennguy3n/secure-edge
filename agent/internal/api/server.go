@@ -235,6 +235,28 @@ type Server struct {
 	startedAt    time.Time
 	scanLimiter  *rateLimiter
 	once         sync.Once
+
+	// allowedExtensionIDs is the optional pinned-ID allowlist set
+	// via SetAllowedExtensionIDs. nil / empty means "accept any
+	// extension origin with a non-empty ID" (the historical
+	// behaviour). When non-nil, only the listed IDs are accepted
+	// as control-plane callers from chrome-extension:// /
+	// moz-extension:// / safari-web-extension:// origins.
+	allowedExtensionIDs map[string]struct{}
+
+	// apiToken is the per-install capability token loaded from
+	// the file at config.api_token_path. Empty string means "no
+	// token configured", which disables the Bearer middleware
+	// regardless of apiTokenRequired.
+	apiToken string
+
+	// apiTokenRequired, when true, makes the Bearer middleware
+	// reject control-path requests that lack a matching token.
+	// When false the middleware still validates a token if one is
+	// supplied (so a misbehaving client doesn't silently get
+	// admin access with the wrong token) but does not reject
+	// callers that omit the header.
+	apiTokenRequired bool
 }
 
 // NewServer returns an API server with its start time set to now.
@@ -299,6 +321,48 @@ func (s *Server) SetRuleOverride(o RuleOverride) { s.Rules = o }
 // button on builds without a release channel.
 func (s *Server) SetAgentUpdater(u AgentSelfUpdater) { s.AgentUpdate = u }
 
+// SetAllowedExtensionIDs pins the browser-extension ID allowlist
+// consulted by isControlOrigin. ids may be nil or empty to keep the
+// pre-existing "any non-empty ID" behaviour; otherwise only the
+// listed IDs are accepted as control-plane callers from
+// chrome-extension:// / moz-extension:// / safari-web-extension://
+// origins. The check is case-sensitive against the ID substring
+// between the scheme and the next "/" (or end of string).
+func (s *Server) SetAllowedExtensionIDs(ids []string) {
+	if len(ids) == 0 {
+		s.allowedExtensionIDs = nil
+		return
+	}
+	m := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		m[id] = struct{}{}
+	}
+	if len(m) == 0 {
+		s.allowedExtensionIDs = nil
+		return
+	}
+	s.allowedExtensionIDs = m
+}
+
+// SetAPIToken installs the per-install capability token. An empty
+// token disables Bearer validation regardless of the required flag.
+// When required is true and token is non-empty, control-path
+// requests without a matching "Authorization: Bearer <token>" header
+// receive 401. When required is false the token is still accepted
+// on valid requests (so a correctly-configured client doesn't get
+// silently downgraded) but missing-header requests fall through to
+// the existing origin-based authorisation — preserving backwards
+// compatibility with installs that have not yet rolled out the
+// matching Electron / extension builds.
+func (s *Server) SetAPIToken(token string, required bool) {
+	s.apiToken = token
+	s.apiTokenRequired = required
+}
+
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -322,7 +386,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/rules/override/", s.handleRuleOverrideItem)
 	mux.HandleFunc("/api/agent/update-check", s.handleAgentUpdateCheck)
 	mux.HandleFunc("/api/agent/update", s.handleAgentUpdate)
-	return withCORS(mux)
+	return s.withCORS(mux)
 }
 
 // ListenAndServe starts the HTTP server in a background goroutine and
@@ -349,7 +413,7 @@ func (s *Server) ListenAndServe(addr string) (*http.Server, error) {
 	return srv, nil
 }
 
-func withCORS(h http.Handler) http.Handler {
+func (s *Server) withCORS(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Host-header allowlist: blocks DNS-rebinding (the browser sends
 		// the attacker-controlled hostname in the Host header even after
@@ -379,20 +443,50 @@ func withCORS(h http.Handler) http.Handler {
 			// check is in series with the Host-header check above;
 			// together they keep both a DNS-rebinding attacker and a
 			// compromised AI tool page out of the admin surface.
-			if isControlPath(r.URL.Path) && !isControlOrigin(origin) {
+			if isControlPath(r.URL.Path) && !s.isControlOrigin(origin) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		}
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+
+		// Bearer-token enforcement for state-changing endpoints.
+		// This runs after the Origin and Host checks so the failure
+		// mode for an unauthenticated control caller is 401 (rather
+		// than 403 from CORS) — useful signal for the Electron tray,
+		// which can then surface "agent rejected token" to the user.
+		//
+		// When apiToken is empty (operator hasn't configured the
+		// token feature yet) we skip this gate entirely, preserving
+		// the pre-existing origin-only authorisation model. When
+		// apiToken is set but apiTokenRequired is false ("staged")
+		// we validate any token the caller supplies but accept a
+		// missing header — useful for rolling out the token to
+		// extension and tray builds before enforcing.
+		if s.apiToken != "" && isControlPath(r.URL.Path) {
+			got := tokenFromRequest(r)
+			switch {
+			case got == "":
+				if s.apiTokenRequired {
+					w.Header().Set("WWW-Authenticate", "Bearer")
+					http.Error(w, "missing bearer token", http.StatusUnauthorized)
+					return
+				}
+			case !tokensEqual(got, s.apiToken):
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				http.Error(w, "invalid bearer token", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		h.ServeHTTP(w, r)
 	})
 }
@@ -446,26 +540,91 @@ func isControlPath(path string) bool {
 // state-changing endpoints. AI page origins (Tier-2 tool pages) are
 // explicitly excluded; only the Electron renderer and any installed
 // build of the companion extension qualify.
-func isControlOrigin(origin string) bool {
+//
+// When s.allowedExtensionIDs is non-empty, an extension-scheme
+// origin is accepted only if the ID portion (between scheme and
+// the next slash) is in the allowlist. An empty allowlist preserves
+// the pre-existing "any non-empty ID" behaviour; the operator-
+// recommended configuration is to populate the allowlist with the
+// install-time IDs of the Web Store / AMO / App Store builds.
+func (s *Server) isControlOrigin(origin string) bool {
 	if _, ok := aiPageOrigins[origin]; ok {
 		return false
 	}
 	if _, ok := controlOrigins[origin]; ok {
 		return true
 	}
-	if strings.HasPrefix(origin, chromeExtensionScheme) &&
-		len(origin) > len(chromeExtensionScheme) {
-		return true
+	if id, ok := extractExtensionID(origin); ok {
+		return s.extensionIDAllowed(id)
 	}
-	if strings.HasPrefix(origin, mozExtensionScheme) &&
-		len(origin) > len(mozExtensionScheme) {
-		return true
+	return false
+}
+
+// extractExtensionID returns the (id, true) parsed from a
+// chrome-extension://, moz-extension://, or safari-web-extension://
+// origin. The id is the substring between the scheme and the next
+// slash or end-of-string. ok is false for other schemes, an empty
+// id, or an id containing characters that should never appear in a
+// real extension ID (a defensive check against trivial spoofs).
+func extractExtensionID(origin string) (string, bool) {
+	var rest string
+	switch {
+	case strings.HasPrefix(origin, chromeExtensionScheme):
+		rest = origin[len(chromeExtensionScheme):]
+	case strings.HasPrefix(origin, mozExtensionScheme):
+		rest = origin[len(mozExtensionScheme):]
+	case strings.HasPrefix(origin, safariExtensionScheme):
+		rest = origin[len(safariExtensionScheme):]
+	default:
+		return "", false
 	}
-	if strings.HasPrefix(origin, safariExtensionScheme) &&
-		len(origin) > len(safariExtensionScheme) {
+	if i := strings.IndexByte(rest, '/'); i >= 0 {
+		rest = rest[:i]
+	}
+	if rest == "" {
+		return "", false
+	}
+	// Real Chrome IDs are 32 lowercase letters [a-p]; Firefox and
+	// Safari use UUIDs (hex + dashes + curly braces). Reject
+	// anything outside the union of those character classes so a
+	// path-traversal-ish origin like
+	// "chrome-extension://attacker.com/" doesn't even reach the
+	// allowlist check.
+	for _, c := range rest {
+		if !isValidExtensionIDChar(c) {
+			return "", false
+		}
+	}
+	return rest, true
+}
+
+func isValidExtensionIDChar(c rune) bool {
+	switch {
+	case c >= 'a' && c <= 'z':
+		return true
+	case c >= 'A' && c <= 'Z':
+		return true
+	case c >= '0' && c <= '9':
+		return true
+	case c == '-', c == '{', c == '}':
 		return true
 	}
 	return false
+}
+
+// extensionIDAllowed reports whether id is permitted to act as a
+// control caller. When s.allowedExtensionIDs is nil/empty we fall
+// back to the historical "any non-empty ID" rule; otherwise we
+// require an exact case-sensitive match.
+func (s *Server) extensionIDAllowed(id string) bool {
+	if id == "" {
+		return false
+	}
+	if len(s.allowedExtensionIDs) == 0 {
+		return true
+	}
+	_, ok := s.allowedExtensionIDs[id]
+	return ok
 }
 
 func isAllowedOrigin(origin string) bool {

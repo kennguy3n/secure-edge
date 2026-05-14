@@ -298,3 +298,89 @@ func TestNativeMessaging_StatsCountersBumpOnAllow(t *testing.T) {
 		t.Errorf("dlp_blocks_total = %d, want 0 (allow path)", got.DLPBlocksTotal)
 	}
 }
+
+// TestNativeMessaging_HelloReturnsAPIToken confirms the A2
+// capability-token bootstrap: a "hello" request returns the
+// configured token in api_token so the extension can cache it for
+// its HTTP-fallback path.
+func TestNativeMessaging_HelloReturnsAPIToken(t *testing.T) {
+	var in bytes.Buffer
+	in.Write(frame(t, NativeMessageRequest{ID: 7, Kind: "hello"}))
+
+	var out bytes.Buffer
+	err := ServeNativeMessagingWithOptions(
+		context.Background(),
+		nil, // scanner not needed for hello
+		nil, // no stats store needed
+		NativeMessagingOptions{APIToken: "tok-12345"},
+		&in, &out,
+	)
+	if err != nil {
+		t.Fatalf("ServeNativeMessagingWithOptions: %v", err)
+	}
+	frames := readFrames(t, &out)
+	if len(frames) != 1 {
+		t.Fatalf("frames = %d, want 1", len(frames))
+	}
+	got := frames[0]
+	if got.ID != 7 {
+		t.Errorf("ID = %d, want 7", got.ID)
+	}
+	if got.APIToken != "tok-12345" {
+		t.Errorf("APIToken = %q, want %q", got.APIToken, "tok-12345")
+	}
+	if got.Error != "" {
+		t.Errorf("Error = %q, want empty", got.Error)
+	}
+}
+
+// TestNativeMessaging_HelloWithoutTokenReturnsEmpty confirms the
+// backwards-compat path: a hello request against a host that has
+// no token wired in returns an empty api_token (not an error) so
+// the extension can fall back to the pre-A2 posture.
+func TestNativeMessaging_HelloWithoutTokenReturnsEmpty(t *testing.T) {
+	var in bytes.Buffer
+	in.Write(frame(t, NativeMessageRequest{ID: 7, Kind: "hello"}))
+
+	var out bytes.Buffer
+	err := ServeNativeMessagingWithOptions(
+		context.Background(),
+		nil, nil,
+		NativeMessagingOptions{}, // no token
+		&in, &out,
+	)
+	if err != nil {
+		t.Fatalf("ServeNativeMessagingWithOptions: %v", err)
+	}
+	frames := readFrames(t, &out)
+	if len(frames) != 1 {
+		t.Fatalf("frames = %d, want 1", len(frames))
+	}
+	if frames[0].APIToken != "" {
+		t.Errorf("APIToken = %q, want empty", frames[0].APIToken)
+	}
+	if frames[0].Error != "" {
+		t.Errorf("Error = %q, want empty", frames[0].Error)
+	}
+}
+
+// TestNativeMessaging_ShimDelegatesToOptions confirms that the
+// backwards-compat shim ServeNativeMessaging delegates correctly:
+// scans still work, and hello returns empty token because the shim
+// passes a zero-value options struct.
+func TestNativeMessaging_ShimDelegatesToOptions(t *testing.T) {
+	var in bytes.Buffer
+	in.Write(frame(t, NativeMessageRequest{ID: 9, Kind: "hello"}))
+
+	var out bytes.Buffer
+	if err := ServeNativeMessaging(context.Background(), nil, nil, &in, &out); err != nil {
+		t.Fatalf("shim: %v", err)
+	}
+	frames := readFrames(t, &out)
+	if len(frames) != 1 {
+		t.Fatalf("frames = %d, want 1", len(frames))
+	}
+	if frames[0].APIToken != "" {
+		t.Errorf("shim hello: APIToken = %q, want empty", frames[0].APIToken)
+	}
+}

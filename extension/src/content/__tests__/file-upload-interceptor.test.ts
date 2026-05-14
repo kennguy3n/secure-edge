@@ -195,6 +195,48 @@ test("readFilesText truncates at cap and reports it", async () => {
     assert.equal(truncated, true);
 });
 
+// Regression test for the multi-file newline-separator bug: when two
+// or more files collectively reach exactly `cap` bytes, the joined
+// text would previously be `cap + (N-1)` chars due to uncounted
+// "\n" separators between parts. scan-client's `content.length >
+// MAX_SCAN_BYTES` guard would then silently return null, defeating
+// the toast UX. The fix slices the joined string to `cap`.
+test("readFilesText never returns a string longer than cap (multi-file with separators)", async () => {
+    const cap = 1024;
+    // Two files of exactly cap/2 chars each. Without the fix, the
+    // joined text would be cap + 1 chars (one "\n" separator).
+    const f1 = new File([new Uint8Array(cap / 2).fill(65)], "a.bin");
+    const f2 = new File([new Uint8Array(cap / 2).fill(66)], "b.bin");
+    const { text, truncated } = await readFilesText(
+        { length: 2, 0: f1, 1: f2 } as unknown as FileList,
+        cap,
+    );
+    assert.ok(
+        text.length <= cap,
+        `readFilesText returned ${text.length} chars; MUST be <= cap (${cap}) so scanContent does not silently bail`,
+    );
+    // Three files where the per-file accounting (used) only reaches
+    // cap on the third file, but the two intervening separators
+    // would have pushed joined.length to cap + 2 before the fix.
+    const third = Math.floor(cap / 3);
+    const g1 = new File([new Uint8Array(third).fill(65)], "a.bin");
+    const g2 = new File([new Uint8Array(third).fill(66)], "b.bin");
+    const g3 = new File([new Uint8Array(cap - 2 * third).fill(67)], "c.bin");
+    const result = await readFilesText(
+        { length: 3, 0: g1, 1: g2, 2: g3 } as unknown as FileList,
+        cap,
+    );
+    assert.ok(
+        result.text.length <= cap,
+        `readFilesText (3 files) returned ${result.text.length} chars; MUST be <= cap (${cap})`,
+    );
+    assert.equal(
+        truncated,
+        true,
+        "truncated MUST be true when the joined string was sliced down to cap",
+    );
+});
+
 test("onChange ignores non-file inputs", async () => {
     const { calls } = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
     const ev = {

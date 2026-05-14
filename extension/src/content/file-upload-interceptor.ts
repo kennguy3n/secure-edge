@@ -204,6 +204,15 @@ async function scanFileList(files: ArrayLike<File>, kind: "upload"): Promise<Sca
  * does not buffer 5 GB into the page. Returns the decoded text plus
  * a `truncated` flag indicating whether the cap was reached.
  *
+ * The returned string is GUARANTEED to be at most `cap` characters
+ * long. We join parts with `"\n"` separators, which means the join
+ * itself can push the joined string past the cap even when the
+ * per-file accounting stays under it (e.g. two files of exactly
+ * cap/2 chars each yield cap + 1 chars after joining). A final
+ * `slice(0, cap)` enforces the invariant unconditionally so
+ * downstream `scanContent` does not silently return null on
+ * `content.length > MAX_SCAN_BYTES`.
+ *
  * Binary files (e.g. PNG) decode as best-effort UTF-8 via
  * `Blob.text()` (which uses a fatal=false UTF-8 decoder under the
  * hood); the scanner still sees recognisable runs of ASCII that
@@ -215,10 +224,12 @@ async function readFilesText(
 ): Promise<{ text: string; truncated: boolean }> {
     const parts: string[] = [];
     let used = 0;
+    let stoppedAtCap = false;
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (used >= cap) {
-            return { text: parts.join("\n"), truncated: true };
+            stoppedAtCap = true;
+            break;
         }
         const remaining = cap - used;
         try {
@@ -232,7 +243,14 @@ async function readFilesText(
             // up the whole scan.
         }
     }
-    return { text: parts.join("\n"), truncated: used >= cap };
+    const joined = parts.join("\n");
+    // Enforce the cap on the joined string: the `"\n"` separators
+    // between parts are not counted in `used`, so a stream of
+    // small-enough files can still push `joined.length` over `cap`.
+    // `slice(0, cap)` is a cheap unconditional safety net.
+    const text = joined.length > cap ? joined.slice(0, cap) : joined;
+    const truncated = stoppedAtCap || used >= cap || joined.length > cap;
+    return { text, truncated };
 }
 
 export const __test__ = { onChange, onDrop, scanFileList, readFilesText };

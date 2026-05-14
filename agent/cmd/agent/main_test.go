@@ -127,3 +127,82 @@ func TestCategoryFromPath(t *testing.T) {
 		}
 	}
 }
+
+// TestOrphanedRulePublicKeyWarning covers the misconfiguration
+// nudge that fires when an operator sets `rule_update_public_key`
+// but leaves `rule_update_url` empty. Reviewers flagged the silent-
+// ignore on PR #20 as an operator footgun: a partial rollout
+// (deploy the key first, plumb the URL second) would leave the
+// signature verification code path inert with no visible signal.
+//
+// The helper is pure (returns the warning message, or "") so the
+// real test surface stays decoupled from os.Stderr and the rest
+// of run().
+func TestOrphanedRulePublicKeyWarning(t *testing.T) {
+	const wellFormedKey = "00112233445566778899aabbccddeeff" +
+		"00112233445566778899aabbccddeeff"
+
+	cases := []struct {
+		name string
+		url  string
+		key  string
+		want string // "" means no warning
+	}{
+		{
+			name: "both empty: no warning",
+			url:  "",
+			key:  "",
+			want: "",
+		},
+		{
+			name: "url set, key empty: no warning",
+			url:  "https://example.com/manifest.json",
+			key:  "",
+			want: "",
+		},
+		{
+			name: "both set: well-formed rollout, no warning",
+			url:  "https://example.com/manifest.json",
+			key:  wellFormedKey,
+			want: "",
+		},
+		{
+			name: "url empty, key set: WARN (this is the case the helper exists for)",
+			url:  "",
+			key:  wellFormedKey,
+			want: "agent: rule_update_public_key is set but rule_update_url is empty; " +
+				"the configured key will be ignored. Set rule_update_url to enable signature verification, " +
+				"or remove rule_update_public_key to silence this warning.",
+		},
+		{
+			name: "url empty, key is whitespace-only: treat as unset, no warning",
+			url:  "",
+			key:  "   \t\n  ",
+			want: "",
+		},
+		{
+			name: "url empty, key has surrounding whitespace: still warn (matches trimmed-decode path)",
+			url:  "",
+			key:  "   " + wellFormedKey + "   ",
+			want: "agent: rule_update_public_key is set but rule_update_url is empty; " +
+				"the configured key will be ignored. Set rule_update_url to enable signature verification, " +
+				"or remove rule_update_public_key to silence this warning.",
+		},
+		{
+			name: "url set, key whitespace-only: no warning (mirror of the no-rollout case)",
+			url:  "https://example.com/manifest.json",
+			key:  "   ",
+			want: "",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := orphanedRulePublicKeyWarning(tc.url, tc.key)
+			if got != tc.want {
+				t.Fatalf("orphanedRulePublicKeyWarning(%q, %q):\n  got:  %q\n  want: %q",
+					tc.url, tc.key, got, tc.want)
+			}
+		})
+	}
+}

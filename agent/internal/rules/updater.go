@@ -30,10 +30,41 @@ import (
 // updater falls back to per-file SHA-256 checks only. The field is
 // always emitted on the wire so signed and unsigned manifests share
 // one struct.
+//
+// IMPORTANT: when adding new manifest fields, also extend
+// `manifestBody` below so the new field participates in the signed
+// canonical form. The two struct shapes (Manifest minus Signature)
+// MUST stay in lockstep; the dedicated body type makes that
+// requirement explicit at the source level rather than relying on
+// `omitempty` to silently exclude future fields.
 type Manifest struct {
 	Version   string         `json:"version"`
 	Files     []ManifestFile `json:"files"`
 	Signature string         `json:"signature,omitempty"`
+}
+
+// manifestBody is the structurally-explicit canonical-signing
+// shape of Manifest with the Signature field physically removed.
+//
+// Why a separate type:
+//
+//   - The previous approach was to shallow-copy Manifest into a
+//     local with Signature left zero-valued and rely on
+//     `json:"signature,omitempty"` to drop it from the canonical
+//     bytes. That works today but is fragile: any future field
+//     added to Manifest without `omitempty` would silently change
+//     the canonical form and invalidate every previously-signed
+//     manifest. Reviewers flagged this on PR #20.
+//   - With a dedicated body type, the compiler tells us when
+//     Manifest and manifestBody drift apart: every new field needs
+//     to be mirrored here (or explicitly chosen not to participate
+//     in the signature).
+//   - Field order MUST match Manifest's declaration order because
+//     `encoding/json` emits fields in source order, and the signed
+//     byte sequence is order-sensitive.
+type manifestBody struct {
+	Version string         `json:"version"`
+	Files   []ManifestFile `json:"files"`
 }
 
 // ManifestFile is a single rule file. Either an explicit URL or a path
@@ -406,20 +437,25 @@ func (u *Updater) verifyManifestSignature(m Manifest) error {
 // CanonicalForSigning returns the byte sequence that the manifest
 // signer signs over and that the updater verifies. The signature
 // field itself is omitted from the canonical body — otherwise the
-// signer would have to fixed-point its own input. Field order is
-// fixed by Go's encoding/json (declaration order on the struct) so
-// a signer and verifier built from the same Manifest type agree
-// without an explicit "canonicalisation" library.
+// signer would have to fixed-point its own input. The body is
+// marshalled through `manifestBody`, a sibling struct that
+// physically lacks a Signature field, so this code is robust
+// against future additions to Manifest that forget `omitempty`
+// (see the doc comment on manifestBody for the full reasoning).
+//
+// Field order is fixed by Go's encoding/json (declaration order on
+// manifestBody), which must match Manifest's order field-for-field
+// so existing signatures remain valid.
 func CanonicalForSigning(m Manifest) ([]byte, error) {
-	// Note on the shallow copy: stripped.Files shares its backing
+	// Note on the shallow copy: body.Files shares its backing
 	// array with m.Files. Safe here because json.Marshal only
 	// reads the slice and CanonicalForSigning is never called on
 	// a Manifest that is being mutated concurrently (the only
 	// writers are deserialisation in fetchManifest and the signer
 	// tool, both of which finish before this is called). A deep
 	// copy would defeat the point of the function being cheap.
-	stripped := Manifest{Version: m.Version, Files: m.Files}
-	return json.Marshal(stripped)
+	body := manifestBody{Version: m.Version, Files: m.Files}
+	return json.Marshal(body)
 }
 
 // applyManifest iterates manifest.Files, compares each against the

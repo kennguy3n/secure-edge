@@ -390,6 +390,18 @@ func run(configPath string) error {
 			}()
 		}
 
+		// Misconfiguration nudge: a public key only does anything
+		// when there's a manifest URL to fetch. An operator who sets
+		// `rule_update_public_key` without `rule_update_url` is
+		// likely mid-rollout or has a typo'd YAML key — the key
+		// would otherwise be silently ignored and the operator
+		// would have no signal that their signature verification is
+		// inert. Warn once, do not fail (the agent is otherwise
+		// fully functional). Reviewer suggested this on PR #20.
+		if msg := orphanedRulePublicKeyWarning(cfg.RuleUpdateURL, cfg.RuleUpdatePublicKey); msg != "" {
+			fmt.Fprintln(os.Stderr, msg)
+		}
+
 		// Wire the rule updater after the pipeline so the reload
 		// callback can refresh both the policy engine's lookup table
 		// and the DLP automaton from the freshly-downloaded files.
@@ -565,6 +577,32 @@ func run(configPath string) error {
 	<-sig
 	fmt.Fprintln(os.Stderr, "agent: shutting down")
 	return nil
+}
+
+// orphanedRulePublicKeyWarning returns a non-empty operator-facing
+// message when an operator has set `rule_update_public_key` but
+// left `rule_update_url` empty. Returns "" when the configuration
+// is well-formed.
+//
+// The check trims the public key value because YAML scalars often
+// carry stray surrounding whitespace, and that pre-trim consistency
+// is also what the actual key-decoding path does (see the
+// `strings.TrimSpace(cfg.RuleUpdatePublicKey)` block above). A key
+// that is whitespace-only is treated as unset.
+//
+// Pure / side-effect-free so the agent's startup integration code
+// can call it once and unit tests can drive it directly without
+// stubbing os.Stderr or running the full `run()` boot path.
+func orphanedRulePublicKeyWarning(ruleUpdateURL, ruleUpdatePublicKey string) string {
+	if ruleUpdateURL != "" {
+		return ""
+	}
+	if strings.TrimSpace(ruleUpdatePublicKey) == "" {
+		return ""
+	}
+	return "agent: rule_update_public_key is set but rule_update_url is empty; " +
+		"the configured key will be ignored. Set rule_update_url to enable signature verification, " +
+		"or remove rule_update_public_key to silence this warning."
 }
 
 // validateRulesAlignment checks that every rule file the live agent

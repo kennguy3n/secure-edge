@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { __test__ } from "../form-interceptor.js";
+import { __test__ as scanTest, MAX_SCAN_BYTES } from "../scan-client.js";
 
 const { extractFormText, handleSubmit } = __test__;
 
@@ -137,4 +138,89 @@ test("handleSubmit ignores empty forms", async () => {
     await handleSubmit(ev);
     assert.equal(preventCalls.count, 0, "empty form should not preventDefault");
     assert.equal(calls.length, 0);
+});
+
+// --- Oversize routing -------------------------------------------------------
+//
+// scanContent returns null for any payload bigger than MAX_SCAN_BYTES.
+// Before these tests existed, the form-submit handler routed that null
+// through the policyForUnavailable() branch, surfacing a misleading
+// "agent unavailable" toast on a body that was simply too large. The
+// three cases below pin the corrected routing for personal / team /
+// managed and double as a regression guard for the diagnostic.
+
+function oversizeValue(): string {
+    return "x".repeat(MAX_SCAN_BYTES + 1);
+}
+
+test("handleSubmit in personal mode falls through (no scan call, native submit proceeds)", async () => {
+    scanTest.setCachedEnforcementMode("personal");
+    try {
+        const calls = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+        let submitCalls = 0;
+        const form = makeForm([{ tagName: "TEXTAREA", value: oversizeValue() }], () => {
+            submitCalls++;
+        });
+        const { ev, preventCalls, stopCalls } = makeEvent(form);
+
+        await handleSubmit(ev);
+
+        assert.equal(calls.length, 0, "oversize must not hit /api/dlp/scan");
+        assert.equal(preventCalls.count, 0, "personal-mode oversize should not preventDefault");
+        assert.equal(stopCalls.count, 0, "personal-mode oversize should not stopPropagation");
+        // form.submit() is NOT called: the native browser submit runs
+        // because preventDefault never fired.
+        assert.equal(submitCalls, 0, "personal-mode oversize leaves the native submit untouched");
+    } finally {
+        scanTest.resetEnforcementMode();
+    }
+});
+
+test("handleSubmit in team mode falls through silently on oversize (no warn toast, native submit proceeds)", async () => {
+    scanTest.setCachedEnforcementMode("team");
+    try {
+        const calls = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+        let submitCalls = 0;
+        const form = makeForm([{ tagName: "TEXTAREA", value: oversizeValue() }], () => {
+            submitCalls++;
+        });
+        const { ev, preventCalls } = makeEvent(form);
+
+        await handleSubmit(ev);
+
+        assert.equal(calls.length, 0, "oversize must not hit /api/dlp/scan");
+        assert.equal(
+            preventCalls.count,
+            0,
+            "team mode treats oversize as silent allow — must not preventDefault",
+        );
+        assert.equal(submitCalls, 0, "team mode lets the native submit proceed");
+    } finally {
+        scanTest.resetEnforcementMode();
+    }
+});
+
+test("handleSubmit in managed mode blocks oversize and leaves the form intact", async () => {
+    scanTest.setCachedEnforcementMode("managed");
+    try {
+        const calls = mockFetch({ ok: true, body: { blocked: false, pattern_name: "", score: 0 } });
+        let submitCalls = 0;
+        const form = makeForm([{ tagName: "TEXTAREA", value: oversizeValue() }], () => {
+            submitCalls++;
+        });
+        const { ev, preventCalls, stopCalls } = makeEvent(form);
+
+        await handleSubmit(ev);
+
+        assert.equal(calls.length, 0, "oversize must not hit /api/dlp/scan");
+        assert.equal(preventCalls.count, 1, "managed-mode oversize must preventDefault");
+        assert.equal(stopCalls.count, 1, "managed-mode oversize must stopPropagation");
+        assert.equal(
+            submitCalls,
+            0,
+            "managed-mode oversize must NOT programmatically re-submit",
+        );
+    } finally {
+        scanTest.resetEnforcementMode();
+    }
 });

@@ -36,7 +36,9 @@
 
 import type { ScanResult } from "../shared.js";
 import {
+    MAX_SCAN_BYTES,
     ensureEnforcementModeBootstrapped,
+    policyForOversize,
     policyForUnavailable,
     scanContent,
 } from "./scan-client.js";
@@ -83,13 +85,23 @@ type ReplyFn = (msg: ScanResponseMessage) => void;
  *  DLP pattern. */
 export const POLICY_PATTERN_AGENT_UNAVAILABLE = "policy:agent-unavailable";
 
+/** Synthetic pattern name the relay returns when the request body
+ *  exceeds MAX_SCAN_BYTES and managed mode is active. Distinct from
+ *  the agent-unavailable pattern so tests, telemetry, and the
+ *  bridge's own error surface can tell the two policy paths apart. */
+export const POLICY_PATTERN_OVERSIZE = "policy:oversize";
+
 /** Hooks exposed for tests so the policy decision can be driven
  *  without standing up the real cached enforcement state. Production
- *  callers leave these at the module defaults. */
+ *  callers leave these at the module defaults. `onOversize` is
+ *  consulted before the scan call; `onUnavailable` afterwards, so
+ *  the two paths can be driven independently in unit tests. */
 export interface BridgePolicyHooks {
     onUnavailable?: () => "allow" | "warn" | "block";
+    onOversize?: () => "allow" | "warn" | "block";
     showPolicyBlock?: () => void;
     showPolicyWarn?: () => void;
+    showOversizeBlock?: () => void;
 }
 
 /** Handle a single bridge message. Exported for unit tests so we can
@@ -103,6 +115,33 @@ export async function handleBridgeMessage(
 ): Promise<void> {
     if (!isScanRequest(data)) return;
     const { id, content } = data;
+
+    // Oversize routing has to run BEFORE the scan call. scanContent
+    // returns null for any payload larger than MAX_SCAN_BYTES, and
+    // routing that null through the agent-unavailable branch below
+    // would surface a misleading "agent unavailable" toast on a
+    // request body that is simply too large for inline scan. In
+    // managed mode the bridge synthesises a blocked result so the
+    // page-world fetch / XHR patch aborts the request; in
+    // personal/team the request falls open silently to match the
+    // pre-C2 behaviour for oversized bodies.
+    if (content.length > MAX_SCAN_BYTES) {
+        const decision = (policy.onOversize ?? policyForOversize)();
+        if (decision === "block") {
+            (policy.showOversizeBlock ?? (() =>
+                showPolicyBlockedToast("oversize", "request")))();
+            const synthetic: ScanResult = {
+                blocked: true,
+                pattern_name: POLICY_PATTERN_OVERSIZE,
+                score: 0,
+            };
+            reply({ source: ISO_SOURCE, kind: "scan-resp", id, result: synthetic });
+            return;
+        }
+        reply({ source: ISO_SOURCE, kind: "scan-resp", id, result: null });
+        return;
+    }
+
     let result: ScanResult | null;
     try {
         result = await scan(content);

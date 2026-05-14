@@ -23,7 +23,12 @@ import {
     policyForOversize,
     policyForUnavailable,
 } from "../scan-client.js";
-import { __test__ as iso, POLICY_PATTERN_AGENT_UNAVAILABLE } from "../network-interceptor.js";
+import {
+    __test__ as iso,
+    POLICY_PATTERN_AGENT_UNAVAILABLE,
+    POLICY_PATTERN_OVERSIZE,
+} from "../network-interceptor.js";
+import { MAX_SCAN_BYTES } from "../scan-client.js";
 import { __test__ as toastTest } from "../toast.js";
 
 const { handleBridgeMessage } = iso;
@@ -204,6 +209,105 @@ test("handleBridgeMessage passes through a clean (allowed) verdict in managed mo
     assert.equal(recorded.length, 1);
     assert.equal(recorded[0].blocked, false);
     assert.equal(policyBlock, 0, "policy-block toast only fires when the agent had no verdict");
+});
+
+// --- Bridge handler: oversize routing ---------------------------------------
+//
+// The oversize path has to short-circuit *before* the bridge calls
+// scan(), otherwise scanContent's own 1 MiB cap (returning null) gets
+// laundered through the agent-unavailable branch and the user sees
+// "agent unavailable" on a payload that's simply too big for inline
+// scan. These tests pin that ordering for personal / team / managed.
+
+function oversizeContent(): string {
+    return "x".repeat(MAX_SCAN_BYTES + 1);
+}
+
+test("handleBridgeMessage in personal mode falls open silently on oversize (no scan call, no toast)", async () => {
+    let scanCalls = 0;
+    let toasted = 0;
+    let oversizeBlock = 0;
+    let warnToast = 0;
+    const { recorded, reply } = recorder();
+    await handleBridgeMessage(
+        { source: "secure-edge-bridge", kind: "scan-req", id: "ov-personal", content: oversizeContent() },
+        reply,
+        async () => { scanCalls++; return null; },
+        () => { toasted++; },
+        {
+            onOversize: () => "allow",
+            // onUnavailable should never run on the oversize path; if
+            // the implementation regresses to the unavailable branch
+            // this assertion would not be reached, but the scanCalls
+            // check below would still catch it.
+            onUnavailable: () => "allow",
+            showOversizeBlock: () => { oversizeBlock++; },
+            showPolicyWarn: () => { warnToast++; },
+        },
+    );
+    assert.equal(scanCalls, 0, "oversize must not invoke scan()");
+    assert.deepEqual(recorded, [{ id: "ov-personal", blocked: null, pattern_name: undefined }]);
+    assert.equal(toasted, 0, "no DLP-block toast on oversize fall-open");
+    assert.equal(oversizeBlock, 0, "personal mode does not show the oversize block toast");
+    assert.equal(warnToast, 0, "personal mode does not warn on oversize");
+});
+
+test("handleBridgeMessage in team mode falls open silently on oversize (no warn toast)", async () => {
+    let scanCalls = 0;
+    let warnToast = 0;
+    const { recorded, reply } = recorder();
+    await handleBridgeMessage(
+        { source: "secure-edge-bridge", kind: "scan-req", id: "ov-team", content: oversizeContent() },
+        reply,
+        async () => { scanCalls++; return null; },
+        () => { /* unused */ },
+        {
+            onOversize: () => "allow",
+            onUnavailable: () => "warn",
+            showPolicyWarn: () => { warnToast++; },
+        },
+    );
+    assert.equal(scanCalls, 0, "oversize must not invoke scan()");
+    assert.deepEqual(recorded, [{ id: "ov-team", blocked: null, pattern_name: undefined }]);
+    assert.equal(
+        warnToast,
+        0,
+        "team mode treats oversize as silent allow — no 'agent unavailable' warn",
+    );
+});
+
+test("handleBridgeMessage in managed mode synthesises a distinct oversize block (not agent-unavailable)", async () => {
+    let scanCalls = 0;
+    let oversizeBlock = 0;
+    let agentBlock = 0;
+    const { recorded, reply } = recorder();
+    await handleBridgeMessage(
+        { source: "secure-edge-bridge", kind: "scan-req", id: "ov-managed", content: oversizeContent() },
+        reply,
+        async () => { scanCalls++; return null; },
+        () => { /* unused */ },
+        {
+            onOversize: () => "block",
+            onUnavailable: () => "block",
+            showOversizeBlock: () => { oversizeBlock++; },
+            showPolicyBlock: () => { agentBlock++; },
+        },
+    );
+    assert.equal(scanCalls, 0, "oversize must not invoke scan()");
+    assert.equal(recorded.length, 1);
+    assert.equal(recorded[0].blocked, true);
+    assert.equal(
+        recorded[0].pattern_name,
+        POLICY_PATTERN_OVERSIZE,
+        "oversize block uses the oversize pattern, not agent-unavailable",
+    );
+    assert.notEqual(
+        recorded[0].pattern_name,
+        POLICY_PATTERN_AGENT_UNAVAILABLE,
+        "regression guard: agent-unavailable must not stand in for oversize",
+    );
+    assert.equal(oversizeBlock, 1, "oversize toast fires exactly once");
+    assert.equal(agentBlock, 0, "agent-unavailable toast must not fire on oversize");
 });
 
 test("setCachedEnforcementMode reflects through to policy helpers without an explicit arg", () => {

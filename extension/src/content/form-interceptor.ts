@@ -12,7 +12,9 @@
 // up in a real DOM environment.
 
 import {
+    MAX_SCAN_BYTES,
     ensureEnforcementModeBootstrapped,
+    policyForOversize,
     policyForUnavailable,
     scanContent,
 } from "./scan-client.js";
@@ -53,6 +55,26 @@ export async function handleSubmit(ev: SubmitEvent): Promise<void> {
 
     const text = extractFormText(form);
     if (text.length === 0) return;
+
+    // Oversize routing must run BEFORE the agent call. scanContent
+    // returns null for any payload bigger than MAX_SCAN_BYTES, and
+    // routing that null through the agent-unavailable branch would
+    // surface a misleading toast ("agent unavailable") on a body
+    // that's simply too large for inline scan. The other three
+    // interceptors (paste / drag / clipboard) check size first for
+    // the same reason.
+    if (text.length > MAX_SCAN_BYTES) {
+        if (policyForOversize() === "block") {
+            // Stop the submit and leave the form intact so the user
+            // can trim before retrying.
+            ev.preventDefault();
+            ev.stopPropagation();
+            showPolicyBlockedToast("oversize", "submission");
+        }
+        // personal/team: silent fall-open. Do NOT preventDefault so
+        // the native submit proceeds as it would have before C2.
+        return;
+    }
 
     // Block the native submit while we ask the agent. On allow / fall
     // open we re-submit programmatically; on block we leave the form

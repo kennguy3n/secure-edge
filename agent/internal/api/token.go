@@ -31,79 +31,122 @@ const tokenByteLength = 32
 // configured" identically to "token feature disabled".
 //
 // Concurrency: the daemon and the Native Messaging host both call
-// this on first install and can race. The create path uses
-// O_CREATE|O_EXCL so the kernel picks exactly one winner; the loser
-// reads the file the winner wrote and returns the same string. Two
-// processes therefore never end up with different in-memory tokens
-// from a single first-install — the tray, daemon, and NM host stay
-// in sync without any explicit lockfile.
+// this on first install and can race. The create path stages the
+// candidate in a tmp file (in the same directory, so it is on the
+// same filesystem) and then calls os.Link to atomically install it
+// at path. Link fails with EEXIST when path already exists, so the
+// kernel picks exactly one winner across concurrent callers — and
+// crucially the destination at path is never visible empty. Losers
+// read the winner's token via readToken and return the same string.
+// Two processes therefore never end up with different in-memory
+// tokens from a single first-install — the tray, daemon, and NM
+// host stay in sync without any explicit lockfile.
 func LoadOrCreateAPIToken(path string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
 
-	// Fast path: an existing, non-empty token wins.
-	if tok, ok, err := readToken(path); err != nil {
-		return "", err
-	} else if ok {
-		return tok, nil
-	}
-
-	// Mint a candidate. Two concurrent callers will each mint
-	// their own, but at most one wins the O_EXCL create below.
-	buf := make([]byte, tokenByteLength)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("api token: generate: %w", err)
-	}
-	candidate := hex.EncodeToString(buf)
-
-	if dir := filepath.Dir(path); dir != "" && dir != "." {
+	dir := filepath.Dir(path)
+	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return "", fmt.Errorf("api token: mkdir %s: %w", dir, err)
 		}
 	}
 
-	// Create-or-lose: O_EXCL guarantees the kernel picks exactly
-	// one winner across concurrent callers.
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err == nil {
-		if _, werr := f.WriteString(candidate); werr != nil {
-			_ = f.Close()
-			return "", fmt.Errorf("api token: write %s: %w", path, werr)
+	// Bound the retry loop so a pathological filesystem state
+	// (e.g. another process repeatedly recreating a whitespace
+	// file under us) cannot wedge the daemon forever. In practice
+	// every realistic call returns in 1 iteration; 32 is far above
+	// what concurrent first-install contention can need.
+	const maxAttempts = 32
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// Fast path: an existing, non-empty token wins.
+		if tok, ok, err := readToken(path); err != nil {
+			return "", err
+		} else if ok {
+			return tok, nil
 		}
-		if cerr := f.Close(); cerr != nil {
-			return "", fmt.Errorf("api token: close %s: %w", path, cerr)
+
+		// Mint a candidate. Two concurrent callers will each mint
+		// their own, but at most one wins the os.Link below.
+		buf := make([]byte, tokenByteLength)
+		if _, err := rand.Read(buf); err != nil {
+			return "", fmt.Errorf("api token: generate: %w", err)
 		}
-		// Re-apply restrictive mode in case umask widened it.
-		_ = os.Chmod(path, 0o600)
-		return candidate, nil
-	}
-	if !errors.Is(err, fs.ErrExist) {
-		return "", fmt.Errorf("api token: create %s: %w", path, err)
-	}
+		candidate := hex.EncodeToString(buf)
 
-	// The file already exists. Either a concurrent caller won the
-	// race (it just wrote a token), or a previous run left an
-	// empty/whitespace file behind. Re-read — if it now has a
-	// real token, that's our answer.
-	if tok, ok, rerr := readToken(path); rerr != nil {
-		return "", rerr
-	} else if ok {
-		return tok, nil
-	}
+		// Stage the candidate in a tmp file co-located with path so
+		// the eventual os.Link is a same-filesystem link.
+		tmpName, err := writeTokenTmpFile(dir, candidate)
+		if err != nil {
+			return "", err
+		}
 
-	// Recovery: the file is still whitespace-only. Truncate-and-
-	// rewrite, then re-read so concurrent overwriters converge on
-	// whichever write hit disk last.
-	if err := overwriteTokenFile(path, candidate); err != nil {
-		return "", err
+		// Atomically install tmp at path. Link fails with EEXIST
+		// when path already exists, which is exactly the "someone
+		// else already won" or "stale whitespace file" signal we
+		// need.
+		if linkErr := os.Link(tmpName, path); linkErr == nil {
+			_ = os.Remove(tmpName)
+			// Re-apply restrictive mode in case umask widened it
+			// on the tmp file (and therefore on the link target).
+			_ = os.Chmod(path, 0o600)
+			return candidate, nil
+		} else if !errors.Is(linkErr, fs.ErrExist) {
+			_ = os.Remove(tmpName)
+			return "", fmt.Errorf("api token: link %s: %w", path, linkErr)
+		}
+		_ = os.Remove(tmpName)
+
+		// Lost the race or path already existed: read what's on
+		// disk. A concurrent winner will have populated it with
+		// their full candidate (Link is atomic, no empty window).
+		if tok, ok, rerr := readToken(path); rerr != nil {
+			return "", rerr
+		} else if ok {
+			return tok, nil
+		}
+
+		// Genuine pre-existing whitespace-only file (e.g. an
+		// operator touched it). Remove it and retry — the next
+		// iteration races to install our candidate. Use Remove
+		// (not RemoveAll) so we don't accidentally clobber a
+		// non-empty file written between the readToken above and
+		// the Remove here.
+		if rerr := os.Remove(path); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+			return "", fmt.Errorf("api token: remove %s: %w", path, rerr)
+		}
 	}
-	if tok, ok, rerr := readToken(path); rerr != nil {
-		return "", rerr
-	} else if ok {
-		return tok, nil
+	return "", fmt.Errorf("api token: %s: gave up after %d attempts (filesystem racing?)", path, maxAttempts)
+}
+
+// writeTokenTmpFile stages token in a uniquely-named temp file in
+// dir (so the eventual os.Link into the canonical path is a
+// same-filesystem hard link). Returns the absolute path of the tmp
+// file. Callers are responsible for either os.Link-ing it into
+// place or os.Remove-ing it.
+func writeTokenTmpFile(dir, token string) (string, error) {
+	f, err := os.CreateTemp(dir, ".api-token.*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("api token: create tmp: %w", err)
 	}
-	return candidate, nil
+	name := f.Name()
+	if _, werr := f.WriteString(token); werr != nil {
+		_ = f.Close()
+		_ = os.Remove(name)
+		return "", fmt.Errorf("api token: write tmp %s: %w", name, werr)
+	}
+	if cerr := f.Close(); cerr != nil {
+		_ = os.Remove(name)
+		return "", fmt.Errorf("api token: close tmp %s: %w", name, cerr)
+	}
+	// Tighten the mode before linking; umask may have widened
+	// CreateTemp's default.
+	if cerr := os.Chmod(name, 0o600); cerr != nil {
+		_ = os.Remove(name)
+		return "", fmt.Errorf("api token: chmod tmp %s: %w", name, cerr)
+	}
+	return name, nil
 }
 
 // readToken returns (token, true, nil) when path holds a non-empty
@@ -122,27 +165,6 @@ func readToken(path string) (string, bool, error) {
 		return "", false, nil
 	}
 	return tok, true, nil
-}
-
-// overwriteTokenFile is the recovery path for an existing empty or
-// whitespace-only token file (e.g. a previous run crashed between
-// create and write). The primary writer uses O_EXCL; this is reached
-// only after readToken confirmed there's nothing useful to preserve.
-func overwriteTokenFile(path, token string) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return fmt.Errorf("api token: open %s: %w", path, err)
-	}
-	if _, err := f.WriteString(token); err != nil {
-		_ = f.Close()
-		return fmt.Errorf("api token: write %s: %w", path, err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("api token: close %s: %w", path, err)
-	}
-	// Re-apply restrictive mode in case umask widened it.
-	_ = os.Chmod(path, 0o600)
-	return nil
 }
 
 // tokenFromRequest extracts the bearer token from the Authorization

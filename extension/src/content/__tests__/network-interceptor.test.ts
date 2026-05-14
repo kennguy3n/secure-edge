@@ -11,7 +11,18 @@ import { __test__ as iso } from "../network-interceptor.js";
 import type { ScanResult } from "../../shared.js";
 import type { BridgeDoc, BridgeRuntime } from "../network-interceptor.js";
 
-const { patchFetch, patchXHR, extractFetchBody, bodyToText, requestScan, BRIDGE_SOURCE, ISO_SOURCE } = mainWorld;
+const {
+    patchFetch,
+    patchXHR,
+    extractFetchBody,
+    extractFetchBodyAsync,
+    bodyToText,
+    bodyToTextAsync,
+    requestScan,
+    BRIDGE_SOURCE,
+    ISO_SOURCE,
+    MAX_SCAN_BYTES,
+} = mainWorld;
 const { handleBridgeMessage, manifestDeclaresMainWorld, injectMainWorldBridge, BRIDGE_SCRIPT_PATH } = iso;
 
 type MessageListener = (ev: MessageEvent) => void;
@@ -93,13 +104,94 @@ test("extractFetchBody extracts FormData text fields (P1-5)", () => {
     assert.equal(extractFetchBody(args), "question=AKIAABCDEFGHIJKLMNOP");
 });
 
-test("bodyToText returns empty string for Blob / ArrayBuffer (intentional, P1-5)", () => {
-    // Per the spec comment in bodyValueToText: reading Blob /
-    // ArrayBuffer is async and intentionally NOT supported in the
-    // synchronous interception path. They must short-circuit to ""
-    // rather than triggering a misleading partial scan.
+test("bodyToText returns empty string for Blob / ArrayBuffer (sync fast path)", () => {
+    // The synchronous helper is the legacy fast path retained for
+    // string + URLSearchParams + FormData-with-only-text-fields. Any
+    // body that requires I/O to read (Blob, ArrayBuffer, file-bearing
+    // FormData entries) must use bodyToTextAsync. Asserting "" here
+    // pins the sync surface so a future refactor that re-routes the
+    // sync path through async transparently would be caught by tests.
     assert.equal(bodyToText(new Blob(["AKIA..."], { type: "text/plain" })), "");
     assert.equal(bodyToText(new ArrayBuffer(16)), "");
+});
+
+test("bodyToTextAsync reads Blob contents (B1 — file upload interception)", async () => {
+    // Plain-text Blob: the scanner sees the full payload.
+    const blob = new Blob(["leak: AKIAABCDEFGHIJKLMNOP"], { type: "text/plain" });
+    assert.equal(await bodyToTextAsync(blob), "leak: AKIAABCDEFGHIJKLMNOP");
+});
+
+test("bodyToTextAsync reads File contents (B1)", async () => {
+    // File is a Blob subclass; the same read path covers it. The
+    // scanner therefore catches a file dragged into <input type=file>
+    // and uploaded via fetch(url, { body: file }).
+    const file = new File(["password = hunter2"], "creds.txt", { type: "text/plain" });
+    assert.equal(await bodyToTextAsync(file), "password = hunter2");
+});
+
+test("bodyToTextAsync truncates Blob at MAX_SCAN_BYTES (B1 oversize cap)", async () => {
+    // A 5 MiB blob must read at most MAX_SCAN_BYTES (1 MiB) so the
+    // page is never made to buffer a multi-GB upload through the
+    // bridge. The exact length pins the policy-layer contract:
+    // text.length >= MAX_SCAN_BYTES is the trigger for the oversize
+    // branch (`policyForOversize`).
+    const huge = new Blob([new Uint8Array(5 * 1024 * 1024).fill(65)]);
+    const text = await bodyToTextAsync(huge);
+    assert.equal(text.length, MAX_SCAN_BYTES);
+});
+
+test("bodyToTextAsync decodes ArrayBuffer + ArrayBufferView as UTF-8 (B1)", async () => {
+    const encoder = new TextEncoder();
+    const buf = encoder.encode("token = AKIAABCDEFGHIJKLMNOP").buffer;
+    assert.equal(await bodyToTextAsync(buf), "token = AKIAABCDEFGHIJKLMNOP");
+    // ArrayBufferView (Uint8Array) covers fetch(url, { body: arr }).
+    const view = new Uint8Array(buf);
+    assert.equal(await bodyToTextAsync(view), "token = AKIAABCDEFGHIJKLMNOP");
+});
+
+test("bodyToTextAsync reads FormData with File entries (B1)", async () => {
+    // FormData with file entry: the scanner sees both text fields
+    // and the file contents on a single line, which lets DLP patterns
+    // match across the file body the same way they match text.
+    const fd = new FormData();
+    fd.append("prompt", "review this");
+    fd.append("upload", new File(["AKIAABCDEFGHIJKLMNOP"], "leak.txt", { type: "text/plain" }));
+    const text = await bodyToTextAsync(fd);
+    // Insertion order, files contribute key=<utf8 contents>.
+    assert.equal(text, "prompt=review%20this&upload=AKIAABCDEFGHIJKLMNOP");
+});
+
+test("bodyToTextAsync FormData enforces cumulative MAX_SCAN_BYTES cap", async () => {
+    // Two big files: the first fills the cap, the second contributes
+    // its key but not its contents. The cumulative cap is what gates
+    // the oversize-policy branch — per-file caps would let an attacker
+    // sneak past by splitting a payload across N files.
+    const fd = new FormData();
+    fd.append("a", new Blob([new Uint8Array(800 * 1024).fill(65)]));
+    fd.append("b", new Blob([new Uint8Array(800 * 1024).fill(66)]));
+    const text = await bodyToTextAsync(fd);
+    assert.ok(text.length >= MAX_SCAN_BYTES, "cumulative read must reach the oversize cap");
+    // The "a=" prefix and the early bytes of file a should appear;
+    // the encoder pads bytes so we just check the cap is hit.
+});
+
+test("bodyToTextAsync returns empty for ReadableStream (intentional, B1)", async () => {
+    // ReadableStream cannot be safely tee'd here without replacing
+    // init.body. Returning "" routes the request through
+    // policyForUnavailable (per the JSDoc note) — a conservative
+    // fall-open posture vs. a spurious block.
+    const stream = new ReadableStream({
+        start(controller) { controller.enqueue(new Uint8Array([65, 66])); controller.close(); },
+    });
+    assert.equal(await bodyToTextAsync(stream), "");
+});
+
+test("extractFetchBodyAsync handles Blob body on fetch (B1)", async () => {
+    const args = [
+        "https://example.test/upload",
+        { method: "POST", body: new Blob(["secret-token-XYZ-1234567890"]) },
+    ] as unknown as Parameters<typeof fetch>;
+    assert.equal(await extractFetchBodyAsync(args), "secret-token-XYZ-1234567890");
 });
 
 test("requestScan resolves with the isolated-world verdict", async () => {
@@ -161,7 +253,7 @@ test("patchFetch is idempotent", () => {
     unpatch();
 });
 
-test("patchXHR forwards small bodies untouched", () => {
+test("patchXHR forwards small bodies untouched", async () => {
     let originalSendCalls = 0;
     const proto = {
         send(_body?: unknown) { originalSendCalls++; },
@@ -170,6 +262,11 @@ test("patchXHR forwards small bodies untouched", () => {
     const XHR = { prototype: proto } as { prototype: XMLHttpRequest };
     patchXHR(XHR, win);
     (XHR.prototype.send as (body?: unknown) => void).call({} as XMLHttpRequest, "tiny");
+    // patchedSend now defers through bodyToTextAsync (Blob/File/
+    // ArrayBuffer reads are async). Sub-threshold bodies still
+    // short-circuit but the original send happens one microtask
+    // later. Drain microtasks before asserting.
+    await new Promise((r) => setTimeout(r, 5));
     assert.equal(originalSendCalls, 1);
 });
 

@@ -56,7 +56,8 @@
       ],
       "js": [
         "dist/content/paste-interceptor.js",
-        "dist/content/form-interceptor.js"
+        "dist/content/form-interceptor.js",
+        "dist/content/file-upload-interceptor.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

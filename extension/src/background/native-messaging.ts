@@ -12,6 +12,13 @@
 // trivially fall through to the HTTP path.
 
 import { NATIVE_HOST, ScanResult } from "../shared.js";
+import {
+    computeRequestMAC,
+    computeResponseMAC,
+    constantTimeEqHex,
+    decodeNonceHex,
+    importBridgeKey,
+} from "./bridge-mac.js";
 
 /** Per-request timeout. Same budget as the HTTP fallback so a slow
  *  native host is no worse than a slow loopback. */
@@ -20,6 +27,9 @@ const REQUEST_TIMEOUT_MS = 1500;
 interface PendingRequest {
     resolve: (r: ScanResult | null) => void;
     timer: ReturnType<typeof setTimeout>;
+    /** Captured `kind` so the reply-side MAC verification can recompute
+     *  the response HMAC input field-for-field. */
+    kind: string;
 }
 
 interface NativeMessage {
@@ -30,6 +40,14 @@ interface NativeMessage {
     // token" and the extension falls back to its pre-A2 HTTP
     // posture (no Authorization header).
     api_token?: string;
+    // bridge_nonce is populated on the hello reply when the agent
+    // has an api_token configured (work item C1). The extension
+    // caches it and includes it in the HMAC input on every
+    // subsequent non-hello frame.
+    bridge_nonce?: string;
+    // mac is the lowercase-hex HMAC-SHA256 of the documented input
+    // tuple. Empty on the hello reply by design (TOFU bootstrap).
+    mac?: string;
     error?: string;
 }
 
@@ -43,6 +61,15 @@ let nextId = 1;
 const pending = new Map<number, PendingRequest>();
 const pendingHello = new Map<number, PendingHello>();
 let portUnsupported = false;
+
+// C1 per-connection MAC state. nonce + signing key are seeded by the
+// hello reply and cleared on port disconnect.
+let bridgeKey: CryptoKey | null = null;
+let bridgeNonce: Uint8Array | null = null;
+// Pre-imported key is async to construct; we cache the pending
+// import so concurrent scans don't race to importKey() five times.
+let bridgeKeyPromise: Promise<CryptoKey | null> | null = null;
+let bridgeWarnedOnce = false;
 
 function ensurePort(): chrome.runtime.Port | null {
     if (port) return port;
@@ -78,6 +105,35 @@ function ensurePort(): chrome.runtime.Port | null {
             const token = typeof msg.api_token === "string" && msg.api_token.length > 0
                 ? msg.api_token
                 : null;
+            // C1: cache the per-connection nonce + signing key if
+            // the agent surfaced one. The hello reply itself is
+            // intentionally unsigned (TOFU bootstrap: the very
+            // frame that hands us the secret can't be MAC'd
+            // against it).
+            if (token !== null && typeof msg.bridge_nonce === "string") {
+                const decoded = decodeNonceHex(msg.bridge_nonce);
+                if (decoded !== null) {
+                    bridgeNonce = decoded;
+                    bridgeKeyPromise = importBridgeKey(token).then(
+                        (k) => {
+                            bridgeKey = k;
+                            return k;
+                        },
+                        (err) => {
+                            // Web Crypto refused the key (extension
+                            // context lacks crypto.subtle? key
+                            // material malformed?). Fall through
+                            // to no-MAC posture; the agent's
+                            // lenient default will still serve.
+                            console.warn("secure-edge: failed to import bridge key", err);
+                            bridgeKey = null;
+                            bridgeKeyPromise = null;
+                            bridgeNonce = null;
+                            return null;
+                        },
+                    );
+                }
+            }
             helloReq.resolve(token);
             return;
         }
@@ -89,10 +145,20 @@ function ensurePort(): chrome.runtime.Port | null {
             req.resolve(null);
             return;
         }
-        req.resolve(msg.result ?? null);
+        // C1: if we have a signing key and the agent surfaced a
+        // MAC, verify it before delivering the result. On
+        // verification failure we still resolve with the result
+        // (extension-side lenient posture) but log a warning so
+        // the operator notices.
+        const result = msg.result ?? null;
+        verifyResponseMACAndResolve(req, msg, result);
     });
     port.onDisconnect.addListener(() => {
         port = null;
+        bridgeKey = null;
+        bridgeNonce = null;
+        bridgeKeyPromise = null;
+        bridgeWarnedOnce = false;
         for (const r of pending.values()) {
             clearTimeout(r.timer);
             r.resolve(null);
@@ -107,6 +173,67 @@ function ensurePort(): chrome.runtime.Port | null {
     return port;
 }
 
+/** Best-effort verification of the agent's response MAC. On
+ *  verification failure or absent MAC we log a one-time warning
+ *  per connection and resolve with the result anyway (lenient
+ *  posture mirrors the agent's bridge_mac_required=false default). */
+function verifyResponseMACAndResolve(
+    req: PendingRequest,
+    msg: NativeMessage,
+    result: ScanResult | null,
+): void {
+    if (!bridgeKey || !bridgeNonce) {
+        // No MAC infrastructure cached (pre-C1 agent or hello
+        // didn't surface a nonce). Skip verification — there's
+        // nothing to verify against.
+        req.resolve(result);
+        return;
+    }
+    const macHex = typeof msg.mac === "string" ? msg.mac : "";
+    if (!macHex) {
+        warnOncePerConnection("agent reply missing MAC");
+        req.resolve(result);
+        return;
+    }
+    let blockedByte: 0x00 | 0x01 | 0xff = 0xff;
+    if (result !== null) {
+        blockedByte = result.blocked ? 0x01 : 0x00;
+    }
+    // computeResponseMAC is async; we kick it off and resolve the
+    // pending request from the .then(). Errors are caught + logged
+    // and we still resolve with the result.
+    computeResponseMAC(
+        bridgeKey,
+        bridgeNonce,
+        typeof msg.id === "number" ? msg.id : 0,
+        req.kind,
+        blockedByte,
+        typeof msg.api_token === "string" ? msg.api_token : "",
+        typeof msg.error === "string" ? msg.error : "",
+    ).then(
+        (expected) => {
+            if (!constantTimeEqHex(expected, macHex)) {
+                warnOncePerConnection("agent reply MAC mismatch");
+            }
+            req.resolve(result);
+        },
+        (err) => {
+            console.warn("secure-edge: failed to compute response MAC", err);
+            req.resolve(result);
+        },
+    );
+}
+
+function warnOncePerConnection(reason: string): void {
+    if (bridgeWarnedOnce) return;
+    bridgeWarnedOnce = true;
+    console.warn(
+        `secure-edge: ${reason} on Native Messaging bridge ` +
+        "(extension-side lenient mode); upgrade either side once " +
+        "both produce MACs.",
+    );
+}
+
 /** Send `content` to the Native Messaging host for a DLP scan.
  *  Returns null when the host is unavailable, disconnects mid-request,
  *  or exceeds REQUEST_TIMEOUT_MS. Never throws. */
@@ -114,19 +241,50 @@ export function scanViaNativeMessaging(content: string): Promise<ScanResult | nu
     const p = ensurePort();
     if (!p) return Promise.resolve(null);
     const id = nextId++;
+    const kind = "scan";
     return new Promise<ScanResult | null>((resolve) => {
         const timer = setTimeout(() => {
             if (pending.delete(id)) resolve(null);
         }, REQUEST_TIMEOUT_MS);
-        pending.set(id, { resolve, timer });
-        try {
-            p.postMessage({ id, kind: "scan", content });
-        } catch {
+        pending.set(id, { resolve, timer, kind });
+        // postMessage must happen synchronously enough that the
+        // agent sees frames in monotonic-id order, but the MAC
+        // compute is async. We resolve the promise with null on
+        // any compute-side error so callers always fall through
+        // to HTTP rather than hanging on a never-resolved scan.
+        sendScanWithMAC(p, id, kind, content).catch((err) => {
             pending.delete(id);
             clearTimeout(timer);
+            console.warn("secure-edge: scan send failed", err);
             resolve(null);
-        }
+        });
     });
+}
+
+async function sendScanWithMAC(
+    p: chrome.runtime.Port,
+    id: number,
+    kind: string,
+    content: string,
+): Promise<void> {
+    // If a hello bridge-key import is in flight, wait for it so the
+    // first scan after hello picks up the MAC infrastructure rather
+    // than racing the hello reply.
+    if (bridgeKeyPromise && !bridgeKey) {
+        await bridgeKeyPromise;
+    }
+    const frame: Record<string, unknown> = { id, kind, content };
+    if (bridgeKey && bridgeNonce) {
+        try {
+            frame.mac = await computeRequestMAC(bridgeKey, bridgeNonce, id, kind, content);
+        } catch (err) {
+            console.warn("secure-edge: failed to compute request MAC", err);
+            // Fall through and send without a MAC — the agent's
+            // lenient default still serves; strict mode will
+            // reject.
+        }
+    }
+    p.postMessage(frame);
 }
 
 /** Send a "hello" handshake to the Native Messaging host and
@@ -146,6 +304,10 @@ export function helloViaNativeMessaging(): Promise<string | null> {
         }, REQUEST_TIMEOUT_MS);
         pendingHello.set(id, { resolve, timer });
         try {
+            // Hello is deliberately NOT MAC'd: the very reply we
+            // are about to read is what hands us the secret + nonce
+            // (TOFU bootstrap). Matches the agent's hello-path
+            // handling in agent/internal/api/nativemsg.go.
             p.postMessage({ id, kind: "hello" });
         } catch {
             pendingHello.delete(id);
@@ -161,6 +323,10 @@ export const __test__ = {
         port = null;
         nextId = 1;
         portUnsupported = false;
+        bridgeKey = null;
+        bridgeNonce = null;
+        bridgeKeyPromise = null;
+        bridgeWarnedOnce = false;
         for (const r of pending.values()) {
             clearTimeout(r.timer);
             r.resolve(null);
@@ -174,4 +340,5 @@ export const __test__ = {
     },
     pendingSize: (): number => pending.size,
     pendingHelloSize: (): number => pendingHello.size,
+    bridgeKeyReady: (): boolean => bridgeKey !== null && bridgeNonce !== null,
 };

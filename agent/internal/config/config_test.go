@@ -291,6 +291,49 @@ api_token_required: true
 	}
 }
 
+// TestLoad_BridgeMACRequired confirms the C1 staged-rollout knob
+// round-trips cleanly. Mirrors the api_token_required test above:
+// default is false (lenient), explicit false is allowed, explicit
+// true flips the agent into strict-MAC-enforcement mode.
+func TestLoad_BridgeMACRequired(t *testing.T) {
+	dir := t.TempDir()
+	for _, tc := range []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{
+			name: "off (defaults — lenient)",
+			yaml: ``,
+			want: false,
+		},
+		{
+			name: "explicit lenient",
+			yaml: `bridge_mac_required: false` + "\n",
+			want: false,
+		},
+		{
+			name: "strict",
+			yaml: `bridge_mac_required: true` + "\n",
+			want: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := filepath.Join(dir, tc.name+".yaml")
+			if err := os.WriteFile(p, []byte(tc.yaml), 0o600); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+			cfg, err := Load(p)
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.BridgeMACRequired != tc.want {
+				t.Errorf("BridgeMACRequired = %v, want %v", cfg.BridgeMACRequired, tc.want)
+			}
+		})
+	}
+}
+
 // TestLoad_EnforcementMode_AcceptsKnown confirms the four accepted
 // inputs (empty + the three explicit modes) load without error.
 // Empty is intentionally permitted at the YAML layer; the merge

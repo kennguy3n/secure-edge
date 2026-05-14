@@ -122,6 +122,25 @@ may introduce breaking changes between feature releases.
   v6's Open Source Maintenance Fee EULA gate); and switched the
   `SHA256SUMS` pipeline to NUL-separated piping so artefacts whose
   names contain spaces hash correctly.
+- **C1**: HMAC-authenticated Native Messaging bridge. Every non-
+  `hello` frame on the extension ↔ agent Native Messaging
+  connection now carries an HMAC-SHA256 MAC over `nonce ||
+  direction_byte || id || kind || (content | blocked + token +
+  error)`, keyed by the per-install API token issued in A2. The
+  `hello` reply additionally surfaces a 16-byte `bridge_nonce`
+  (TOFU bootstrap; the very reply that hands out the secret +
+  nonce is intentionally unsigned). A new `bridge_mac_required`
+  config knob mirrors `api_token_required`: false (default)
+  emits a one-time stderr warning per connection and keeps
+  serving scans for staged rollout, true rejects any
+  mismatched / missing MAC with a `bridge MAC required` /
+  `bridge MAC mismatch` error reply. The agent also enforces a
+  strict-monotonic request id (`bridge id rollback` reply) and
+  rejects a second `hello` on the same connection (`hello
+  already issued`). A cross-language reference vector is pinned
+  byte-for-byte in both `agent/internal/api/bridge_mac_test.go`
+  and `extension/src/background/__tests__/bridge-mac.test.ts`
+  so any drift in the HMAC input layout is caught on both sides.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

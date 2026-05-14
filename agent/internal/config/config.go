@@ -166,6 +166,21 @@ type Config struct {
 	// and flip enforcement on without an outage.
 	APITokenRequired bool `yaml:"api_token_required"`
 
+	// BridgeMACRequired, when true, makes the Native Messaging
+	// handler reject any non-hello frame whose HMAC-SHA256 MAC
+	// does not verify against the per-connection nonce + the
+	// per-install API token. When false (default) the handler
+	// still issues a one-time stderr warning per connection but
+	// keeps serving scans — letting an operator stage the MAC
+	// rollout in parallel with their extension rollout and flip
+	// enforcement on without an outage. Phase 7 work item C1.
+	//
+	// Inherits the threat model of api_token_required: with no
+	// api_token configured there is no shared secret to verify
+	// against, so the MAC check short-circuits regardless of
+	// this flag's value.
+	BridgeMACRequired bool `yaml:"bridge_mac_required"`
+
 	// EnforcementMode controls how the browser extension behaves
 	// when the local agent is unreachable or replies with no
 	// verdict (Phase 7 work item C2). Three values are accepted:
@@ -378,6 +393,9 @@ func merge(defaults, override Config) Config {
 	// distinction; we always copy the override's value so the
 	// operator can explicitly flip it off in the YAML.
 	out.APITokenRequired = override.APITokenRequired
+	// BridgeMACRequired follows the same pattern as
+	// APITokenRequired (see C1 plan, choice Q2: lenient default).
+	out.BridgeMACRequired = override.BridgeMACRequired
 	if override.EnforcementMode != "" {
 		out.EnforcementMode = override.EnforcementMode
 	}

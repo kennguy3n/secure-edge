@@ -196,8 +196,3 @@ maintainer exception on behalf of anyone else.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design
 - [SECURITY.md](SECURITY.md) — vulnerability disclosure
 - [SECURITY_RULES.md](SECURITY_RULES.md) — rule-set policy
-
-This file is modelled after
-[`ggml-org/llama.cpp`'s `AGENTS.md`](https://github.com/ggml-org/llama.cpp/blob/master/AGENTS.md),
-adapted to the threat model and contributor surface of a
-privacy-focused local agent.

@@ -9,6 +9,17 @@ productName: Secure Edge
 # .github/workflows/release.yml.
 directories:
   output: dist-electron
+# Force every produced artefact to use the package.json `name`
+# (secure-edge-tray) instead of `productName` ("Secure Edge"). The
+# release.yml `Generate SHA256SUMS` step hashes filenames as they
+# exist in `release/`, but GitHub's release upload API rewrites any
+# space character in an asset name to a `.` before publishing —
+# leaving the SHA256SUMS line referring to `Secure Edge...` while
+# the actual downloaded asset is named `Secure.Edge...`, causing
+# `sha256sum -c SHA256SUMS` to fail with "no such file" on every
+# space-containing entry. Using ${name} yields hyphenated filenames
+# that round-trip untouched through GitHub Releases.
+artifactName: "${name}-${version}-${arch}.${ext}"
 files:
   - dist/**/*
   - package.json
@@ -26,6 +37,12 @@ linux:
 win:
   target:
     - nsis
+# NSIS is single-arch (x64) on the windows-latest runner, so drop the
+# trailing `-${arch}` segment. The default NSIS template inserts
+# "Setup" between productName and version; keep that semantic by
+# placing "setup" between name and version.
+nsis:
+  artifactName: "${name}-setup-${version}.${ext}"
 # Publish artifacts to GitHub Releases so electron-updater can find
 # the latest .yml manifest and incremental binaries.
 publish:

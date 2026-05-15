@@ -267,7 +267,23 @@ may introduce breaking changes between feature releases.
   enabled, every signed artefact verified, fail-closed posture
   for an MDM-deployed fleet). New §2.0 in `docs/admin-guide.md`
   cross-references all three and recommends a personal → team →
-  managed graduation path.
+  managed graduation path. The personal and managed presets
+  DELIBERATELY leave `risky_file_extensions` unset so the
+  extension falls through to the baked-in 34-entry default
+  (Windows / macOS / Linux executables, installers, scripts,
+  disk images, Java archives — see `BAKED_IN_RISKY_EXTENSIONS`
+  in `extension/src/content/risky-extensions.ts`); the managed
+  preset's comment includes an extension-hook example for fleets
+  that need to ADD entries on top of the default. The team
+  preset documents the wire-protocol gotcha that an explicit
+  populated list REPLACES (not augments) the baked-in default,
+  and its conservative 7-entry subset is therefore strictly
+  fewer entries than personal/managed (intentional for staged
+  rollout). New `config-presets.test.ts` pins the no-key-set
+  contract on personal + managed so a future PR cannot silently
+  reintroduce a coverage-shrinking explicit list, and asserts
+  that every team-preset entry is a strict subset of the
+  baked-in default.
 - **Screenshot / image DLP limitation**: explicit
   `docs/admin-guide.md §8.1` subsection documents that the DLP
   scanner is text-only, that binary payloads (screenshots,

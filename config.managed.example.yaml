@@ -110,16 +110,60 @@ profile_public_key: "<org-profile-ed25519-pubkey>"
 rule_update_public_key: "<org-rules-ed25519-pubkey>"
 
 # Phase 7 / B2 — browser-side filename blocklist. The managed preset
-# enables the operator-recommended hardened set (Windows / macOS /
-# Linux executables + the canonical script payloads). Add or remove
-# entries based on your fleet's measured impact. Documented case-
-# insensitive; leading dots are stripped; blanks are dropped.
-risky_file_extensions:
-  - exe
-  - scr
-  - ps1
-  - msi
-  - bat
-  - cmd
-  - vbs
-  - sh
+# DELIBERATELY leaves `risky_file_extensions` unset. The wire
+# protocol (see §2.2 of docs/admin-guide.md) is three-state:
+#
+#   - Key absent      → extension uses the baked-in 34-entry default
+#                       (Windows / macOS / Linux executables,
+#                       installers, scripts, disk images, Java
+#                       archives — see BAKED_IN_RISKY_EXTENSIONS in
+#                       extension/src/content/risky-extensions.ts).
+#   - Empty list `[]` → opts out of B2 entirely.
+#   - Populated list  → REPLACES the baked-in default verbatim.
+#
+# Setting an explicit list here would silently shrink B2 coverage
+# (e.g. an 8-entry list replaces a 34-entry default), so the
+# managed preset keeps the key omitted and falls through to the
+# baked-in default. Override this only if your fleet needs to
+# EXTEND the default — in which case copy the baked-in list out of
+# extension/src/content/risky-extensions.ts FIRST and add your
+# entries on top, e.g.:
+#
+# risky_file_extensions:
+#   # full baked-in 34-entry default ↓
+#   - exe
+#   - scr
+#   - com
+#   - pif
+#   - msi
+#   - msp
+#   - mst
+#   - appx
+#   - appxbundle
+#   - msix
+#   - bat
+#   - cmd
+#   - vbs
+#   - vbe
+#   - wsf
+#   - wsh
+#   - ps1
+#   - psm1
+#   - psd1
+#   - sh
+#   - dll
+#   - sys
+#   - reg
+#   - app
+#   - pkg
+#   - dmg
+#   - deb
+#   - rpm
+#   - jar
+#   - class
+#   - iso
+#   - img
+#   - vhd
+#   - vhdx
+#   # your additions ↓ (e.g. js for non-developer fleets)
+#   - js

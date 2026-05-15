@@ -110,6 +110,17 @@ bridge_mac_required: false
 # fleets may add `js` / `sh` / `py` under config.managed.example.yaml
 # once they have measured impact; do not add them under the team
 # preset until then.
+#
+# IMPORTANT — wire-protocol gotcha (§2.2 of docs/admin-guide.md):
+# setting an explicit populated list REPLACES the baked-in 34-entry
+# default verbatim; it does not AUGMENT it. The seven entries below
+# are therefore strictly fewer than the personal preset's posture
+# (which leaves the key unset and serves all 34 baked-in entries).
+# This is intentional for the team's staged-rollout posture — but
+# graduate to config.managed.example.yaml (which keeps the key
+# unset) once you have validated the broader baked-in default
+# does not generate false-positive blocks for your fleet's
+# workflows.
 risky_file_extensions:
   - exe
   - scr

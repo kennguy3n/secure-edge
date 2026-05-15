@@ -1628,4 +1628,116 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Cisco Meraki API Key"] = func(r *rand.Rand) string {
 		return "MERAKI_API_KEY=" + randHex(r, 40)
 	}
+	// ---------------- Batch 11: Additional Secret Formats ----------------
+	valueGenerators["TOTP Shared Secret (otpauth URI)"] = func(r *rand.Rand) string {
+		return "otpauth://totp/Example:user@example.com?secret=" + randBase32Lower(r, 32) + "&issuer=Example"
+	}
+	valueGenerators["TOTP Plain Base32 Seed"] = func(r *rand.Rand) string {
+		return "TOTP_SECRET=" + randBase32Lower(r, 32)
+	}
+	valueGenerators["HMAC-Based OTP Counter Seed"] = func(r *rand.Rand) string {
+		return "otpauth://hotp/Example:user@example.com?secret=" + randBase32Lower(r, 32) + "&counter=0"
+	}
+	valueGenerators["SAML Assertion Signature"] = func(r *rand.Rand) string {
+		return "<ds:SignatureValue>" + randFromAlphabet(r, alnum+"+/=", 88) + "</ds:SignatureValue>"
+	}
+	valueGenerators["SAML Encrypted Assertion Key"] = func(r *rand.Rand) string {
+		return "<xenc:CipherValue>" + randFromAlphabet(r, alnum+"+/=", 128) + "</xenc:CipherValue>"
+	}
+	valueGenerators["Generic OAuth 2.0 Refresh Token"] = func(r *rand.Rand) string {
+		return "refresh_token=" + randFromAlphabet(r, alnum+"_-.~", 56)
+	}
+	valueGenerators["Generic OAuth 2.0 Access Token (Bearer)"] = func(r *rand.Rand) string {
+		return "Authorization: Bearer " + randFromAlphabet(r, alnum+"_-.~+/", 56)
+	}
+	valueGenerators["OpenID Connect ID Token (JWT)"] = func(r *rand.Rand) string {
+		return "id_token=eyJ" + randFromAlphabet(r, alnum+"_-", 60) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 200) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["OAuth PKCE Code Verifier"] = func(r *rand.Rand) string {
+		return "code_verifier=" + randFromAlphabet(r, alnum+"_-.~", 64)
+	}
+	valueGenerators["X.509 Certificate PEM"] = func(r *rand.Rand) string {
+		return "-----BEGIN CERTIFICATE-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END CERTIFICATE-----"
+	}
+	valueGenerators["X.509 Certificate Request (CSR)"] = func(r *rand.Rand) string {
+		return "-----BEGIN CERTIFICATE REQUEST-----\n" + randFromAlphabet(r, alnum+"+/=", 300) + "\n-----END CERTIFICATE REQUEST-----"
+	}
+	valueGenerators["X.509 Encrypted Private Key"] = func(r *rand.Rand) string {
+		return "-----BEGIN ENCRYPTED PRIVATE KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END ENCRYPTED PRIVATE KEY-----"
+	}
+	valueGenerators["SSH authorized_keys ssh-rsa Entry"] = func(r *rand.Rand) string {
+		return "ssh-rsa AAAA" + randFromAlphabet(r, alnum+"+/=", 360) + " user@host"
+	}
+	valueGenerators["SSH authorized_keys ssh-ed25519 Entry"] = func(r *rand.Rand) string {
+		return "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5" + randFromAlphabet(r, alnum+"+/=", 56) + " user@host"
+	}
+	valueGenerators["SSH known_hosts Entry"] = func(r *rand.Rand) string {
+		return "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5" + randFromAlphabet(r, alnum+"+/=", 56)
+	}
+	valueGenerators["OpenSSH Private Key (OPENSSH format)"] = func(r *rand.Rand) string {
+		return "-----BEGIN OPENSSH PRIVATE KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END OPENSSH PRIVATE KEY-----"
+	}
+	valueGenerators["PGP Private Key Block"] = func(r *rand.Rand) string {
+		return "-----BEGIN PGP PRIVATE KEY BLOCK-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END PGP PRIVATE KEY BLOCK-----"
+	}
+	valueGenerators["PGP Public Key Block"] = func(r *rand.Rand) string {
+		return "-----BEGIN PGP PUBLIC KEY BLOCK-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END PGP PUBLIC KEY BLOCK-----"
+	}
+	valueGenerators["PGP Signature Block"] = func(r *rand.Rand) string {
+		return "-----BEGIN PGP SIGNATURE-----\n" + randFromAlphabet(r, alnum+"+/=", 200) + "\n-----END PGP SIGNATURE-----"
+	}
+	valueGenerators["PGP Symmetric Encrypted Block"] = func(r *rand.Rand) string {
+		return "-----BEGIN PGP MESSAGE-----\n" + randFromAlphabet(r, alnum+"+/=", 300) + "\n-----END PGP MESSAGE-----"
+	}
+	valueGenerators["JWS Compact Serialization"] = func(r *rand.Rand) string {
+		return "eyJhbGciOi" + randFromAlphabet(r, alnum+"_-", 40) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 200) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["JWE Compact Serialization"] = func(r *rand.Rand) string {
+		return "eyJ" + randFromAlphabet(r, alnum+"_-", 40) + "." + randFromAlphabet(r, alnum+"_-", 60) + "." + randFromAlphabet(r, alnum+"_-", 28) + "." + randFromAlphabet(r, alnum+"_-", 80) + "." + randFromAlphabet(r, alnum+"_-", 28)
+	}
+	valueGenerators["JSON Web Key (JWK)"] = func(r *rand.Rand) string {
+		return "{\"kty\":\"RSA\",\"n\":\"" + randFromAlphabet(r, alnum+"_-", 100) + "\",\"e\":\"AQAB\",\"d\":\"" + randFromAlphabet(r, alnum+"_-", 100) + "\"}"
+	}
+	valueGenerators["Generic 32-Hex API Key"] = func(r *rand.Rand) string {
+		return "API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Generic 64-Hex Token"] = func(r *rand.Rand) string {
+		return "AUTH_TOKEN=" + randHex(r, 64)
+	}
+	valueGenerators["Session Cookie (HMAC-signed)"] = func(r *rand.Rand) string {
+		return "connect.sid=s%3A" + randAlnum(r, 24) + "." + randFromAlphabet(r, alnum+"+/=_-", 44)
+	}
+	valueGenerators["Laravel APP_KEY"] = func(r *rand.Rand) string {
+		return "APP_KEY=base64:" + randFromAlphabet(r, alnum+"+/=", 44)
+	}
+	valueGenerators["Django SECRET_KEY"] = func(r *rand.Rand) string {
+		return "SECRET_KEY=\"" + randFromAlphabet(r, alnum+"!@#$%^&*()_-+=", 60) + "\""
+	}
+	valueGenerators["PuTTY PPK Private Key"] = func(r *rand.Rand) string {
+		return "PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: none\nComment: user\nPublic-Lines: 1\n" + randFromAlphabet(r, alnum+"+/=", 60) + "\nPrivate-Lines: 1"
+	}
+	valueGenerators[".npmrc Auth Token"] = func(r *rand.Rand) string {
+		return "//registry.npmjs.org/:_authToken=npm_" + randAlnum(r, 36)
+	}
+	valueGenerators["PyPI .pypirc Token"] = func(r *rand.Rand) string {
+		return "password = pypi-AgEIcHlwaS5vcmc" + randFromAlphabet(r, alnum+"+/=_-", 100)
+	}
+	valueGenerators["Composer auth.json Token"] = func(r *rand.Rand) string {
+		return "\"github-oauth\": { \"github.com\": \"ghp_" + randAlnum(r, 36) + "\" }"
+	}
+	valueGenerators["SAML SP Private Key Reference"] = func(r *rand.Rand) string {
+		return "<KeyDescriptor use=\"signing\"><KeyInfo><X509Data><X509Certificate>" + randFromAlphabet(r, alnum+"+/=", 200) + "</X509Certificate></X509Data></KeyInfo></KeyDescriptor>"
+	}
+	valueGenerators["Microsoft Office DocCookie"] = func(r *rand.Rand) string {
+		return "MSOAuthCookie=" + randFromAlphabet(r, alnum+"+/=_-", 56)
+	}
+	valueGenerators["WebAuthn Recovery Code"] = func(r *rand.Rand) string {
+		return "recovery_code=" + randUpperAlnum(r, 4) + "-" + randUpperAlnum(r, 4) + "-" + randUpperAlnum(r, 4)
+	}
+	valueGenerators["HashiCorp Boundary Token"] = func(r *rand.Rand) string {
+		return "at_" + randAlnum(r, 28)
+	}
+	valueGenerators["AWS Temporary Session Credentials"] = func(r *rand.Rand) string {
+		return "AWS_SESSION_TOKEN=" + randFromAlphabet(r, alnum+"+/=", 320)
+	}
 }

@@ -7479,7 +7479,7 @@
     {
       "name": "Grafana API Key (legacy)",
       "regex": "eyJrIjoi[A-Za-z0-9+/=]{60,}",
-      "prefix": "eyjriroi",
+      "prefix": "eyjrijoi",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -8409,6 +8409,637 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "TOTP Shared Secret (otpauth URI)",
+      "regex": "otpauth://totp/[^?]+\\?secret=[A-Za-z2-7]{16,}",
+      "prefix": "otpauth://totp/",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "totp",
+        "otpauth",
+        "2fa",
+        "mfa"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "TOTP Plain Base32 Seed",
+      "regex": "(?i)(?:TOTP_SECRET|MFA_SECRET|OATH_SEED)\\s*[:=]\\s*['\\\"]?[A-Z2-7\\s]{32,}",
+      "prefix": "totp_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "totp",
+        "mfa",
+        "oath",
+        "2fa"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "HMAC-Based OTP Counter Seed",
+      "regex": "otpauth://hotp/[^?]+\\?secret=[A-Za-z2-7]{16,}",
+      "prefix": "otpauth://hotp/",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hotp",
+        "otpauth",
+        "counter"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "SAML Assertion Signature",
+      "regex": "<ds:SignatureValue>[A-Za-z0-9+/=\\s]{40,}</ds:SignatureValue>",
+      "prefix": "<ds:signaturevalue>",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "saml",
+        "signature",
+        "sso"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "SAML Encrypted Assertion Key",
+      "regex": "<xenc:CipherValue>[A-Za-z0-9+/=\\s]{60,}</xenc:CipherValue>",
+      "prefix": "<xenc:ciphervalue>",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "saml",
+        "encrypted",
+        "xenc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "Generic OAuth 2.0 Refresh Token",
+      "regex": "(?i)(?:OAUTH_REFRESH_TOKEN|refresh_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-\\.~]{40,}",
+      "prefix": "refresh_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "refresh_token",
+        "oauth",
+        "grant"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "Generic OAuth 2.0 Access Token (Bearer)",
+      "regex": "(?i)Authorization:\\s*Bearer\\s+[A-Za-z0-9_\\-\\.~+/]{40,}",
+      "prefix": "bearer ",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "authorization",
+        "bearer",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "OpenID Connect ID Token (JWT)",
+      "regex": "(?i)id_token\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "id_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "oidc",
+        "id_token",
+        "openid"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "OAuth PKCE Code Verifier",
+      "regex": "(?i)code_verifier\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-\\.~]{43,128}",
+      "prefix": "code_verifier",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pkce",
+        "code_verifier",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "X.509 Certificate PEM",
+      "regex": "-----BEGIN CERTIFICATE-----[\\s\\S]{0,800}-----END CERTIFICATE-----",
+      "prefix": "-----begin certificate-----",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "x509",
+        "certificate",
+        "tls"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "X.509 Certificate Request (CSR)",
+      "regex": "-----BEGIN CERTIFICATE REQUEST-----[\\s\\S]{0,800}-----END CERTIFICATE REQUEST-----",
+      "prefix": "-----begin certificate request-----",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "x509",
+        "csr",
+        "certificate request"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "X.509 Encrypted Private Key",
+      "regex": "-----BEGIN ENCRYPTED PRIVATE KEY-----[\\s\\S]{0,800}-----END ENCRYPTED PRIVATE KEY-----",
+      "prefix": "-----begin encrypted private key-----",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "x509",
+        "encrypted",
+        "private key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "SSH authorized_keys ssh-rsa Entry",
+      "regex": "ssh-rsa\\s+AAAA[B0-9A-Za-z+/=]{200,}",
+      "prefix": "ssh-rsa ",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ssh",
+        "authorized_keys",
+        "public key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "SSH authorized_keys ssh-ed25519 Entry",
+      "regex": "ssh-ed25519\\s+AAAAC3NzaC1lZDI1NTE5[A-Za-z0-9+/=]{40,}",
+      "prefix": "ssh-ed25519 ",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ssh",
+        "ed25519",
+        "authorized_keys"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "SSH known_hosts Entry",
+      "regex": "^[a-zA-Z0-9.\\-]+\\s+ssh-(?:rsa|ed25519|ecdsa[a-z0-9-]+)\\s+AAAA[B0-9A-Za-z+/=]{40,}",
+      "prefix": "ssh-",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "known_hosts",
+        "ssh",
+        "host key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "credential"
+    },
+    {
+      "name": "OpenSSH Private Key (OPENSSH format)",
+      "regex": "-----BEGIN OPENSSH PRIVATE KEY-----[\\s\\S]{0,800}-----END OPENSSH PRIVATE KEY-----",
+      "prefix": "-----begin openssh private key-----",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "openssh",
+        "private key",
+        "ssh"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "PGP Private Key Block",
+      "regex": "-----BEGIN PGP PRIVATE KEY BLOCK-----[\\s\\S]{0,800}-----END PGP PRIVATE KEY BLOCK-----",
+      "prefix": "-----begin pgp private key block-----",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pgp",
+        "gpg",
+        "private key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "PGP Public Key Block",
+      "regex": "-----BEGIN PGP PUBLIC KEY BLOCK-----[\\s\\S]{0,800}-----END PGP PUBLIC KEY BLOCK-----",
+      "prefix": "-----begin pgp public key block-----",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "pgp",
+        "gpg",
+        "public key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "credential"
+    },
+    {
+      "name": "PGP Signature Block",
+      "regex": "-----BEGIN PGP SIGNATURE-----[\\s\\S]{0,800}-----END PGP SIGNATURE-----",
+      "prefix": "-----begin pgp signature-----",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "pgp",
+        "gpg",
+        "signature"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "credential"
+    },
+    {
+      "name": "PGP Symmetric Encrypted Block",
+      "regex": "-----BEGIN PGP MESSAGE-----[\\s\\S]{0,800}-----END PGP MESSAGE-----",
+      "prefix": "-----begin pgp message-----",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pgp",
+        "gpg",
+        "message"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "JWS Compact Serialization",
+      "regex": "eyJhbGciOi[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "eyjhbgcioi",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "jws",
+        "jwt",
+        "sign"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "JWE Compact Serialization",
+      "regex": "eyJ[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "eyj",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jwe",
+        "encrypted",
+        "jose"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "JSON Web Key (JWK)",
+      "regex": "\\\"kty\\\"\\s*:\\s*\\\"(?:RSA|EC|OKP|oct)\\\"[\\s\\S]{0,400}\\\"d\\\"\\s*:\\s*\\\"[A-Za-z0-9_\\-]{20,}\\\"",
+      "prefix": "\"kty\"",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "jwk",
+        "jose",
+        "private key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "Generic 32-Hex API Key",
+      "regex": "(?i)(?:api[_\\-]?key|apikey)\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}\\b",
+      "prefix": "api_key",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "api key",
+        "apikey",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "credential"
+    },
+    {
+      "name": "Generic 64-Hex Token",
+      "regex": "(?i)(?:token|access[_\\-]?token|auth[_\\-]?token)\\s*[:=]\\s*['\\\"]?[a-f0-9]{64}\\b",
+      "prefix": "token",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "token",
+        "access",
+        "auth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "Session Cookie (HMAC-signed)",
+      "regex": "(?i)(?:session|sid|connect\\.sid)\\s*=\\s*s%3A[A-Za-z0-9_\\-]{16,}\\.[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "s%3a",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "session",
+        "connect.sid",
+        "express"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "credential"
+    },
+    {
+      "name": "Laravel APP_KEY",
+      "regex": "(?i)APP_KEY\\s*[:=]\\s*['\\\"]?base64:[A-Za-z0-9+/=]{40,}",
+      "prefix": "base64:",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "laravel",
+        "app_key",
+        "framework"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "Django SECRET_KEY",
+      "regex": "(?i)SECRET_KEY\\s*[:=]\\s*['\\\"][A-Za-z0-9!@#$%\\^&*()_\\-+=]{50,}['\\\"]",
+      "prefix": "secret_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "django",
+        "secret_key",
+        "framework"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "PuTTY PPK Private Key",
+      "regex": "PuTTY-User-Key-File-[23]:[ \\t]*(?:ssh-rsa|ssh-ed25519)[\\s\\S]{0,800}Private-Lines:\\s*\\d+",
+      "prefix": "putty-user-key-file-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "putty",
+        "ppk",
+        "private key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "credential"
+    },
+    {
+      "name": ".npmrc Auth Token",
+      "regex": "(?i)//registry\\.npmjs\\.org/:_authToken\\s*=\\s*['\\\"]?npm_[A-Za-z0-9]{36,}",
+      "prefix": "//registry.npmjs.org/:_authtoken",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "npm",
+        "registry",
+        "authtoken"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "PyPI .pypirc Token",
+      "regex": "(?i)password\\s*=\\s*pypi-AgEIcHlwaS5vcmc[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "pypi-ageich",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pypi",
+        "pypirc",
+        "token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "Composer auth.json Token",
+      "regex": "(?i)\\\"github-oauth\\\":[\\s\\S]{0,200}\\\"ghp_[A-Za-z0-9]{36}\\\"",
+      "prefix": "github-oauth",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "composer",
+        "auth.json",
+        "github"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "SAML SP Private Key Reference",
+      "regex": "(?i)<KeyDescriptor[\\s\\S]{0,200}<X509Certificate>[A-Za-z0-9+/=\\s]{40,}</X509Certificate>",
+      "prefix": "<keydescriptor",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "saml",
+        "keydescriptor",
+        "sp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "Microsoft Office DocCookie",
+      "regex": "(?i)(?:WLSAuthCookie|MSOAuthCookie)\\s*=\\s*[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "msoauthcookie",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "microsoft",
+        "office",
+        "cookie"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "WebAuthn Recovery Code",
+      "regex": "(?i)recovery_code\\s*[:=]\\s*['\\\"]?[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}",
+      "prefix": "recovery_code",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "webauthn",
+        "passkey",
+        "recovery"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "credential"
+    },
+    {
+      "name": "HashiCorp Boundary Token",
+      "regex": "at_[A-Za-z0-9]{20,}",
+      "prefix": "at_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "boundary",
+        "hashicorp",
+        "auth token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "credential"
+    },
+    {
+      "name": "AWS Temporary Session Credentials",
+      "regex": "(?i)AWS_SESSION_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{200,}",
+      "prefix": "aws_session_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aws",
+        "session",
+        "sts"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "credential"
     }
   ]
 }

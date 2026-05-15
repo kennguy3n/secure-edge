@@ -1457,4 +1457,83 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		return "SPINNAKER_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
 	}
 	// ---------------- Batch 7: Container / Orchestration ----------------
+	// ---------------- Batch 8: Monitoring / Logging ----------------
+	valueGenerators["Grafana Service Account Token"] = func(r *rand.Rand) string {
+		return "glsa_" + randAlnum(r, 32) + "_" + randHex(r, 8)
+	}
+	valueGenerators["Grafana API Key (legacy)"] = func(r *rand.Rand) string {
+		return "eyJrIjoi" + randFromAlphabet(r, alnum+"+/=", 80)
+	}
+	valueGenerators["Grafana Cloud Stack Token"] = func(r *rand.Rand) string {
+		return "glc_" + randFromAlphabet(r, alnum+"+/=", 40)
+	}
+	valueGenerators["Splunk HEC Token"] = func(r *rand.Rand) string {
+		return "SPLUNK_HEC_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["Splunk On-Call Integration Key"] = func(r *rand.Rand) string {
+		return "VICTOROPS_INTEGRATION_KEY=" + randUUID(r)
+	}
+	valueGenerators["Splunk Observability Access Token"] = func(r *rand.Rand) string {
+		return "SIGNALFX_ACCESS_TOKEN=" + randFromAlphabet(r, alnum+"_-", 22)
+	}
+	valueGenerators["Elastic Cloud API Key"] = func(r *rand.Rand) string {
+		return "ELASTIC_API_KEY=" + randFromAlphabet(r, alnum+"+/=", 80)
+	}
+	valueGenerators["Elasticsearch Bearer Token"] = func(r *rand.Rand) string {
+		return "ELASTICSEARCH_BEARER=" + randFromAlphabet(r, alnum+"+/=_-", 80)
+	}
+	valueGenerators["Kibana Service Account Token"] = func(r *rand.Rand) string {
+		return "KIBANA_SERVICE_ACCOUNT_TOKEN=AAEAAW" + randFromAlphabet(r, alnum+"+/=_-", 60)
+	}
+	valueGenerators["Logstash Pipeline Password"] = func(r *rand.Rand) string {
+		return "LOGSTASH_PIPELINE_PASSWORD=" + randAlnum(r, 24)
+	}
+	valueGenerators["Prometheus Remote Write Bearer"] = func(r *rand.Rand) string {
+		return "PROMETHEUS_REMOTE_WRITE_BEARER=" + randFromAlphabet(r, alnum+"+/=_-", 64)
+	}
+	valueGenerators["Grafana Mimir Basic Auth Password"] = func(r *rand.Rand) string {
+		return "MIMIR_REMOTE_WRITE_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["Cortex Auth Token"] = func(r *rand.Rand) string {
+		return "CORTEX_AUTH_TOKEN=" + randFromAlphabet(r, alnum+"+/=_-", 64)
+	}
+	valueGenerators["Loki Push API Token"] = func(r *rand.Rand) string {
+		return "LOKI_PUSH_TOKEN=" + randFromAlphabet(r, alnum+"+/=_-", 64)
+	}
+	valueGenerators["Loki Tenant Password"] = func(r *rand.Rand) string {
+		return "LOKI_TENANT_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["Sumologic Access ID"] = func(r *rand.Rand) string {
+		return "SUMO_ACCESS_ID=su" + randAlnum(r, 14)
+	}
+	valueGenerators["Sumologic Access Key"] = func(r *rand.Rand) string {
+		return "SUMO_ACCESS_KEY=" + randAlnum(r, 64)
+	}
+	valueGenerators["Honeycomb API Key"] = func(r *rand.Rand) string {
+		return "HONEYCOMB_API_KEY=" + randLowerAlnum(r, 32)
+	}
+	valueGenerators["Honeycomb Ingest Key"] = func(r *rand.Rand) string {
+		return "HONEYCOMB_INGEST_KEY=hcaik_" + randAlnum(r, 56)
+	}
+	valueGenerators["Lightstep Access Token"] = func(r *rand.Rand) string {
+		return "LIGHTSTEP_ACCESS_TOKEN=" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Wavefront API Token"] = func(r *rand.Rand) string {
+		return "WAVEFRONT_API_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["AppDynamics API Key"] = func(r *rand.Rand) string {
+		return "APPDYNAMICS_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["Dynatrace API Token"] = func(r *rand.Rand) string {
+		return "dt0c01." + randUpperAlnum(r, 24) + "." + randUpperAlnum(r, 64)
+	}
+	valueGenerators["Bugsnag API Key"] = func(r *rand.Rand) string {
+		return "BUGSNAG_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Rollbar Access Token"] = func(r *rand.Rand) string {
+		return "ROLLBAR_ACCESS_TOKEN=" + randHex(r, 32)
+	}
+	valueGenerators["Mezmo Ingestion Key"] = func(r *rand.Rand) string {
+		return "MEZMO_INGESTION_KEY=" + randHex(r, 32)
+	}
 }

@@ -547,6 +547,34 @@ var patternCategory = map[string]string{
 	"HashiCorp Consul ACL Token":                    "container_orchestration",
 	"Spinnaker API Token":                           "container_orchestration",
 
+	// Batch 8: Monitoring / Logging
+	"Grafana Service Account Token":     "monitoring",
+	"Grafana API Key (legacy)":          "monitoring",
+	"Grafana Cloud Stack Token":         "monitoring",
+	"Splunk HEC Token":                  "monitoring",
+	"Splunk On-Call Integration Key":    "monitoring",
+	"Splunk Observability Access Token": "monitoring",
+	"Elastic Cloud API Key":             "monitoring",
+	"Elasticsearch Bearer Token":        "monitoring",
+	"Kibana Service Account Token":      "monitoring",
+	"Logstash Pipeline Password":        "monitoring",
+	"Prometheus Remote Write Bearer":    "monitoring",
+	"Grafana Mimir Basic Auth Password": "monitoring",
+	"Cortex Auth Token":                 "monitoring",
+	"Loki Push API Token":               "monitoring",
+	"Loki Tenant Password":              "monitoring",
+	"Sumologic Access ID":               "monitoring",
+	"Sumologic Access Key":              "monitoring",
+	"Honeycomb API Key":                 "monitoring",
+	"Honeycomb Ingest Key":              "monitoring",
+	"Lightstep Access Token":            "monitoring",
+	"Wavefront API Token":               "monitoring",
+	"AppDynamics API Key":               "monitoring",
+	"Dynatrace API Token":               "monitoring",
+	"Bugsnag API Key":                   "monitoring",
+	"Rollbar Access Token":              "monitoring",
+	"Mezmo Ingestion Key":               "monitoring",
+
 	// Batch 7: Container / Orchestration
 }
 

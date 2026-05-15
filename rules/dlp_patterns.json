@@ -7458,6 +7458,447 @@
       "require_hotword": true,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "Grafana Service Account Token",
+      "regex": "glsa_[A-Za-z0-9]{32}_[a-f0-9]{8}",
+      "prefix": "glsa_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "grafana",
+        "service account",
+        "observability"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Grafana API Key (legacy)",
+      "regex": "eyJrIjoi[A-Za-z0-9+/=]{60,}",
+      "prefix": "eyjriroi",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "grafana",
+        "api key",
+        "legacy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Grafana Cloud Stack Token",
+      "regex": "glc_[A-Za-z0-9+/=]{30,}",
+      "prefix": "glc_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "grafana cloud",
+        "stack",
+        "observability"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Splunk HEC Token",
+      "regex": "(?i)SPLUNK_HEC_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "splunk_hec_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "splunk",
+        "hec",
+        "event collector"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Splunk On-Call Integration Key",
+      "regex": "(?i)VICTOROPS_INTEGRATION_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "victorops_integration_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "splunk",
+        "victorops",
+        "on-call"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Splunk Observability Access Token",
+      "regex": "(?i)SIGNALFX_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{22}",
+      "prefix": "signalfx_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "splunk",
+        "signalfx",
+        "observability"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Elastic Cloud API Key",
+      "regex": "(?i)ELASTIC_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{60,}",
+      "prefix": "elastic_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "elastic",
+        "cloud",
+        "es"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Elasticsearch Bearer Token",
+      "regex": "(?i)ELASTICSEARCH_BEARER\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{60,}",
+      "prefix": "elasticsearch_bearer",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "elasticsearch",
+        "bearer",
+        "es"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Kibana Service Account Token",
+      "regex": "(?i)KIBANA_SERVICE_ACCOUNT_TOKEN\\s*[:=]\\s*['\\\"]?AAEAAW[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "kibana_service_account_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kibana",
+        "service account",
+        "elastic"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Logstash Pipeline Password",
+      "regex": "(?i)LOGSTASH_PIPELINE_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{16,}",
+      "prefix": "logstash_pipeline_password",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "logstash",
+        "pipeline",
+        "elastic"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Prometheus Remote Write Bearer",
+      "regex": "(?i)PROMETHEUS_REMOTE_WRITE_BEARER\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "prometheus_remote_write_bearer",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "prometheus",
+        "remote write",
+        "bearer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Grafana Mimir Basic Auth Password",
+      "regex": "(?i)MIMIR_REMOTE_WRITE_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{16,}",
+      "prefix": "mimir_remote_write_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mimir",
+        "remote write",
+        "grafana"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cortex Auth Token",
+      "regex": "(?i)CORTEX_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "cortex_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cortex",
+        "metrics",
+        "tenant"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Loki Push API Token",
+      "regex": "(?i)LOKI_PUSH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "loki_push_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "loki",
+        "push",
+        "logs"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Loki Tenant Password",
+      "regex": "(?i)LOKI_TENANT_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{16,}",
+      "prefix": "loki_tenant_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "loki",
+        "tenant",
+        "grafana"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Sumologic Access ID",
+      "regex": "(?i)SUMO_ACCESS_ID\\s*[:=]\\s*['\\\"]?su[A-Za-z0-9]{12,}",
+      "prefix": "sumo_access_id",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sumologic",
+        "sumo",
+        "access id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Sumologic Access Key",
+      "regex": "(?i)SUMO_ACCESS_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{64}",
+      "prefix": "sumo_access_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sumologic",
+        "sumo",
+        "access key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Honeycomb API Key",
+      "regex": "(?i)HONEYCOMB_API_KEY\\s*[:=]\\s*['\\\"]?[a-z0-9]{32}",
+      "prefix": "honeycomb_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "honeycomb",
+        "observability",
+        "traces"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Honeycomb Ingest Key",
+      "regex": "(?i)HONEYCOMB_INGEST_KEY\\s*[:=]\\s*['\\\"]?hcaik_[A-Za-z0-9]{50,}",
+      "prefix": "honeycomb_ingest_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "honeycomb",
+        "ingest",
+        "environment"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Lightstep Access Token",
+      "regex": "(?i)LIGHTSTEP_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "lightstep_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "lightstep",
+        "servicenow",
+        "tracing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Wavefront API Token",
+      "regex": "(?i)WAVEFRONT_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "wavefront_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "wavefront",
+        "vmware",
+        "tanzu"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "AppDynamics API Key",
+      "regex": "(?i)APPDYNAMICS_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "appdynamics_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "appdynamics",
+        "apm",
+        "cisco"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Dynatrace API Token",
+      "regex": "dt0c01\\.[A-Z0-9]{24}\\.[A-Z0-9]{64}",
+      "prefix": "dt0c01.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "dynatrace",
+        "apm",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Bugsnag API Key",
+      "regex": "(?i)BUGSNAG_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "bugsnag_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bugsnag",
+        "error",
+        "apm"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Rollbar Access Token",
+      "regex": "(?i)ROLLBAR_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "rollbar_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rollbar",
+        "error tracking"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Mezmo Ingestion Key",
+      "regex": "(?i)MEZMO_INGESTION_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "mezmo_ingestion_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mezmo",
+        "logdna",
+        "ingest"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
     }
   ]
 }

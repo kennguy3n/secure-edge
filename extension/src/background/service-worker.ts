@@ -26,7 +26,11 @@ import {
     ScanResult,
     StatusResponse,
 } from "../shared.js";
-import { helloViaNativeMessaging, scanViaNativeMessaging } from "./native-messaging.js";
+import {
+    helloViaNativeMessaging,
+    scanViaNativeMessaging,
+    setBridgeEnforcementMode,
+} from "./native-messaging.js";
 import { startDynamicHostUpdater } from "./dynamic-hosts.js";
 
 // chrome.storage.session key under which the per-install API
@@ -267,6 +271,10 @@ export async function getEnforcementMode(): Promise<EnforcementMode> {
         cachedEnforcementMode = fresh;
         cachedEnforcementModeAt = now;
         enforcementModeEverFetched = true;
+        // Mirror the new value into the Native Messaging module so
+        // the bridge's MAC-failure fall-closed gate (G4) reads the
+        // same enforcement state as runtime.onMessage handlers.
+        setBridgeEnforcementMode(fresh);
         await persistEnforcementMode(fresh);
     }
     return cachedEnforcementMode;
@@ -411,11 +419,16 @@ export const __test__ = {
         cachedEnforcementMode = "personal";
         cachedEnforcementModeAt = 0;
         enforcementModeEverFetched = false;
+        // Keep the bridge's locally-cached mode in sync with the
+        // service-worker cache so tests that reset one don't leave
+        // the other holding a stale managed-mode flag.
+        setBridgeEnforcementMode("personal");
     },
     setEnforcementMode(mode: EnforcementMode, at: number): void {
         cachedEnforcementMode = mode;
         cachedEnforcementModeAt = at;
         enforcementModeEverFetched = true;
+        setBridgeEnforcementMode(mode);
     },
     /** Reset the B2 cache (Phase 7) to its post-import state.
      *  Must be called from afterEach in any test that exercises

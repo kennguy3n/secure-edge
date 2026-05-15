@@ -67,8 +67,56 @@ changes between feature releases — breaking entries are flagged explicitly.
 - **Breaking (team & managed):** the new secure-defaults validator
   rejects configs that omit `allowed_extension_ids`, `api_token_path`,
   or `api_token_required: true`; `managed` additionally requires
-  `bridge_mac_required: true` and a non-empty `profile_public_key`.
+  `bridge_mac_required: true`, a non-empty `profile_public_key`, and
+  (added in this release) a non-empty `rule_update_public_key`.
   Whitespace-only values are treated as empty.
+- **Local API and proxy HTTP servers set the full timeout tuple.** Both
+  `agent/internal/api/server.go` and `agent/internal/proxy/proxy.go` now
+  set `ReadTimeout` / `WriteTimeout` / `IdleTimeout` / `MaxHeaderBytes`
+  on the underlying `*http.Server` so a slowloris or write-stall cannot
+  hold a listener thread indefinitely. The control API uses 10 s / 10 s
+  / 60 s / 16 KiB; the proxy uses 30 s / 30 s / 120 s / 16 KiB.
+- **JSON control endpoints are capped at 64 KiB.** A new
+  `decodeControlBody` helper in `agent/internal/api/handlers.go` wraps
+  `r.Body` in `http.MaxBytesReader(maxControlBytes=64 KiB)` and returns
+  `413 Request Entity Too Large` instead of buffering megabytes of
+  attacker-controlled JSON. Wired into `PUT /api/policies/:category`,
+  `PUT /api/dlp/config`, `POST /api/rules/override`, and
+  `POST /api/proxy/disable`. `/api/dlp/scan` (4 MiB) and
+  `/api/profile/import` (1 MiB) keep their existing higher caps.
+- **CA private-key permission check on every load.** `loadCA()` in
+  `agent/internal/proxy/ca.go` refuses to read a Root CA key whose
+  POSIX mode bits include group / world access (mask `0o077`), and
+  `NewCA()` re-stats after `writeCA()` to fail closed when a hostile
+  umask or stale file leaks the key. The proxy controller's `Enable()`
+  path re-checks on every call so a runtime `POST /api/proxy/enable`
+  refuses to start if the key file was tampered with between calls.
+  No-op on Windows where ACLs, not mode bits, are the access-control
+  mechanism.
+- **Browser extension fails closed on Native Messaging MAC mismatch in
+  managed mode.** `extension/src/background/native-messaging.ts` now
+  caches the agent's enforcement mode and, when a reply MAC is
+  missing, mismatched, or unverifiable (compute error), discards the
+  result in managed mode instead of resolving with it. The bridge's
+  per-connection warn-once log is preserved; personal and team mode
+  retain the pre-existing warn-and-resolve posture.
+- **Content scripts now inject into every frame.** All three packaging
+  manifests (`extension/manifest.json`, `manifest.firefox.json`,
+  `manifest.safari.json`) flip `all_frames` from `false` to `true` on
+  every `content_scripts` entry so Tier-2 AI surfaces that render
+  their input inside same-origin iframes (e.g. embedded chat widgets,
+  artefact / canvas views) stay covered by the DLP scanner. A new
+  `manifest-all-frames.test.ts` pins the contract per manifest target.
+- **Adversarial bridge test matrix.** New
+  `extension/src/content/__tests__/adversarial.test.ts` consolidates
+  the four documented bridge threat shapes in one file: page-forged
+  `scan-resp` after the legitimate reply (first-reply-wins), pre-
+  injection `fetch()` (documented limitation, deferred to the proxy +
+  OS egress controls), oversize content in managed mode
+  (`POLICY_PATTERN_OVERSIZE` block), and scan-null in managed mode
+  (`POLICY_PATTERN_AGENT_UNAVAILABLE` block). Symmetric "must not
+  block in personal mode" assertions guard against an over-eager
+  promotion of the block branches.
 - **Packaged `config.yaml` now self-identifies as the personal
   preset.** The header comment block at the top of `config.yaml`
   explicitly labels the file as `PERSONAL mode (development /

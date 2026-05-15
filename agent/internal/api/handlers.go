@@ -29,6 +29,19 @@ var osStat = func(name string) (os.FileInfo, error) { return os.Stat(name) }
 // AI tool, and an unbounded body is a memory-exhaustion vector.
 const maxScanBytes = 4 * 1024 * 1024 // 4 MiB
 
+// maxControlBytes caps the body size accepted by every JSON control
+// endpoint that is not /api/dlp/scan or /api/profile/import. The
+// control surface accepts small documents (a single category /
+// action pair, a DLP-config struct, a single allow/block override,
+// etc.) — none of these legitimately exceed a few hundred bytes, so
+// 64 KiB is comfortable for headroom while still keeping an
+// unbounded body from forcing the agent to buffer megabytes of
+// attacker-controlled JSON before json.Decode has a chance to
+// reject it. Wired in via http.MaxBytesReader so the handler
+// surfaces 413 Request Entity Too Large with a consistent error
+// shape — the same status code MaxBytesReader uses by convention.
+const maxControlBytes = 64 * 1024 // 64 KiB
+
 // StatusResponse is the body for GET /api/status.
 // Both `uptime` (human-readable) and `uptime_seconds` (machine-readable)
 // are emitted so the Electron tray and the browser extension don't have
@@ -103,14 +116,14 @@ type RiskyExtensionsResponse struct {
 // All fields are derived from runtime.MemStats / runtime.NumGoroutine
 // and contain no user-derived data.
 type RuntimeStats struct {
-	GoVersion     string `json:"go_version"`
-	NumGoroutine  int    `json:"num_goroutine"`
-	NumCPU        int    `json:"num_cpu"`
-	HeapAllocKB   uint64 `json:"heap_alloc_kb"`
-	HeapInuseKB   uint64 `json:"heap_inuse_kb"`
-	SysKB         uint64 `json:"sys_kb"`
-	NumGC         uint32 `json:"num_gc"`
-	GoMaxProcs    int    `json:"gomaxprocs"`
+	GoVersion    string `json:"go_version"`
+	NumGoroutine int    `json:"num_goroutine"`
+	NumCPU       int    `json:"num_cpu"`
+	HeapAllocKB  uint64 `json:"heap_alloc_kb"`
+	HeapInuseKB  uint64 `json:"heap_inuse_kb"`
+	SysKB        uint64 `json:"sys_kb"`
+	NumGC        uint32 `json:"num_gc"`
+	GoMaxProcs   int    `json:"gomaxprocs"`
 }
 
 // RuleFileInfo carries the modification time and byte size of a rule
@@ -135,6 +148,34 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 
 func writeError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+// decodeControlBody caps r.Body at maxControlBytes via
+// http.MaxBytesReader and json.Decodes into dst. It writes a 413
+// when the body exceeds the cap (so the caller doesn't conflate
+// "too big" with "malformed JSON") and a 400 when the JSON is
+// otherwise invalid. allowEmpty is for the two endpoints whose
+// body is optional (POST /api/proxy/disable, POST /api/rules/local
+// reload) — passing true treats io.EOF as a no-op.
+//
+// The returned bool is true when decoding succeeded; the caller
+// should `return` immediately when it is false because an error
+// response has already been written.
+func decodeControlBody(w http.ResponseWriter, r *http.Request, dst any, allowEmpty bool) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		if allowEmpty && errors.Is(err, io.EOF) {
+			return true
+		}
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request too large")
+			return false
+		}
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -342,8 +383,7 @@ func (s *Server) handlePolicyItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body PolicyUpdate
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeControlBody(w, r, &body, false) {
 		return
 	}
 	if err := s.Store.SetPolicy(r.Context(), category, body.Action); err != nil {
@@ -468,8 +508,7 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body store.DLPConfig
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeControlBody(w, r, &body, false) {
 		return
 	}
 	if err := s.Store.SetDLPConfig(r.Context(), body); err != nil {
@@ -662,8 +701,7 @@ func (s *Server) handleProxyDisable(w http.ResponseWriter, r *http.Request) {
 	// -1 when no Content-Length header is present (e.g. chunked
 	// transfer encoding or a plain POST without the header).
 	var body proxyDisableRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeControlBody(w, r, &body, true) {
 		return
 	}
 	if err := s.Proxy.Disable(r.Context(), body.RemoveCA); err != nil {
@@ -886,8 +924,7 @@ func (s *Server) handleRuleOverride(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, ruleOverrideResponse{Allow: a, Block: b})
 	case http.MethodPost:
 		var body ruleOverrideRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid JSON body")
+		if !decodeControlBody(w, r, &body, false) {
 			return
 		}
 		if strings.TrimSpace(body.Domain) == "" {

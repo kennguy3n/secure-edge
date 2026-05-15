@@ -216,6 +216,15 @@ func (s *Server) ScansTotal() int64 { return s.scans.Load() }
 // BlocksTotal returns the anonymous DLP-block counter.
 func (s *Server) BlocksTotal() int64 { return s.blocks.Load() }
 
+// httpServerForTest returns the active *http.Server. Test-only
+// accessor; the production lifecycle goes through ListenAndServe /
+// Shutdown and never reads this pointer.
+func (s *Server) httpServerForTest() *http.Server {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.httpSrv
+}
+
 // ListenAndServe starts the proxy on addr. The server runs in a
 // background goroutine; this call returns after the listener is
 // established (or with an error if listen failed within a short
@@ -229,10 +238,22 @@ func (s *Server) ListenAndServe(addr string) error {
 		s.mu.Unlock()
 		return errors.New("proxy: already running")
 	}
+	// The proxy server fronts the goproxy MITM. Read / write
+	// budgets are larger than the loopback control API because
+	// real HTTPS uploads (file attachments to Tier-2 AI sites)
+	// flow through here, but they still bound any single
+	// connection so a slowloris / write-stall cannot hold a
+	// listener thread forever. MaxHeaderBytes caps the CONNECT /
+	// request preamble at 16 KiB, well above any legitimate
+	// browser header tuple.
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           s.httpProxy,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    16 << 10, // 16 KiB
 	}
 	s.httpSrv = srv
 	s.listenOn = addr

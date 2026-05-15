@@ -58,7 +58,7 @@
         "dist/content/file-upload-interceptor.js"
       ],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": true
     },
     {
       "matches": [
@@ -85,7 +85,7 @@
         "dist/content/network-interceptor.js"
       ],
       "run_at": "document_start",
-      "all_frames": false
+      "all_frames": true
     }
   ],
 

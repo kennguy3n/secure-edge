@@ -29,6 +29,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -92,6 +93,17 @@ func NewCA(certPath, keyPath string) (*CA, error) {
 	}
 
 	if err := writeCA(certPath, keyPath, cert, key); err != nil {
+		return nil, err
+	}
+
+	// writeCA writes the key with 0600, but a hostile umask or a
+	// stale file from a previous install with weaker permissions
+	// can still leave the file world-readable. Re-stat after the
+	// write so a misconfigured target directory fails closed
+	// instead of producing a usable CA that the next loadCA call
+	// would also refuse — symmetric with the check at the top of
+	// loadCA above.
+	if err := checkKeyPermissions(keyPath); err != nil {
 		return nil, err
 	}
 
@@ -250,7 +262,42 @@ func generateRoot() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	return cert, key, nil
 }
 
+// checkKeyPermissions confirms the on-disk Root CA private key is
+// readable only by its owner. Anything broader (group, world) lets a
+// second user on the same machine read the key and forge TLS leaves
+// for every Tier-2 domain the agent proxies — the exact attack the
+// per-device CA exists to constrain. The check is a no-op on Windows
+// because POSIX-style mode bits are not the access-control mechanism
+// there; the WriteFile call still hands the file out with 0600
+// equivalent ACLs, and the platform itself is what we trust for
+// per-user isolation.
+func checkKeyPermissions(keyPath string) error {
+	fi, err := os.Stat(keyPath)
+	if err != nil {
+		return fmt.Errorf("proxy: stat ca key: %w", err)
+	}
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	mode := fi.Mode().Perm()
+	if mode&0o077 != 0 {
+		return fmt.Errorf("proxy: ca key %s has mode %04o; must be 0600 or stricter (group/other bits must be zero)", keyPath, mode)
+	}
+	return nil
+}
+
 func loadCA(certPath, keyPath string) (*CA, error) {
+	// The on-disk key is the entire trust root for the proxy's
+	// TLS interception path; refuse to load it when a wider mode
+	// has crept in (e.g. an operator chmod'd the directory to
+	// fix a permission bug and accidentally weakened the key).
+	// loadCA is the choke point for every subsequent leaf
+	// signature so this single check covers the proxy server,
+	// the controller's Enable() retries, and any unit-test path
+	// that reuses an existing CA on disk.
+	if err := checkKeyPermissions(keyPath); err != nil {
+		return nil, err
+	}
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, fmt.Errorf("proxy: read ca cert: %w", err)

@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -219,4 +221,70 @@ func containsString(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestCA_LoadRejectsWorldReadableKey confirms loadCA refuses to read
+// a Root CA key whose mode bits include group / world access. A
+// permissive on-disk key is the entire attack surface for proxy
+// trust forgery; the unit test pins the failure path so an edit
+// that accidentally drops the os.Stat check (or relaxes the bitmask)
+// re-introduces the vulnerability with a visible regression.
+//
+// Mode bits are not a meaningful access-control mechanism on Windows
+// (NTFS ACLs are), so the check itself is a no-op there and the test
+// would be flaky against a tightly-mocked filesystem; we skip on
+// windows for the same reason checkKeyPermissions does.
+func TestCA_LoadRejectsWorldReadableKey(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("CA key permission check is a no-op on Windows")
+	}
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "ca.crt")
+	keyPath := filepath.Join(dir, "ca.key")
+
+	// Bootstrap a real CA on disk with the canonical 0600 key.
+	if _, err := NewCA(certPath, keyPath); err != nil {
+		t.Fatalf("NewCA: %v", err)
+	}
+
+	// Widen the key mode to world-readable and try to reload.
+	// loadCA must refuse — every subsequent leaf signed by this
+	// key would otherwise be forgeable by any user who can read
+	// the file.
+	if err := os.Chmod(keyPath, 0o644); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	_, err := loadCA(certPath, keyPath)
+	if err == nil {
+		t.Fatal("loadCA accepted a world-readable key; expected error")
+	}
+	if !strings.Contains(err.Error(), "must be 0600 or stricter") {
+		t.Errorf("error message = %q; expected the documented permission diagnostic", err.Error())
+	}
+}
+
+// TestCA_ReuseAfterChmodFailsLoad is the operator-facing version of
+// the previous test: NewCA on a path that already has a wider-mode
+// key on disk must also refuse, even though it would otherwise hit
+// the loadCA fast path. The check lives at the top of loadCA, which
+// NewCA calls when both files already exist.
+func TestCA_ReuseAfterChmodFailsLoad(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("CA key permission check is a no-op on Windows")
+	}
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "ca.crt")
+	keyPath := filepath.Join(dir, "ca.key")
+
+	// Bootstrap, then widen.
+	if _, err := NewCA(certPath, keyPath); err != nil {
+		t.Fatalf("NewCA: %v", err)
+	}
+	if err := os.Chmod(keyPath, 0o640); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+
+	if _, err := NewCA(certPath, keyPath); err == nil {
+		t.Fatal("second NewCA accepted a group-readable key; expected error")
+	}
 }

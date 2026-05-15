@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestExtensionIDPinning_RejectsUnpinnedOrigin confirms that once
@@ -514,5 +515,36 @@ func TestDefaultAPITokenPath_APPDATAEmptyPreserved(t *testing.T) {
 	want := filepath.Join("", "secure-edge", "api-token")
 	if got := DefaultAPITokenPath(); got != want {
 		t.Errorf("APPDATA=\"\": got %q, want %q (empty string must be preserved to match Electron)", got, want)
+	}
+}
+
+// TestListenAndServe_AppliesFullTimeouts confirms that ListenAndServe
+// returns an *http.Server with every documented hardening field set.
+// A regression here would surface as resource exhaustion under
+// slowloris / write-stall scenarios rather than a visible test
+// failure, so the assertion is a pure field check against the
+// hardened values pinned in the function itself.
+func TestListenAndServe_AppliesFullTimeouts(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	httpSrv, err := srv.ListenAndServe("127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("ListenAndServe: %v", err)
+	}
+	t.Cleanup(func() { _ = httpSrv.Close() })
+
+	if got, want := httpSrv.ReadHeaderTimeout, 5*time.Second; got != want {
+		t.Errorf("ReadHeaderTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.ReadTimeout, 10*time.Second; got != want {
+		t.Errorf("ReadTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.WriteTimeout, 10*time.Second; got != want {
+		t.Errorf("WriteTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.IdleTimeout, 60*time.Second; got != want {
+		t.Errorf("IdleTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.MaxHeaderBytes, 16<<10; got != want {
+		t.Errorf("MaxHeaderBytes = %d, want %d", got, want)
 	}
 }

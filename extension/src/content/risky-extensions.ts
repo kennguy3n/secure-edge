@@ -42,7 +42,7 @@ import type {
     RiskyExtensionsRequest,
 } from "../shared.js";
 
-/** Baked-in default blocklist (31 extensions). The list covers
+/** Baked-in default blocklist (34 extensions). The list covers
  *  Windows / macOS / Linux executables, installers, scripts (sans
  *  .js — too noisy for developer workflows), disk images, and
  *  cross-platform Java archives. All entries are lowercase and

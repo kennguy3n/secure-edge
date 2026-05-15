@@ -143,7 +143,7 @@ may introduce breaking changes between feature releases.
   so any drift in the HMAC input layout is caught on both sides.
 - **B2**: Block risky file extensions at the upload gesture. The
   `file-upload-interceptor` content script now matches every
-  selected / dropped file's extension against a baked-in 31-entry
+  selected / dropped file's extension against a baked-in 34-entry
   blocklist (Windows / macOS / Linux executables, installers,
   scripts, disk images, Java archives; `.js` intentionally
   excluded) BEFORE any content is read or sent to the agent. The

@@ -68,7 +68,7 @@ guarantees that we consider in-scope for this policy are:
 6. **Risky-extension upload block** — the browser extension's
    `file-upload-interceptor` content script blocks uploads of
    files whose extension is on a policy-controlled risky list
-   (default: 31 executable, installer, script, disk-image, and
+   (default: 34 executable, installer, script, disk-image, and
    Java-archive extensions; `.js` intentionally excluded). The
    check runs synchronously before any content is read or sent
    to the agent, so the filename and contents never leave the

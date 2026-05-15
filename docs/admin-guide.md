@@ -122,7 +122,7 @@ evaluated **on the page**, inside the browser extension's
 read or sent to the agent — so the filename and contents never
 leave the page for a B2 verdict.
 
-The extension ships with a baked-in default list of 31 extensions
+The extension ships with a baked-in default list of 34 extensions
 covering Windows / macOS / Linux executables, installers (`.msi`,
 `.pkg`, `.deb`, `.rpm`), scripts (`.ps1`, `.vbs`, `.bat`, `.cmd`,
 `.sh`, `.psm1`, `.psd1`, `.wsf`, `.wsh`, `.vbe`), disk images
@@ -139,7 +139,7 @@ Operators override the baked-in list via a single config key:
 
 ```yaml
 # Optional risky-extension override. Three states:
-#   1) Omit the key entirely    → extension uses the baked-in 31-entry default.
+#   1) Omit the key entirely    → extension uses the baked-in 34-entry default.
 #   2) Empty list `[]`          → opts out of B2 entirely (no extension is
 #                                 blocked at this layer; content scan still runs).
 #   3) Populated list           → replaces the baked-in default verbatim.

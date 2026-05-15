@@ -4506,7 +4506,7 @@
     {
       "name": "Sentry DSN with Secret Key",
       "regex": "https?://[a-f0-9]{32}:[a-f0-9]{32}@(?:o\\d+\\.ingest\\.)?sentry\\.io/\\d+",
-      "prefix": "@sentry.io/",
+      "prefix": "sentry.io/",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -4774,7 +4774,7 @@
     },
     {
       "name": "Jira/Atlassian API Token",
-      "regex": "ATATT3[A-Za-z0-9_\\-]{180,}=?[0-9A-F]{8}",
+      "regex": "ATATT3[A-Za-z0-9_\\-=]{180,}",
       "prefix": "atatt3",
       "severity": "critical",
       "score_weight": 1,
@@ -8652,7 +8652,7 @@
     },
     {
       "name": "SSH known_hosts Entry",
-      "regex": "^[a-zA-Z0-9.\\-]+\\s+ssh-(?:rsa|ed25519|ecdsa[a-z0-9-]+)\\s+AAAA[B0-9A-Za-z+/=]{40,}",
+      "regex": "(?m)^[a-zA-Z0-9.\\-]+\\s+ssh-(?:rsa|ed25519|ecdsa[a-z0-9-]+)\\s+AAAA[B0-9A-Za-z+/=]{40,}",
       "prefix": "ssh-",
       "severity": "medium",
       "score_weight": 1,
@@ -11152,7 +11152,7 @@
     {
       "name": ".NET Service Connection String",
       "regex": "(?i)(?:storage|servicebus|cosmos|signal[a-z]+)connectionstring\\s*[:=]\\s*['\\\"]?(?:DefaultEndpointsProtocol|Endpoint)=[^;\\\"\\s]+;(?:[^;\\\"\\s]+;){0,5}[A-Za-z]+Key=[A-Za-z0-9+/=]{40,}",
-      "prefix": "endpoint=",
+      "prefix": "connectionstring=",
       "severity": "critical",
       "score_weight": 1,
       "hotwords": [
@@ -11760,6 +11760,349 @@
       "require_hotword": true,
       "entropy_min": 3.0,
       "category": "code_secret"
+    },
+    {
+      "name": "FHIR R4 Patient Resource ID",
+      "regex": "(?i)\\\"resourceType\\\"\\s*:\\s*\\\"Patient\\\"[\\s\\S]{0,200}\\\"id\\\"\\s*:\\s*\\\"[A-Za-z0-9\\-\\.]{1,64}\\\"",
+      "prefix": "\"resourcetype\":",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "fhir",
+        "patient",
+        "r4",
+        "resource"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "FHIR Bearer Access Token",
+      "regex": "(?i)FHIR_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "fhir_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fhir",
+        "smart",
+        "oauth"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "phi"
+    },
+    {
+      "name": "SMART-on-FHIR App Refresh Token",
+      "regex": "(?i)SMART_REFRESH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-\\.]{40,}",
+      "prefix": "smart_refresh_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "smart",
+        "fhir",
+        "refresh",
+        "oauth"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "phi"
+    },
+    {
+      "name": "Epic FHIR Client Secret",
+      "regex": "(?i)EPIC_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=_\\-]{40,}",
+      "prefix": "epic_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "epic",
+        "mychart",
+        "fhir",
+        "client secret"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "phi"
+    },
+    {
+      "name": "Epic MyChart Refresh Token",
+      "regex": "(?i)MYCHART_REFRESH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-\\.]{40,}",
+      "prefix": "mychart_refresh_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mychart",
+        "epic",
+        "refresh"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "phi"
+    },
+    {
+      "name": "Cerner FHIR Tenant Bearer Token",
+      "regex": "(?i)CERNER_FHIR_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-\\.]{50,}",
+      "prefix": "cerner_fhir_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cerner",
+        "oracle health",
+        "fhir"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 PID Segment with DOB/SSN",
+      "regex": "PID\\|\\d{1,3}\\|[^|]{1,40}\\|[^|]{0,40}\\|[^|]{1,80}\\|[^|]{0,80}\\|\\d{8}\\|[MF]\\|",
+      "prefix": "pid|",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "pid",
+        "patient identifier"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 ADT Message Header",
+      "regex": "MSH\\|\\^~\\\\&\\|[A-Z0-9_\\-]{1,15}\\|[A-Z0-9_\\-]{1,15}\\|[A-Z0-9_\\-]{1,15}\\|[A-Z0-9_\\-]{1,15}\\|\\d{12,14}\\|\\|ADT\\^A\\d{2}\\|",
+      "prefix": "msh|^~\\&|",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "adt",
+        "msh"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DICOM Patient ID Tag",
+      "regex": "\\(0010,0020\\)\\s*LO\\s*\\[[A-Za-z0-9\\-]{6,40}\\]",
+      "prefix": "(0010,0020)",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dicom",
+        "patient id",
+        "pacs"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DICOM Issuer of Patient ID",
+      "regex": "\\(0010,0021\\)\\s*LO\\s*\\[[A-Za-z0-9\\- ]{6,40}\\]",
+      "prefix": "(0010,0021)",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "dicom",
+        "issuer",
+        "pacs"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US NPI (National Provider Identifier)",
+      "regex": "(?i)NPI\\s*[:#=]?\\s*\\d{10}\\b",
+      "prefix": "npi",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "npi",
+        "provider",
+        "clinician"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US DEA Number",
+      "regex": "\\b[ABFGM][A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dea",
+        "controlled substance",
+        "prescriber"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US Medicare Beneficiary Identifier (MBI)",
+      "regex": "[1-9][AC-HJKMNPRTUVWXY][AC-HJKMNPRTUVWXY0-9]\\d[AC-HJKMNPRTUVWXY][AC-HJKMNPRTUVWXY0-9]\\d[AC-HJKMNPRTUVWXY]{2}\\d{2}",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mbi",
+        "medicare",
+        "beneficiary"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US NDC Drug Code (10-digit)",
+      "regex": "(?i)NDC\\s*[:#=]?\\s*\\d{4,5}-\\d{3,4}-\\d{1,2}\\b",
+      "prefix": "ndc",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "ndc",
+        "drug code",
+        "prescription"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Medical Record Number (MRN)",
+      "regex": "(?i)\\bMRN\\s*[:#=]?\\s*[A-Z0-9\\-]{6,15}\\b",
+      "prefix": "mrn",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mrn",
+        "medical record",
+        "patient"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Patient Account Number",
+      "regex": "(?i)patient_account_number\\s*[:=]\\s*['\\\"]?[A-Z0-9\\-]{6,15}",
+      "prefix": "patient_account_number",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "patient",
+        "account",
+        "admit"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Health Plan Beneficiary Number",
+      "regex": "(?i)health[_\\s\\-]?plan[_\\s\\-]?(?:beneficiary[_\\s\\-]?)?(?:id|number)\\s*[:=]\\s*['\\\"]?[A-Z0-9\\-]{6,15}",
+      "prefix": "health",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "health plan",
+        "beneficiary",
+        "insurance"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "ICD-10-CM Diagnosis Code List",
+      "regex": "(?:(?:[A-TV-Z][0-9][0-9A-Z](?:\\.[0-9A-Z]{1,4})?)\\b[\\s,;|]+){3,}",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "icd-10",
+        "icd10",
+        "diagnosis"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Lab Result with Patient Name",
+      "regex": "(?i)patient[_\\s]?name\\s*:?\\s*[A-Z][a-z]+\\s+[A-Z][a-z]+[\\s\\S]{0,200}(?:hemoglobin|hba1c|glucose|cholesterol)\\s*:?\\s*\\d+",
+      "prefix": "patient",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "lab",
+        "hba1c",
+        "glucose"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Discharge Summary Header",
+      "regex": "(?i)discharge[\\s_]?summary[\\s\\S]{0,200}(?:DOB|date of birth)\\s*[:=]\\s*\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{2,4}",
+      "prefix": "discharge",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "discharge",
+        "summary",
+        "ehr"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
     }
   ]
 }

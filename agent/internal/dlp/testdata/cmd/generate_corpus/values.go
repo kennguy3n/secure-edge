@@ -2224,4 +2224,65 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["AWS Secrets Manager ARN"] = func(r *rand.Rand) string {
 		return "arn:aws:secretsmanager:us-east-1:" + randFromAlphabet(r, digits, 12) + ":secret:prod/api/key-" + randAlnum(r, 6)
 	}
+	// ---------------- Batch 16: Healthcare ----------------
+	valueGenerators["FHIR R4 Patient Resource ID"] = func(r *rand.Rand) string {
+		return "{\"resourceType\":\"Patient\",\"id\":\"pt-" + randAlnum(r, 12) + "\"}"
+	}
+	valueGenerators["FHIR Bearer Access Token"] = func(r *rand.Rand) string {
+		return "FHIR_ACCESS_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 30) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 120) + "." + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["SMART-on-FHIR App Refresh Token"] = func(r *rand.Rand) string {
+		return "SMART_REFRESH_TOKEN=" + randFromAlphabet(r, alnum+"_-.", 60)
+	}
+	valueGenerators["Epic FHIR Client Secret"] = func(r *rand.Rand) string {
+		return "EPIC_CLIENT_SECRET=" + randFromAlphabet(r, alnum+"+/=_-", 64)
+	}
+	valueGenerators["Epic MyChart Refresh Token"] = func(r *rand.Rand) string {
+		return "MYCHART_REFRESH_TOKEN=" + randFromAlphabet(r, alnum+"_-.", 56)
+	}
+	valueGenerators["Cerner FHIR Tenant Bearer Token"] = func(r *rand.Rand) string {
+		return "CERNER_FHIR_TOKEN=" + randFromAlphabet(r, alnum+"_-.", 80)
+	}
+	valueGenerators["HL7 v2 PID Segment with DOB/SSN"] = func(r *rand.Rand) string {
+		return "PID|1|" + randFromAlphabet(r, digits, 7) + "|" + randFromAlphabet(r, digits+upper+"-", 18) + "|" + randFromAlphabet(r, alnum, 6) + "|Doe^Jane^M|19850131|F|"
+	}
+	valueGenerators["HL7 v2 ADT Message Header"] = func(r *rand.Rand) string {
+		return "MSH|^~\\&|EPIC|MAIN|HCS|MAIN|" + randFromAlphabet(r, digits, 14) + "||ADT^A01|" + randAlnum(r, 12) + "|P|2.5"
+	}
+	valueGenerators["DICOM Patient ID Tag"] = func(r *rand.Rand) string {
+		return "(0010,0020) LO [" + randUpperAlnum(r, 12) + "]"
+	}
+	valueGenerators["DICOM Issuer of Patient ID"] = func(r *rand.Rand) string {
+		return "(0010,0021) LO [General Hospital " + randUpperAlnum(r, 6) + "]"
+	}
+	valueGenerators["US NPI (National Provider Identifier)"] = func(r *rand.Rand) string {
+		return "NPI: 1" + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["US DEA Number"] = func(r *rand.Rand) string {
+		return "DEA Number: " + randFromAlphabet(r, "ABFGM", 1) + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["US Medicare Beneficiary Identifier (MBI)"] = func(r *rand.Rand) string {
+		return "MBI: " + randFromAlphabet(r, "123456789", 1) + randFromAlphabet(r, "ACDEFGHJKMNPRTUVWXY", 1) + randFromAlphabet(r, "ACDEFGHJKMNPRTUVWXY0123456789", 1) + randFromAlphabet(r, digits, 1) + randFromAlphabet(r, "ACDEFGHJKMNPRTUVWXY", 1) + randFromAlphabet(r, "ACDEFGHJKMNPRTUVWXY0123456789", 1) + randFromAlphabet(r, digits, 1) + randFromAlphabet(r, "ACDEFGHJKMNPRTUVWXY", 2) + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["US NDC Drug Code (10-digit)"] = func(r *rand.Rand) string {
+		return "NDC: " + randFromAlphabet(r, digits, 5) + "-" + randFromAlphabet(r, digits, 4) + "-" + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["Medical Record Number (MRN)"] = func(r *rand.Rand) string {
+		return "MRN: " + randFromAlphabet(r, upper+digits, 10)
+	}
+	valueGenerators["Patient Account Number"] = func(r *rand.Rand) string {
+		return "patient_account_number=" + randFromAlphabet(r, upper+digits, 12)
+	}
+	valueGenerators["Health Plan Beneficiary Number"] = func(r *rand.Rand) string {
+		return "health_plan_id=" + randFromAlphabet(r, upper+digits, 12)
+	}
+	valueGenerators["ICD-10-CM Diagnosis Code List"] = func(r *rand.Rand) string {
+		return "Diagnoses: " + randFromAlphabet(r, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 1) + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 2) + ", " + randFromAlphabet(r, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 1) + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 2) + ", " + randFromAlphabet(r, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 1) + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 2) + ", "
+	}
+	valueGenerators["Lab Result with Patient Name"] = func(r *rand.Rand) string {
+		return "patient_name: Jane Doe\nDOB: 1980-05-12\nHbA1c: " + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["Discharge Summary Header"] = func(r *rand.Rand) string {
+		return "DISCHARGE SUMMARY\nPatient: Jane Doe\nDOB: 05/12/1980\nAdmit Date: 2024-03-15"
+	}
 }

@@ -816,6 +816,28 @@ var patternCategory = map[string]string{
 	"Conjur API Key":                              "code_secrets",
 	"AWS Secrets Manager ARN":                     "code_secrets",
 
+	// Batch 16: Healthcare
+	"FHIR R4 Patient Resource ID":              "healthcare",
+	"FHIR Bearer Access Token":                 "healthcare",
+	"SMART-on-FHIR App Refresh Token":          "healthcare",
+	"Epic FHIR Client Secret":                  "healthcare",
+	"Epic MyChart Refresh Token":               "healthcare",
+	"Cerner FHIR Tenant Bearer Token":          "healthcare",
+	"HL7 v2 PID Segment with DOB/SSN":          "healthcare",
+	"HL7 v2 ADT Message Header":                "healthcare",
+	"DICOM Patient ID Tag":                     "healthcare",
+	"DICOM Issuer of Patient ID":               "healthcare",
+	"US NPI (National Provider Identifier)":    "healthcare",
+	"US DEA Number":                            "healthcare",
+	"US Medicare Beneficiary Identifier (MBI)": "healthcare",
+	"US NDC Drug Code (10-digit)":              "healthcare",
+	"Medical Record Number (MRN)":              "healthcare",
+	"Patient Account Number":                   "healthcare",
+	"Health Plan Beneficiary Number":           "healthcare",
+	"ICD-10-CM Diagnosis Code List":            "healthcare",
+	"Lab Result with Patient Name":             "healthcare",
+	"Discharge Summary Header":                 "healthcare",
+
 	// Batch 7: Container / Orchestration
 }
 

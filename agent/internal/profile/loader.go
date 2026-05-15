@@ -24,7 +24,15 @@ const maxProfileBytes = 1 << 20 // 1 MiB
 const DefaultHTTPTimeout = 30 * time.Second
 
 // LoadFromFile reads a profile JSON document from disk and validates it.
-func LoadFromFile(path string) (*Profile, error) {
+//
+// A non-nil v enforces the operator's configured trust posture on
+// the parsed profile before it is returned: see Verifier.Verify for
+// the trust matrix. Pass nil to skip verification entirely (callers
+// that intentionally don't want signature enforcement, e.g. unit
+// tests that build their own Profile in memory). A non-nil Verifier
+// with no public key configured is the operator-friendly
+// backwards-compatible posture (warn once + accept).
+func LoadFromFile(path string, v *Verifier) (*Profile, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, errors.New("profile: load path is empty")
 	}
@@ -32,12 +40,29 @@ func LoadFromFile(path string) (*Profile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("profile: read %q: %w", path, err)
 	}
-	return Parse(raw)
+	p, err := Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if v != nil {
+		if err := v.Verify(p); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
 }
 
 // LoadFromURL fetches a profile JSON document from rawURL via HTTPS GET
 // and validates it. client may be nil; the default client uses
 // DefaultHTTPTimeout.
+//
+// A non-nil v enforces the operator's configured trust posture on
+// the parsed profile after the body has been read and validated:
+// see Verifier.Verify for the trust matrix. Pass nil to skip
+// verification entirely (callers that intentionally don't want
+// signature enforcement). A non-nil Verifier with no public key
+// configured is the operator-friendly backwards-compatible posture
+// (warn once + accept).
 //
 // The URL must use the https:// scheme — plain HTTP profile fetches
 // are rejected because a profile is a load-bearing security document
@@ -47,7 +72,7 @@ func LoadFromFile(path string) (*Profile, error) {
 // RFC1918 / link-local / unique-local addresses are also rejected to
 // keep this code path from being used as an SSRF primitive against
 // internal services on the same machine or LAN.
-func LoadFromURL(ctx context.Context, client *http.Client, rawURL string) (*Profile, error) {
+func LoadFromURL(ctx context.Context, client *http.Client, rawURL string, v *Verifier) (*Profile, error) {
 	if strings.TrimSpace(rawURL) == "" {
 		return nil, errors.New("profile: url is empty")
 	}
@@ -104,7 +129,16 @@ func LoadFromURL(ctx context.Context, client *http.Client, rawURL string) (*Prof
 	if len(raw) > maxProfileBytes {
 		return nil, fmt.Errorf("profile: response exceeds %d bytes", maxProfileBytes)
 	}
-	return Parse(raw)
+	p, err := Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if v != nil {
+		if err := v.Verify(p); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
 }
 
 // hostCheck is the SSRF guard used by LoadFromURL. Exposed as a

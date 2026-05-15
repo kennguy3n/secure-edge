@@ -542,7 +542,30 @@ func run(configPath string) error {
 	holder := profile.NewHolder(nil)
 	applyStore := &profileApplyAdapter{store: s}
 	apiServer.SetProfile(holder, applyStore)
-	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline); err != nil {
+
+	// D2: build the enterprise-profile Ed25519 verifier from the
+	// hex-encoded `profile_public_key` config knob. Both the
+	// startup loader and the POST /api/profile/import handler
+	// route through the same verifier so the on-disk, URL-fetched,
+	// and inline-body import paths share one signing posture.
+	//
+	// NewVerifierFromHex trims its input, accepts an empty string
+	// as "no key configured" (returns a verifier in warn-once
+	// mode), and returns an error on any non-empty string that
+	// is not a valid Ed25519 public key. The non-empty + invalid
+	// case is treated as a hard config error so an operator who
+	// fat-fingered the key value finds out at boot rather than
+	// silently running in lenient mode.
+	profileVerifier, err := profile.NewVerifierFromHex(cfg.ProfilePublicKey)
+	if err != nil {
+		return fmt.Errorf("profile_public_key: %w", err)
+	}
+	apiServer.SetProfileVerifier(profileVerifier)
+	if msg := orphanedProfilePublicKeyWarning(cfg.ProfilePath, cfg.ProfileURL, cfg.ProfilePublicKey); msg != "" {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+
+	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline, profileVerifier); err != nil {
 		fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
 	}
 
@@ -626,6 +649,35 @@ func orphanedRulePublicKeyWarning(ruleUpdateURL, ruleUpdatePublicKey string) str
 	return "agent: rule_update_public_key is set but rule_update_url is empty; " +
 		"the configured key will be ignored. Set rule_update_url to enable signature verification, " +
 		"or remove rule_update_public_key to silence this warning."
+}
+
+// orphanedProfilePublicKeyWarning returns a non-empty operator-facing
+// message when an operator has set `profile_public_key` but left both
+// `profile_path` and `profile_url` empty. Returns "" when the
+// configuration is well-formed.
+//
+// The key is still useful in that configuration for the
+// /api/profile/import handler (an operator may push profiles into
+// the agent at runtime via the inline-body or URL paths through
+// the API), so this warning intentionally only fires when neither
+// startup-load knob is wired. Mirrors orphanedRulePublicKeyWarning
+// above; the check trims the public-key value because YAML scalars
+// often carry stray surrounding whitespace, matching the pre-trim
+// consistency of profile.NewVerifierFromHex's own input handling.
+//
+// Pure / side-effect-free so the agent's startup integration code
+// can call it once and unit tests can drive it directly without
+// stubbing os.Stderr or running the full `run()` boot path.
+func orphanedProfilePublicKeyWarning(profilePath, profileURL, profilePublicKey string) string {
+	if profilePath != "" || profileURL != "" {
+		return ""
+	}
+	if strings.TrimSpace(profilePublicKey) == "" {
+		return ""
+	}
+	return "agent: profile_public_key is set but profile_path and profile_url are both empty; " +
+		"the configured key will only take effect on POST /api/profile/import. Set profile_path or " +
+		"profile_url to enable startup verification, or remove profile_public_key to silence this warning."
 }
 
 // validateRulesAlignment checks that every rule file the live agent
@@ -929,14 +981,14 @@ func (a tamperAdapter) Status() api.TamperStatus {
 // operator-supplied local file overrides any server-distributed
 // profile. Errors are propagated so the caller can decide whether to
 // fail the boot.
-func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Holder, ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline) error {
+func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Holder, ps profile.PolicyStore, engine *policy.Engine, pipeline *dlp.Pipeline, verifier *profile.Verifier) error {
 	var p *profile.Profile
 	var err error
 	switch {
 	case cfg.ProfilePath != "":
-		p, err = profile.LoadFromFile(cfg.ProfilePath)
+		p, err = profile.LoadFromFile(cfg.ProfilePath, verifier)
 	case cfg.ProfileURL != "":
-		p, err = profile.LoadFromURL(ctx, nil, cfg.ProfileURL)
+		p, err = profile.LoadFromURL(ctx, nil, cfg.ProfileURL, verifier)
 	default:
 		return nil
 	}

@@ -206,3 +206,77 @@ func TestOrphanedRulePublicKeyWarning(t *testing.T) {
 		})
 	}
 }
+
+// TestOrphanedProfilePublicKeyWarning covers the D2 mirror of the
+// rule-update orphan check above. The key is still useful in the
+// `both startup-load knobs empty` configuration (POST
+// /api/profile/import will still verify against it), so the
+// warning fires only when neither profile_path nor profile_url is
+// wired AND the key is set — the genuine misconfiguration footgun.
+func TestOrphanedProfilePublicKeyWarning(t *testing.T) {
+	const wellFormedKey = "00112233445566778899aabbccddeeff" +
+		"00112233445566778899aabbccddeeff"
+	const wantWarn = "agent: profile_public_key is set but profile_path and profile_url are both empty; " +
+		"the configured key will only take effect on POST /api/profile/import. Set profile_path or " +
+		"profile_url to enable startup verification, or remove profile_public_key to silence this warning."
+
+	cases := []struct {
+		name string
+		path string
+		url  string
+		key  string
+		want string
+	}{
+		{
+			name: "everything empty: no warning",
+			want: "",
+		},
+		{
+			name: "profile_path set, key empty: no warning",
+			path: "/etc/secure-edge/profile.json",
+			want: "",
+		},
+		{
+			name: "profile_url set, key empty: no warning",
+			url:  "https://example.com/profile.json",
+			want: "",
+		},
+		{
+			name: "profile_path set, key set: well-formed rollout, no warning",
+			path: "/etc/secure-edge/profile.json",
+			key:  wellFormedKey,
+			want: "",
+		},
+		{
+			name: "profile_url set, key set: well-formed rollout, no warning",
+			url:  "https://example.com/profile.json",
+			key:  wellFormedKey,
+			want: "",
+		},
+		{
+			name: "key set + both load knobs empty: WARN (the case the helper exists for)",
+			key:  wellFormedKey,
+			want: wantWarn,
+		},
+		{
+			name: "key whitespace-only + both load knobs empty: treat as unset, no warning",
+			key:  "   \t\n  ",
+			want: "",
+		},
+		{
+			name: "key padded + both load knobs empty: still warn (matches trimmed-decode path)",
+			key:  "   " + wellFormedKey + "   ",
+			want: wantWarn,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := orphanedProfilePublicKeyWarning(tc.path, tc.url, tc.key)
+			if got != tc.want {
+				t.Fatalf("orphanedProfilePublicKeyWarning(%q, %q, %q):\n  got:  %q\n  want: %q",
+					tc.path, tc.url, tc.key, got, tc.want)
+			}
+		})
+	}
+}

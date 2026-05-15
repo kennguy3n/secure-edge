@@ -198,6 +198,78 @@ falls back to the last good profile and logs a single line to the agent log
 When `managed: true`, the Electron tray UI hides the category toggles and the
 Settings page shows a read-only banner with the profile ID + version.
 
+### 3.1 Signing enterprise profiles (`profile_public_key`, Phase 7 / D2)
+
+The agent verifies an Ed25519 signature on every loaded profile when
+`profile_public_key` is configured. The same verifier covers all three
+import surfaces (`profile_path` on disk, `profile_url` over HTTPS, and
+runtime `POST /api/profile/import` with either `{"url": …}` or
+`{"profile": {…}}` shapes) so an attacker can't slip a tampered profile
+through one path while signing the rest.
+
+When `profile_public_key` is **absent**, the agent runs in a
+backwards-compatible warn-once posture: unsigned profiles are accepted,
+and a single line is logged per process so an operator who half-rolled
+out the change sees a breadcrumb in their logs. When the key is
+**configured**, unsigned, malformed, tampered, or wrong-key-signed
+profiles are rejected before any policy is applied.
+
+End-to-end signing example:
+
+```bash
+# 1. Generate an Ed25519 keypair once (keep the private key offline).
+#    The CLI expects the Go crypto/ed25519 raw-private-key format
+#    (64 bytes = 128 hex chars), which is seed || public. The
+#    snippet below emits exactly that.
+$ cat > /tmp/genkey.go <<'EOF'
+package main
+import (
+    "crypto/ed25519"
+    "crypto/rand"
+    "encoding/hex"
+    "fmt"
+    "os"
+)
+func main() {
+    pub, priv, err := ed25519.GenerateKey(rand.Reader)
+    if err != nil { panic(err) }
+    if err := os.WriteFile("ed25519-priv.hex",
+        []byte(hex.EncodeToString(priv)), 0o600); err != nil { panic(err) }
+    fmt.Println(hex.EncodeToString(pub))   // configure as profile_public_key
+}
+EOF
+$ go run /tmp/genkey.go > ed25519-pub.hex
+$ chmod 600 ed25519-priv.hex
+
+# 2. Sign your profile JSON.
+$ go run ./agent/cmd/sign-enterprise-profile \
+    -in config/profile.json \
+    -key ed25519-priv.hex
+sign-enterprise-profile: signed config/profile.json (name=acme version=1.0.0)
+  public key: <hex>
+  configure the agent with `profile_public_key: "<hex>"`
+
+# 3. Add the matching public key to config.yaml on every agent.
+$ cat >> /etc/secure-edge/config.yaml <<EOF
+profile_public_key: "$(cat ed25519-pub.hex)"
+profile_path: "/etc/secure-edge/profile.json"
+EOF
+
+# 4. Restart the agent. It now verifies the on-disk profile, and any
+#    runtime push through POST /api/profile/import, against the key.
+```
+
+Re-signing is necessary on every profile update. The CLI is idempotent —
+running it again over an already-signed profile recomputes the signature
+from the body (the `signature` field is excluded from the canonical
+bytes by construction, so the round-trip is deterministic).
+
+If you set `profile_public_key` but leave both `profile_path` and
+`profile_url` empty, the agent prints a one-line orphan-key warning to
+stderr at startup. The key is still useful in that configuration (runtime
+`POST /api/profile/import` will verify against it), but the warning
+surfaces the partial-rollout footgun.
+
 ## 4. Rule Updates
 
 Two mechanisms:

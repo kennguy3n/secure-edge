@@ -663,7 +663,13 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 	var p *profile.Profile
 	switch {
 	case strings.TrimSpace(req.URL) != "":
-		p, err = profile.LoadFromURL(r.Context(), nil, req.URL)
+		// LoadFromURL with the configured verifier (D2) — the
+		// verifier is nil before D2 ships, which preserves the
+		// historical behaviour. When configured with a public
+		// key the verifier rejects unsigned / tampered profiles
+		// before they ever touch the apply path; when configured
+		// without a key it logs a one-time warning and accepts.
+		p, err = profile.LoadFromURL(r.Context(), nil, req.URL, s.ProfileVerifier)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "fetch profile: "+err.Error())
 			return
@@ -672,6 +678,22 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 		if err := req.Profile.Validate(); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		// D2: verify the inline-body profile through the same
+		// envelope the URL path uses. Mirrors the rule-manifest
+		// verifier path (rules.verifyManifestSignature) so the
+		// inline import surface can't be used to bypass the
+		// signing posture an operator configured. The verifier
+		// recomputes the canonical bytes via CanonicalForSigning,
+		// which goes through profileBody and so produces the
+		// same bytes the signer signed regardless of whether the
+		// inline Profile already carries a Signature field. A
+		// nil verifier preserves pre-D2 behaviour.
+		if s.ProfileVerifier != nil {
+			if err := s.ProfileVerifier.Verify(req.Profile); err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 		p = req.Profile
 	default:

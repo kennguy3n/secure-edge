@@ -76,7 +76,7 @@ func TestLoadFromFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"name":"acme","managed":true}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	p, err := LoadFromFile(path)
+	p, err := LoadFromFile(path, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -84,10 +84,10 @@ func TestLoadFromFile(t *testing.T) {
 		t.Fatalf("unexpected profile: %+v", p)
 	}
 
-	if _, err := LoadFromFile(""); err == nil {
+	if _, err := LoadFromFile("", nil); err == nil {
 		t.Fatalf("expected error for empty path")
 	}
-	if _, err := LoadFromFile(filepath.Join(dir, "nope.json")); err == nil {
+	if _, err := LoadFromFile(filepath.Join(dir, "nope.json"), nil); err == nil {
 		t.Fatalf("expected error for missing file")
 	}
 }
@@ -123,7 +123,7 @@ func TestLoadFromURL(t *testing.T) {
 	defer srv.Close()
 
 	ctx := context.Background()
-	p, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/ok")
+	p, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/ok", nil)
 	if err != nil {
 		t.Fatalf("ok: %v", err)
 	}
@@ -131,19 +131,19 @@ func TestLoadFromURL(t *testing.T) {
 		t.Fatalf("unexpected: %+v", p)
 	}
 
-	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/bad"); err == nil {
+	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/bad", nil); err == nil {
 		t.Fatalf("expected error on 5xx")
 	}
-	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/huge"); err == nil {
+	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/huge", nil); err == nil {
 		t.Fatalf("expected error on oversized response")
 	}
-	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/bad-json"); err == nil {
+	if _, err := LoadFromURL(ctx, srv.Client(), srv.URL+"/bad-json", nil); err == nil {
 		t.Fatalf("expected error on malformed json")
 	}
-	if _, err := LoadFromURL(ctx, srv.Client(), ""); err == nil {
+	if _, err := LoadFromURL(ctx, srv.Client(), "", nil); err == nil {
 		t.Fatalf("expected error on empty url")
 	}
-	if _, err := LoadFromURL(ctx, srv.Client(), "ftp://example.com/p.json"); err == nil {
+	if _, err := LoadFromURL(ctx, srv.Client(), "ftp://example.com/p.json", nil); err == nil {
 		t.Fatalf("expected error on non-http scheme")
 	}
 }
@@ -164,7 +164,7 @@ func TestLoadFromURL_RejectsHTTPScheme(t *testing.T) {
 		"http://[::1]/profile.json",
 	}
 	for _, rawURL := range cases {
-		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		_, err := LoadFromURL(context.Background(), nil, rawURL, nil)
 		if err == nil {
 			t.Errorf("%s: expected scheme error, got nil", rawURL)
 			continue
@@ -202,7 +202,7 @@ func TestLoadFromURL_RejectsPrivateOrLoopbackHosts(t *testing.T) {
 		"https://[::]/profile.json",
 	}
 	for _, rawURL := range cases {
-		_, err := LoadFromURL(context.Background(), nil, rawURL)
+		_, err := LoadFromURL(context.Background(), nil, rawURL, nil)
 		if err == nil {
 			t.Errorf("%s: expected SSRF rejection, got nil", rawURL)
 			continue
@@ -229,7 +229,7 @@ func TestLoadFromURL_RejectsHostnameResolvingToPrivate(t *testing.T) {
 	}
 	t.Cleanup(func() { profileResolver = origResolver })
 
-	_, err := LoadFromURL(context.Background(), nil, "https://mdm-rebinder.example.com/profile.json")
+	_, err := LoadFromURL(context.Background(), nil, "https://mdm-rebinder.example.com/profile.json", nil)
 	if err == nil {
 		t.Fatalf("expected SSRF rejection for hostname resolving to 127.0.0.1, got nil")
 	}
@@ -301,7 +301,7 @@ func TestLoadFromURL_RejectsHTTPRedirect(t *testing.T) {
 			}
 			client := &http.Client{Transport: tr, Timeout: 5 * time.Second}
 
-			_, err := LoadFromURL(context.Background(), client, "https://example.com/profile.json")
+			_, err := LoadFromURL(context.Background(), client, "https://example.com/profile.json", nil)
 			if err == nil {
 				t.Fatalf("expected redirect to be rejected; got nil")
 			}
@@ -336,7 +336,7 @@ func TestLoadFromURL_RedirectGuardEnforcesChainCap(t *testing.T) {
 	client := srv.Client()
 	client.Timeout = 5 * time.Second
 
-	_, err := LoadFromURL(context.Background(), client, srv.URL+"/start")
+	_, err := LoadFromURL(context.Background(), client, srv.URL+"/start", nil)
 	if err == nil {
 		t.Fatalf("expected redirect chain to be cut short; got nil")
 	}

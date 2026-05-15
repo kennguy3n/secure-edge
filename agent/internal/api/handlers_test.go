@@ -1733,3 +1733,93 @@ func TestStatus_DegradedFlag(t *testing.T) {
 		t.Errorf("degraded=false after SetDegraded(true)")
 	}
 }
+
+// TestUpdatePolicy_UnknownCategoryReturns400 covers the API-shape
+// half of the Task 7 hardening: store.SetPolicy now returns
+// ErrInvalidCategory for an out-of-set category name, and the
+// handler must map that to 400, not 500. A 500 would mislead
+// callers into believing the agent malfunctioned rather than that
+// their request was rejected.
+func TestUpdatePolicy_UnknownCategoryReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	body := bytes.NewBufferString(`{"action":"allow"}`)
+	r := newLocalRequest(http.MethodPut, "/api/policies/Made%20Up%20Category", body)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "invalid category") {
+		t.Errorf("body %q should mention invalid category", w.Body.String())
+	}
+}
+
+// TestUpdatePolicy_InvalidActionReturns400 is the regression baseline:
+// the existing ErrInvalidAction → 400 mapping must still fire. Without
+// this test a future refactor of the err-mapping ladder could drop the
+// pre-existing branch and only the new category branch would be
+// covered by the suite.
+func TestUpdatePolicy_InvalidActionReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	body := bytes.NewBufferString(`{"action":"definitely-not-an-action"}`)
+	r := newLocalRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", w.Code, w.Body.String())
+	}
+}
+
+// TestDLPConfig_InvalidThresholdReturns400 covers the API-shape
+// half of the Task 7 DLP validator: store.SetDLPConfig now returns
+// ErrInvalidDLPConfig-wrapped errors for non-positive thresholds and
+// out-of-bounds weights, and the handler must surface that as 400
+// with the underlying message so callers know which field is wrong.
+func TestDLPConfig_InvalidThresholdReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	srv.SetDLP(&fakeDLP{thr: thr})
+
+	bad := store.DLPConfig{
+		ThresholdCritical: 0, // invalid
+		ThresholdHigh:     1,
+		ThresholdMedium:   2,
+		ThresholdLow:      3,
+	}
+	body, _ := json.Marshal(bad)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "threshold_critical") {
+		t.Errorf("body %q should name the offending field", rec.Body.String())
+	}
+}
+
+// TestDLPConfig_OutOfBoundsWeightReturns400 covers the weight half
+// of the Task 7 DLP validator at the API surface.
+func TestDLPConfig_OutOfBoundsWeightReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	srv.SetDLP(&fakeDLP{thr: thr})
+
+	bad := store.DLPConfig{
+		ThresholdCritical: 10,
+		ThresholdHigh:     8,
+		ThresholdMedium:   5,
+		ThresholdLow:      2,
+		HotwordBoost:      200, // outside [-100,100]
+	}
+	body, _ := json.Marshal(bad)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "hotword_boost") {
+		t.Errorf("body %q should name the offending field", rec.Body.String())
+	}
+}

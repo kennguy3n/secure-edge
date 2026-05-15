@@ -348,8 +348,18 @@ func (s *Server) handlePolicyItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.SetPolicy(r.Context(), category, body.Action); err != nil {
+		// Both error sentinels mean "the caller handed us invalid
+		// input" — return 400 with the underlying message so the
+		// caller knows which constraint they tripped, instead of a
+		// generic 500 that implies a server-side fault. Task 7
+		// introduced ErrInvalidCategory at the store boundary; the
+		// HTTP surface must follow.
 		if errors.Is(err, store.ErrInvalidAction) {
 			writeError(w, http.StatusBadRequest, "invalid action")
+			return
+		}
+		if errors.Is(err, store.ErrInvalidCategory) {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "update failed")
@@ -464,6 +474,16 @@ func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.SetDLPConfig(r.Context(), body); err != nil {
+		// Same contract as handlePolicyItem: an invalid threshold or
+		// out-of-bounds weight is a 400, not a 500. The wrapped
+		// ErrInvalidDLPConfig message names the offending field
+		// ("threshold_critical must be positive", "hotword_boost=200
+		// outside [-100,100]", ...) so the caller can fix the input
+		// without having to guess which knob is wrong.
+		if errors.Is(err, store.ErrInvalidDLPConfig) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "update failed")
 		return
 	}

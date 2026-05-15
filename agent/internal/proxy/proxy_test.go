@@ -477,3 +477,55 @@ func TestReadScanBody_OverCapStreams(t *testing.T) {
 		}
 	}
 }
+
+// TestServer_ListenAndServe_AppliesFullTimeouts pins every wall-clock
+// budget set on the proxy's *http.Server. The proxy fronts goproxy
+// for real HTTPS uploads, so the timeouts here are larger than the
+// loopback control API but still bounded — a slowloris / write-stall
+// must not be able to hold a listener thread forever. A regression
+// (a future edit deleting one of these fields) would not surface in
+// any other test, hence this dedicated field-check.
+func TestServer_ListenAndServe_AppliesFullTimeouts(t *testing.T) {
+	ca := newTestCA(t)
+	srv, err := New(ca,
+		PolicyCheckerFunc(func(_ string) bool { return false }),
+		&fakeScanner{}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	addr := "127.0.0.1:" + freePort(t)
+	if err := srv.ListenAndServe(addr); err != nil {
+		t.Fatalf("ListenAndServe: %v", err)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	}()
+
+	// Wait for the listener to come up before peeking at the server.
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) && !srv.Running() {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	httpSrv := srv.httpServerForTest()
+	if httpSrv == nil {
+		t.Fatal("httpServerForTest returned nil")
+	}
+	if got, want := httpSrv.ReadHeaderTimeout, 10*time.Second; got != want {
+		t.Errorf("ReadHeaderTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.ReadTimeout, 30*time.Second; got != want {
+		t.Errorf("ReadTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.WriteTimeout, 30*time.Second; got != want {
+		t.Errorf("WriteTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.IdleTimeout, 120*time.Second; got != want {
+		t.Errorf("IdleTimeout = %v, want %v", got, want)
+	}
+	if got, want := httpSrv.MaxHeaderBytes, 16<<10; got != want {
+		t.Errorf("MaxHeaderBytes = %d, want %d", got, want)
+	}
+}

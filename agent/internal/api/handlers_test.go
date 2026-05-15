@@ -1897,3 +1897,66 @@ func TestStatus_DebugFlagAllowedFromControlOrigin(t *testing.T) {
 		t.Errorf("control-origin debug request did not surface full path: %+v", got.Rules)
 	}
 }
+
+// TestControlEndpoints_BodyTooLarge confirms every JSON control
+// endpoint that reads r.Body returns 413 Request Entity Too Large
+// when the body exceeds maxControlBytes. The handlers are wired
+// through decodeControlBody (defined in handlers.go), which wraps
+// r.Body in http.MaxBytesReader and distinguishes the cap from a
+// malformed-JSON error so the caller knows which constraint they
+// tripped. A regression that strips the cap (or that returns 400
+// instead of 413 on overrun) would silently re-expose the
+// memory-exhaustion vector this guard exists to close — hence the
+// per-endpoint table here.
+func TestControlEndpoints_BodyTooLarge(t *testing.T) {
+	// 64 KiB is the documented cap; one extra byte forces
+	// MaxBytesReader to surface http.MaxBytesError on the very
+	// first read. The payload itself is syntactically valid JSON
+	// (an array of "x" characters) so a handler that wrongly
+	// classifies the overrun as a parse error would land on
+	// http.StatusBadRequest instead and fail the assertion below.
+	oversize := bytes.Repeat([]byte{'x'}, 64*1024+1)
+	bigJSON := []byte(`{"x":"` + string(oversize) + `"}`)
+
+	// Each endpoint here either previously read r.Body without a
+	// cap (handlePolicyItem PUT, handleDLPConfigPut,
+	// handleRuleOverride POST) or treated an empty body as a
+	// no-op while still accepting an arbitrary-sized one
+	// (handleProxyDisable). All four now share decodeControlBody.
+	cases := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{"policy PUT", http.MethodPut, "/api/policies/AI%20Chat%20Blocked"},
+		{"dlp config PUT", http.MethodPut, "/api/dlp/config"},
+		{"rule override POST", http.MethodPost, "/api/rules/override"},
+		{"proxy disable POST", http.MethodPost, "/api/proxy/disable"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			// handleProxyDisable returns 503 when no Proxy is
+			// wired, before reading the body. Wire a stub so the
+			// cap path is the one we observe.
+			if c.path == "/api/proxy/disable" {
+				srv.SetProxyController(&fakeProxyController{})
+			}
+			// handleRuleOverride returns 503 when no rule
+			// override backend is wired; wire a stub so the cap
+			// path is what we observe.
+			if c.path == "/api/rules/override" {
+				srv.SetRuleOverride(&fakeRuleOverride{})
+			}
+			req := newLocalRequest(c.method, c.path, bytes.NewBuffer(bigJSON))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+			if rec.Code != http.StatusRequestEntityTooLarge {
+				t.Errorf("%s: code = %d (body=%q), want %d",
+					c.name, rec.Code, rec.Body.String(),
+					http.StatusRequestEntityTooLarge)
+			}
+		})
+	}
+}

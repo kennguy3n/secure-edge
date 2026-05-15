@@ -354,6 +354,20 @@ func (c Config) ValidateEnforcementRequirements() error {
 		if strings.TrimSpace(c.ProfilePublicKey) == "" {
 			return errors.New("managed mode requires profile_public_key")
 		}
+		// Managed mode pins every signed surface or it doesn't
+		// start: without rule_update_public_key the rule
+		// auto-updater would fall back to per-file SHA-256 + a
+		// one-time warning, exactly the lenient posture managed
+		// installs exist to opt out of. The agent verifies the
+		// trimmed value matches what the rule-updater consumer
+		// expects (rules/updater.go's parseRuleUpdatePublicKey),
+		// so trimming here keeps the validator and consumer in
+		// sync — a whitespace-only value satisfies a naive
+		// "non-empty" check but loads as a zero-length key, which
+		// the verifier silently treats as "no verifier".
+		if strings.TrimSpace(c.RuleUpdatePublicKey) == "" {
+			return errors.New("managed mode requires rule_update_public_key")
+		}
 		// Managed mode must declare a profile source at boot so the
 		// agent never runs without a baseline. A managed install with
 		// neither profile_path nor profile_url set would otherwise

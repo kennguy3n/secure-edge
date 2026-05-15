@@ -1,11 +1,46 @@
-# Secure Edge agent configuration (packaged default).
+# Secure Edge agent configuration — PERSONAL mode (development / individual use).
+#
+# This preset runs with a permissive, fall-open posture suitable for
+# personal installs and local development. It does NOT enforce bearer-
+# token auth on the control API, extension ID pinning, Native Messaging
+# bridge HMAC, or signed enterprise profiles. Missing scans, MAC
+# mismatches, and oversize bodies all fall open rather than blocking.
+#
+# Three deployment models ship with the agent. The decision is driven
+# by the `enforcement_mode` field below; on team and managed presets
+# the secure-defaults validator (`ValidateEnforcementRequirements` in
+# `agent/internal/config/config.go`) refuses to start the agent unless
+# every required control is configured.
+#
+#   personal  Default. Permissive auth + permissive policy. Designed
+#             for the individual developer running the agent on their
+#             own machine.
+#   team      Bearer-token auth + extension ID pinning. Agent unavailable
+#             / scan-null surfaces a warn toast; oversize payloads still
+#             fall open. Designed for small team pilots where the cost
+#             of a spurious block is higher than the cost of a missed
+#             secret.
+#   managed   Fail-closed everywhere. Bearer-token + extension pinning
+#             + bridge HMAC + signed profiles + signed rule manifests
+#             all required at boot; agent unavailable, oversize, and
+#             MAC failures BLOCK. Designed for MDM-deployed enterprise
+#             installs where the threat model includes a hostile page
+#             and a partial-failure agent.
+#
+# For team or enterprise deployments, start from the corresponding
+# reference preset and copy the values you need:
+#   config.team.example.yaml      (bearer token + extension pinning)
+#   config.managed.example.yaml   (fail-closed, every signed surface)
+#
+# The full graduation path (personal → team → managed) is documented
+# in docs/admin-guide.md §2.1 and the enforcement boundary analysis
+# in docs/admin-guide.md §8.
 #
 # This file is installed to /etc/secure-edge/config.yaml on Linux (see
 # agent/nfpm.yaml) and C:\ProgramData\SecureEdge\config.yaml on Windows
-# (see installer/wix/secure-edge.wxs). Treat it as a starting point
-# tuned for an out-of-the-box install — operators are expected to
-# override values via the agent's `--config` flag or by editing this
-# file in place.
+# (see installer/wix/secure-edge.wxs). Treat it as a starting point —
+# operators are expected to override values via the agent's `--config`
+# flag or by editing this file in place.
 #
 # Every value here mirrors the example in README.md; keep them in sync
 # so the README is the canonical reference.

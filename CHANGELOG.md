@@ -117,6 +117,25 @@ changes between feature releases — breaking entries are flagged explicitly.
   (`POLICY_PATTERN_AGENT_UNAVAILABLE` block). Symmetric "must not
   block in personal mode" assertions guard against an over-eager
   promotion of the block branches.
+- **Packaged `config.yaml` now self-identifies as the personal
+  preset.** The header comment block at the top of `config.yaml`
+  explicitly labels the file as `PERSONAL mode (development /
+  individual use)`, enumerates the three enforcement presets
+  (`personal` / `team` / `managed`) and what each one enforces,
+  and points operators at `config.team.example.yaml` and
+  `config.managed.example.yaml` for the harder postures. The file
+  itself is unchanged on the value side — it remains the
+  packaged out-of-the-box install.
+- **`README.md` gained a "Security posture" section.** The new
+  section consolidates the enforcement matrix (personal / team /
+  managed posture per failure mode), the extension-vs-proxy
+  enforcement boundary (what the extension cannot prevent and
+  which OS / browser-policy / proxy control closes which gap),
+  the three-layer DLP accuracy methodology (smoke / large /
+  regression with their per-layer budgets and source files), and
+  the HTTP surface hardening tuple now shared by the control API
+  and the proxy listener. The DLP coverage table moved no rows;
+  the new section sits between Enterprise features and Testing.
 - `paste-interceptor.ts` shares the `MAX_SCAN_BYTES` constant with the
   other interceptors; a parity test pins the value across the isolated
   and MAIN worlds.

@@ -13771,6 +13771,272 @@
       "require_hotword": false,
       "entropy_min": 0.0,
       "category": "pii_sea"
+    },
+    {
+      "name": "US CLIA Number",
+      "regex": "\\b\\d{2}D\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "clia number",
+        "clinical laboratory improvement amendments",
+        "lab certification",
+        "cms clia"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US CPT Procedure Code List",
+      "regex": "(?:\\b\\d{5}\\b[\\s,;|]+){4}\\b\\d{5}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "cpt code",
+        "current procedural terminology",
+        "procedure code",
+        "ama cpt"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US HCPCS Level II Code List",
+      "regex": "(?:\\b[A-V]\\d{4}\\b[\\s,;|]+){2}\\b[A-V]\\d{4}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "hcpcs",
+        "healthcare common procedure",
+        "level ii code",
+        "durable medical equipment"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "LOINC Code List",
+      "regex": "(?:\\b\\d{1,5}-\\d\\b[\\s,;|]+){2}\\b\\d{1,5}-\\d\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "loinc code",
+        "logical observation identifiers names and codes",
+        "regenstrief loinc"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "ICD-9-CM Diagnosis Code List",
+      "regex": "(?:\\b(?:[VE]?\\d{2,3}(?:\\.\\d{1,2})?)\\b[\\s,;|]+){4}\\b[VE]?\\d{2,3}(?:\\.\\d{1,2})?\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "icd-9",
+        "icd9",
+        "icd-9-cm",
+        "international classification of diseases 9th"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US NDC Drug Code (11-digit)",
+      "regex": "\\b\\d{5}-\\d{4}-\\d{2}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "ndc 11-digit",
+        "national drug code",
+        "fda ndc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "SNOMED CT Concept ID List",
+      "regex": "(?:\\b\\d{6,18}\\b[\\s,;|]+){2}\\b\\d{6,18}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "snomed ct",
+        "snomed-ct concept id",
+        "ihtsdo snomed",
+        "systematized nomenclature of medicine"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DSM-5 Diagnosis Code",
+      "regex": "\\bF\\d{2}\\.\\d{1,2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dsm-5",
+        "dsm5",
+        "diagnostic and statistical manual",
+        "mental disorder diagnosis"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US Medicare HICN (legacy)",
+      "regex": "\\b\\d{9}[A-Z]\\d?\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hicn",
+        "health insurance claim number",
+        "medicare hicn legacy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "CMS Certification Number (CCN)",
+      "regex": "\\b\\d{6}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "cms certification number",
+        "ccn medicare",
+        "centers for medicare services facility identifier"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Insurance Subscriber Member ID",
+      "regex": "\\b[A-Z0-9]{9,15}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "subscriber id",
+        "member id",
+        "insurance member id",
+        "policy member number"
+      ],
+      "hotword_window": 80,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Patient DOB in Clinical Context",
+      "regex": "(?i)\\bDOB\\s*[:#=]?\\s*(?:\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})\\b",
+      "prefix": "dob",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "patient",
+        "diagnosis",
+        "treatment",
+        "clinical"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 OBX Result Segment",
+      "regex": "OBX\\|\\d{1,3}\\|[A-Z]{1,3}\\|[^|]{1,40}\\|[^|]{0,40}\\|[^|]{1,80}",
+      "prefix": "obx|",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "obx",
+        "observation result",
+        "lab result"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 ORC Order Segment",
+      "regex": "ORC\\|[A-Z]{2}\\|[^|]{1,40}\\|[^|]{0,40}\\|[^|]{0,40}",
+      "prefix": "orc|",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "orc",
+        "order segment",
+        "lab order"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DICOM Patient Name Tag",
+      "regex": "\\(0010,0010\\)\\s*PN\\s*\\[[A-Za-z\\^\\-' ]{2,60}\\]",
+      "prefix": "(0010,0010)",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dicom",
+        "patient name",
+        "study",
+        "imaging"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
     }
   ]
 }

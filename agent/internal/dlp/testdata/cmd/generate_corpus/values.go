@@ -2623,4 +2623,85 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		}
 		return "HKID (Hong Kong Identity Card 香港身份證 — Immigration Department): " + prefix + randFromAlphabet(r, digits, 6) + "(" + pick(r, []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A"}) + ")"
 	}
+
+	// W4 Batch 6: HIPAA — additional PHI patterns beyond the existing
+	// MRN/NPI/DEA/MBI/ICD-10/NDC/HL7 PID/ADT/FHIR coverage.
+	valueGenerators["US CLIA Number"] = func(r *rand.Rand) string {
+		return "CLIA number (Clinical Laboratory Improvement Amendments — CMS lab certification): " + randFromAlphabet(r, digits, 2) + "D" + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["US CPT Procedure Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 5)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, digits, 5)
+		}
+		return "CPT procedure codes (AMA Current Procedural Terminology billing): " + codes[0] + ", " + codes[1] + ", " + codes[2] + ", " + codes[3] + ", " + codes[4]
+	}
+	valueGenerators["US HCPCS Level II Code List"] = func(r *rand.Rand) string {
+		alpha := "ABCDEFGHJKLMNPQRSTUV"
+		codes := make([]string, 3)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, alpha, 1) + randFromAlphabet(r, digits, 4)
+		}
+		return "HCPCS Level II durable medical equipment / Healthcare Common Procedure Coding System codes: " + codes[0] + ", " + codes[1] + ", " + codes[2]
+	}
+	valueGenerators["LOINC Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 3)
+		for i := range codes {
+			n := 1 + r.Intn(5)
+			codes[i] = randFromAlphabet(r, digits, n) + "-" + randFromAlphabet(r, digits, 1)
+		}
+		return "LOINC codes (Regenstrief Logical Observation Identifiers Names and Codes): " + codes[0] + " " + codes[1] + " " + codes[2]
+	}
+	valueGenerators["ICD-9-CM Diagnosis Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 5)
+		for i := range codes {
+			pfx := pick(r, []string{"", "V", "E"})
+			base := randFromAlphabet(r, digits, 3)
+			if r.Intn(2) == 0 {
+				codes[i] = pfx + base
+			} else {
+				codes[i] = pfx + base + "." + randFromAlphabet(r, digits, 1+r.Intn(2))
+			}
+		}
+		return "ICD-9-CM legacy diagnosis codes (International Classification of Diseases 9th Revision Clinical Modification): " + codes[0] + ", " + codes[1] + ", " + codes[2] + ", " + codes[3] + ", " + codes[4]
+	}
+	valueGenerators["US NDC Drug Code (11-digit)"] = func(r *rand.Rand) string {
+		return "NDC 11-digit (FDA National Drug Code billing form): " + randFromAlphabet(r, digits, 5) + "-" + randFromAlphabet(r, digits, 4) + "-" + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["SNOMED CT Concept ID List"] = func(r *rand.Rand) string {
+		codes := make([]string, 3)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, digits, 6+r.Intn(13))
+		}
+		return "SNOMED CT concept IDs (IHTSDO Systematized Nomenclature of Medicine clinical terms): " + codes[0] + ", " + codes[1] + ", " + codes[2]
+	}
+	valueGenerators["DSM-5 Diagnosis Code"] = func(r *rand.Rand) string {
+		return "DSM-5 diagnosis (Diagnostic and Statistical Manual mental disorder classification): F" + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 1+r.Intn(2))
+	}
+	valueGenerators["US Medicare HICN (legacy)"] = func(r *rand.Rand) string {
+		return "HICN legacy (Health Insurance Claim Number — Medicare pre-MBI): " + randFromAlphabet(r, digits, 9) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["CMS Certification Number (CCN)"] = func(r *rand.Rand) string {
+		return "CCN facility (CMS Certification Number — Centers for Medicare Services facility identifier): " + randFromAlphabet(r, digits, 6)
+	}
+	valueGenerators["Insurance Subscriber Member ID"] = func(r *rand.Rand) string {
+		return "Subscriber ID (insurance member id / policy member number): " + randFromAlphabet(r, upper+digits, 9+r.Intn(7))
+	}
+	valueGenerators["Patient DOB in Clinical Context"] = func(r *rand.Rand) string {
+		mo := 1 + r.Intn(12)
+		dy := 1 + r.Intn(28)
+		yr := 1950 + r.Intn(60)
+		return "Patient clinical record — DOB: " + fmt.Sprintf("%02d/%02d/%04d", mo, dy, yr) + " (diagnosis treatment chart)"
+	}
+	valueGenerators["HL7 v2 OBX Result Segment"] = func(r *rand.Rand) string {
+		return "HL7 v2 lab result OBX observation: OBX|1|NM|GLU^Glucose^L|1|" + randFromAlphabet(r, digits, 3) + ".0|mg/dL|70_110|H|||F"
+	}
+	valueGenerators["HL7 v2 ORC Order Segment"] = func(r *rand.Rand) string {
+		return "HL7 v2 order entry ORC lab order segment: ORC|NW|" + randFromAlphabet(r, digits, 7) + "|" + randFromAlphabet(r, digits, 7) + "|"
+	}
+	valueGenerators["DICOM Patient Name Tag"] = func(r *rand.Rand) string {
+		family := pick(r, []string{"Smith", "Garcia", "Nakamura", "Mueller", "Rossi", "Andersson"})
+		given := pick(r, []string{"John", "Maria", "Hiroshi", "Klaus", "Giulia", "Erik"})
+		return "DICOM imaging study patient (PACS): (0010,0010) PN [" + family + "^" + given + "]"
+	}
 }

@@ -948,6 +948,25 @@ var patternCategory = map[string]string{
 	"India Aadhaar":                             "pii_sea",
 	"India PAN":                                 "pii_sea",
 	"Hong Kong HKID":                            "pii_sea",
+
+	// W4 Batch 6: HIPAA — supplemental PHI patterns. All map to the
+	// existing "phi" corpus directory (alongside the MRN/NPI/DEA/MBI
+	// patterns introduced in earlier W1 work).
+	"US CLIA Number":                  "phi",
+	"US CPT Procedure Code List":      "phi",
+	"US HCPCS Level II Code List":     "phi",
+	"LOINC Code List":                 "phi",
+	"ICD-9-CM Diagnosis Code List":    "phi",
+	"US NDC Drug Code (11-digit)":     "phi",
+	"SNOMED CT Concept ID List":       "phi",
+	"DSM-5 Diagnosis Code":            "phi",
+	"US Medicare HICN (legacy)":       "phi",
+	"CMS Certification Number (CCN)":  "phi",
+	"Insurance Subscriber Member ID":  "phi",
+	"Patient DOB in Clinical Context": "phi",
+	"HL7 v2 OBX Result Segment":       "phi",
+	"HL7 v2 ORC Order Segment":        "phi",
+	"DICOM Patient Name Tag":          "phi",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

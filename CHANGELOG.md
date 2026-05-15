@@ -10,6 +10,19 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP classifier-scoped patterns.** `Pattern` now accepts an optional
+  `content_types` field (any subset of `code`, `structured`, `credentials`,
+  `natural`) that restricts which `ClassifyContent` verdicts a pattern is
+  allowed to fire on. The pipeline captures the classifier verdict and the
+  AC filter step drops candidates whose pattern is scoped to a verdict the
+  current content does not match — so language-specific shapes such as
+  `String x = "..."` cannot fire on prose that happens to share the prefix.
+  Patterns with no `content_types` continue to match every classification
+  (backwards compatible). Initial scoping is intentionally conservative
+  (Source Code Imports → code; Kubernetes Secret YAML →
+  credentials+structured; the four cloud Secret-Manager paste patterns +
+  Docker registry auth + GCP service account → structured). Documented in
+  [`docs/dlp-pattern-authoring-guide.md`](docs/dlp-pattern-authoring-guide.md).
 - **Capability tokens and extension pinning.** Per-install API capability
   token issued at `api_token_path` (32-byte hex, mode `0600`), with
   `api_token_required` enforcing the `Authorization: Bearer` header on

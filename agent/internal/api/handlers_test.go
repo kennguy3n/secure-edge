@@ -1823,3 +1823,77 @@ func TestDLPConfig_OutOfBoundsWeightReturns400(t *testing.T) {
 		t.Errorf("body %q should name the offending field", rec.Body.String())
 	}
 }
+
+// TestStatus_DebugFlagRejectedFromAIPageOrigin closes the Devin
+// Review bypass: the agent's listener binds to 127.0.0.1, so every
+// caller's RemoteAddr is loopback — including content scripts on
+// AI-page origins that CORS already lets reach /api/status. Gating
+// ?debug=true on RemoteAddr was therefore dead code against the
+// stated threat model. The new gate is Origin-based: an AI-page
+// Origin (here https://chatgpt.com) must still receive the
+// path-stripped response even when the caller asked for debug.
+func TestStatus_DebugFlagRejectedFromAIPageOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	r.Header.Set("Origin", "https://chatgpt.com")
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	if got.Rules[0].Path == full {
+		t.Errorf("AI-page Origin received full path %q; debug should be denied", full)
+	}
+	if got.Rules[0].Path != filepath.Base(full) {
+		t.Errorf("Path = %q, want basename %q",
+			got.Rules[0].Path, filepath.Base(full))
+	}
+}
+
+// TestStatus_DebugFlagAllowedFromControlOrigin pins the positive
+// half of the new gate: a control Origin (the Electron renderer's
+// file:// → "null") gets the absolute path back so the tray's
+// diagnostics view keeps working. Without this, the operator-facing
+// admin surface would lose its access to the on-disk path.
+func TestStatus_DebugFlagAllowedFromControlOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	// "null" is the Origin Chromium sends for file:// — the
+	// packaged Electron renderer in production.
+	r.Header.Set("Origin", "null")
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 || got.Rules[0].Path != full {
+		t.Errorf("control-origin debug request did not surface full path: %+v", got.Rules)
+	}
+}

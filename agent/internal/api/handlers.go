@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -174,42 +173,42 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		resp.DLPPatterns = len(s.DLP.Patterns())
 	}
 	if len(s.RuleFiles) > 0 {
-		resp.Rules = collectRuleFileInfo(s.RuleFiles, statusDebugEnabled(r))
+		resp.Rules = collectRuleFileInfo(s.RuleFiles, s.statusDebugEnabled(r))
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
 // statusDebugEnabled reports whether the caller asked for the
-// debug-only full rule-file paths AND is connecting from loopback.
+// debug-only full rule-file paths AND is allowed to receive them.
 // The default response strips paths to filepath.Base() so an
 // extension page (or any unauthenticated caller) cannot enumerate
-// the operator's filesystem layout via /api/status; the full paths
-// are still useful for local troubleshooting, which is why ?debug=true
-// from 127.0.0.1 / ::1 / unix-socket callers re-enables them.
+// the operator's filesystem layout via /api/status.
 //
-// "Localhost" is intentionally strict: we only check the remote
-// address of the TCP connection, not any X-Forwarded-For header,
-// because the agent's listener binds to 127.0.0.1 and any other
-// remote address would be a misconfiguration (or worse).
-func statusDebugEnabled(r *http.Request) bool {
-	if r == nil {
+// The agent's listener binds to 127.0.0.1, so RemoteAddr is always
+// loopback and gating on RemoteAddr alone is dead code — a content
+// script on an AI-page origin allowed by CORS would still appear as
+// a loopback caller. Instead we gate on the request Origin:
+//
+//   - no Origin header (curl / direct CLI calls from the operator's
+//     shell) → debug allowed; this is the local-troubleshooting path.
+//   - Origin matches a control origin (Electron renderer or an
+//     allowlisted extension build, per s.isControlOrigin) → debug
+//     allowed; the tray needs full paths for its diagnostics view.
+//   - Origin is anything else (notably any aiPageOrigins entry) →
+//     debug rejected so a compromised AI-page script cannot use
+//     ?debug=true to read the operator's install layout.
+func (s *Server) statusDebugEnabled(r *http.Request) bool {
+	if r == nil || s == nil {
 		return false
 	}
 	if r.URL == nil || r.URL.Query().Get("debug") != "true" {
 		return false
 	}
-	host := r.RemoteAddr
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	switch host {
-	case "", "127.0.0.1", "::1", "localhost":
+	origin := r.Header.Get("Origin")
+	if origin == "" {
 		return true
 	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		return true
-	}
-	return false
+	return s.isControlOrigin(origin)
 }
 
 // collectRuleFileInfo gathers mtime + size for each rule file path

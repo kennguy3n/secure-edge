@@ -329,10 +329,19 @@ func (c Config) ValidateEnforcementRequirements() error {
 	if mode != "team" && mode != "managed" {
 		return nil
 	}
-	if len(c.AllowedExtensionIDs) == 0 {
+	// Every string secure-default below is checked after
+	// strings.TrimSpace so a whitespace-only value cannot slip past
+	// the validator. The downstream consumers of these fields
+	// (profile.NewVerifierFromHex, the API-token loader, the
+	// Native-Messaging extension-ID matcher) all trim before use, so
+	// without trimming here a managed install could pass validation
+	// with profile_public_key: "  " and then boot on the lenient
+	// warn-once verifier — the exact failure mode the secure-default
+	// gate exists to prevent.
+	if !hasNonBlankEntry(c.AllowedExtensionIDs) {
 		return errors.New("managed/team mode requires allowed_extension_ids to be configured")
 	}
-	if c.APITokenPath == "" {
+	if strings.TrimSpace(c.APITokenPath) == "" {
 		return errors.New("managed/team mode requires api_token_path")
 	}
 	if !c.APITokenRequired {
@@ -342,11 +351,26 @@ func (c Config) ValidateEnforcementRequirements() error {
 		if !c.BridgeMACRequired {
 			return errors.New("managed mode requires bridge_mac_required: true")
 		}
-		if c.ProfilePublicKey == "" {
+		if strings.TrimSpace(c.ProfilePublicKey) == "" {
 			return errors.New("managed mode requires profile_public_key")
 		}
 	}
 	return nil
+}
+
+// hasNonBlankEntry reports whether the slice contains at least one
+// element that is non-empty after strings.TrimSpace. Used by the
+// secure-default gate so allowed_extension_ids: ["   "] doesn't
+// satisfy the "non-empty" check — the Native-Messaging extension-ID
+// matcher trims before comparing, so a blank entry would behave
+// like no entry at runtime.
+func hasNonBlankEntry(ss []string) bool {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // phase6IntOverlay re-decodes the four DLP int fields whose

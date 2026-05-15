@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -675,5 +676,76 @@ func TestValidateEnforcementRequirements_ManagedAddsMACAndPubKey(t *testing.T) {
 	c.ProfilePublicKey = "abc123"
 	if err := c.ValidateEnforcementRequirements(); err != nil {
 		t.Errorf("happy path rejected: %v", err)
+	}
+}
+
+// TestValidateEnforcementRequirements_RejectsWhitespaceProfilePublicKey
+// pins the trim half of the secure-default contract for managed mode.
+// profile.NewVerifierFromHex trims its input and treats the empty
+// result as "no key configured" (warn-once mode), so without trimming
+// here a managed install could pass validation with
+// profile_public_key: "  " and silently boot on the lenient verifier
+// — the exact failure mode the secure-default gate exists to prevent.
+func TestValidateEnforcementRequirements_RejectsWhitespaceProfilePublicKey(t *testing.T) {
+	cases := []string{" ", "  ", "\t", "\n", " \t\n "}
+	for _, key := range cases {
+		c := Config{
+			EnforcementMode:     "managed",
+			AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			APITokenPath:        "/tmp/t",
+			APITokenRequired:    true,
+			BridgeMACRequired:   true,
+			ProfilePublicKey:    key,
+		}
+		err := c.ValidateEnforcementRequirements()
+		if err == nil {
+			t.Errorf("profile_public_key=%q: expected rejection, got nil", key)
+			continue
+		}
+		if !strings.Contains(err.Error(), "profile_public_key") {
+			t.Errorf("profile_public_key=%q: error %q should mention profile_public_key",
+				key, err.Error())
+		}
+	}
+}
+
+// TestValidateEnforcementRequirements_RejectsWhitespaceAPITokenPath
+// is the api_token_path analogue of the profile_public_key trim test.
+// A whitespace-only api_token_path would be treated as "no path" by
+// the loader and the API would boot without token enforcement.
+func TestValidateEnforcementRequirements_RejectsWhitespaceAPITokenPath(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "   ",
+		APITokenRequired:    true,
+	}
+	err := c.ValidateEnforcementRequirements()
+	if err == nil {
+		t.Fatal("expected rejection of whitespace api_token_path")
+	}
+	if !strings.Contains(err.Error(), "api_token_path") {
+		t.Errorf("error %q should mention api_token_path", err.Error())
+	}
+}
+
+// TestValidateEnforcementRequirements_RejectsAllBlankAllowedExtensionIDs
+// closes the third whitespace-bypass: allowed_extension_ids that
+// contains only blank strings is functionally identical to an empty
+// list (the Native-Messaging matcher trims before comparing) and
+// must therefore be rejected the same way.
+func TestValidateEnforcementRequirements_RejectsAllBlankAllowedExtensionIDs(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"  ", "\t", ""},
+		APITokenPath:        "/tmp/t",
+		APITokenRequired:    true,
+	}
+	err := c.ValidateEnforcementRequirements()
+	if err == nil {
+		t.Fatal("expected rejection of all-blank allowed_extension_ids")
+	}
+	if !strings.Contains(err.Error(), "allowed_extension_ids") {
+		t.Errorf("error %q should mention allowed_extension_ids", err.Error())
 	}
 }

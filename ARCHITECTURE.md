@@ -325,7 +325,7 @@ Community can contribute exclusions via PR to reduce false positives without mod
 
 #### Shipped Pattern Coverage
 
-The repository ships **139** patterns across **20** categories — see
+The repository ships **163** patterns across **13** categories — see
 [`SECURITY_RULES.md`](./SECURITY_RULES.md) for the full reference table.
 Categories include cloud providers (AWS, Azure, GCP), cloud
 infrastructure (Cloudflare, DigitalOcean, Vercel, Netlify, Supabase,
@@ -349,7 +349,7 @@ Accuracy is enforced by
 [`agent/internal/dlp/accuracy_test.go`](./agent/internal/dlp/accuracy_test.go)
 with budgets `FP < 10%` and `FN < 5%`.
 
-### 3. Local MITM Proxy (Optional, Phase 4)
+### 3. Local MITM Proxy (Optional)
 
 Optional component for Tier 2 coverage of non-browser AI clients (CLI tools, IDE plugins, native
 apps). Disabled by default; opt-in via the Electron Settings "Advanced DLP" wizard or directly
@@ -382,7 +382,7 @@ bodies. `integration_test.go` regression-tests this by capturing stdout + stderr
 Tier-2 request and asserting that neither the request body nor the Host header sentinel ever
 appears in the captured stream.
 
-### 3b. Enterprise Configuration Profiles (Phase 5)
+### 3b. Enterprise Configuration Profiles
 
 Optional, server-distributed policy bundles for managed deployments.
 
@@ -407,7 +407,7 @@ The profile holder lives in `api.Server`; locking is enforced at the
 HTTP handler, not at the store level, so a profile import that fails
 to apply leaves the existing on-disk config untouched.
 
-### 3c. Tamper Detection (Phase 5)
+### 3c. Tamper Detection
 
 Periodic OS-level check that the device is still routing through the
 agent. Runs as a goroutine started by `main.go`.
@@ -432,7 +432,7 @@ agent/internal/tamper/
 | Counter | `Reporter.IncrementTamperDetections()` is called **only on transitions** (steady-state tamper does not double-count) |
 | Notification | Electron polls `GET /api/tamper/status` every 10s and shows an ephemeral tray balloon on rising-edge; no on-disk event log |
 
-### 3d. Agent Heartbeat (Phase 5, Optional)
+### 3d. Agent Heartbeat (Optional)
 
 Disabled by default. Set `heartbeat_url` in `config.yaml` to enable.
 
@@ -449,7 +449,7 @@ agent/internal/heartbeat/
 | Transport | `http.Client` with a 30s timeout; HTTP errors are logged to stderr and otherwise swallowed |
 | Privacy guarantee | A unit test deserialises the payload and asserts no key matches `/url|domain|ip|match|host|pattern/i` |
 
-### 3e. Admin Override Mechanism (Phase 5)
+### 3e. Admin Override Mechanism
 
 ```
 agent/internal/rules/override.go         # OverrideStore: rules/local/allow.txt + block.txt
@@ -469,7 +469,7 @@ file + rename writes so a crash mid-write cannot corrupt the list.
 Bundled rule files are never mutated; the merge happens in memory at
 load time.
 
-### 3f. Agent Self-Update (Phase 6)
+### 3f. Agent Self-Update
 
 ```
 agent/internal/updater/self.go      # Self.CheckLatest, Self.DownloadAndStage
@@ -485,7 +485,7 @@ hash, and only then stages the binary for the next agent restart. A
 verification failure aborts the update; no partial binary is ever
 written to the live install path.
 
-### 3g. Rate Limiter (Phase 6)
+### 3g. Rate Limiter
 
 ```
 agent/internal/api/ratelimit.go        # token-bucket middleware
@@ -497,7 +497,7 @@ are 100 req/s with a burst of 100, configurable via
 across all callers — the goal is to protect the agent from a
 misbehaving extension, not to enforce per-tab fairness.
 
-### 3h. Scan-Result Cache (Phase 6)
+### 3h. Scan-Result Cache
 
 ```
 agent/internal/dlp/cache.go        # ScanCache: TTL-bounded LRU
@@ -521,9 +521,9 @@ electron/
 │   ├── pages/
 │   │   ├── Settings.tsx       # Policy toggles + DLP config + admin overrides
 │   │   ├── Status.tsx         # Agent health + anonymous aggregate stats + recent blocks
-│   │   ├── ProxySettings.tsx  # Phase 4 MITM proxy wizard
-│   │   ├── Rules.tsx          # Phase 6 read-only rule viewer
-│   │   └── Setup.tsx          # Phase 6 first-run wizard
+│   │   ├── ProxySettings.tsx  # MITM proxy wizard
+│   │   ├── Rules.tsx          # Read-only rule viewer
+│   │   └── Setup.tsx          # First-run wizard
 │   ├── components/
 │   │   ├── CategoryToggle.tsx # Three-state: Allow / Allow+Inspect / Block
 │   │   └── StatsCard.tsx      # Display aggregate counters
@@ -600,7 +600,7 @@ blocks content, the notification displays the pattern name (e.g., "AWS Access Ke
 does NOT include the actual key or matched content. After the user dismisses the notification, no
 trace remains.
 
-### 5b. Rule Updater (Phase 3)
+### 5b. Rule Updater
 
 `agent/internal/rules/updater.go` polls a configurable manifest URL on a
 configurable cadence (default 6 h) and applies delta updates to the on-disk
@@ -660,7 +660,7 @@ CREATE TABLE aggregate_stats (
     dns_blocks_total         INTEGER NOT NULL DEFAULT 0,
     dlp_scans_total          INTEGER NOT NULL DEFAULT 0,
     dlp_blocks_total         INTEGER NOT NULL DEFAULT 0,
-    tamper_detections_total  INTEGER NOT NULL DEFAULT 0,  -- Phase 5
+    tamper_detections_total  INTEGER NOT NULL DEFAULT 0,
     last_reset_at            DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

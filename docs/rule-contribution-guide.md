@@ -104,8 +104,8 @@ duplicate names, malformed regex, or missing required fields.
 1. Branch from `main`. Use a descriptive branch name
    (`add-domain-foo`, `tighten-stripe-pattern`).
 2. Keep PRs focused — one category or pattern family per PR is ideal.
-3. Update the changelog block at the top of `PROGRESS.md` if the change is
-   user-visible (e.g. a new category, a behaviour change in scoring).
+3. Update `CHANGELOG.md` if the change is user-visible (e.g. a new category,
+   a behaviour change in scoring).
 4. CI runs the full agent test suite, electron typecheck, and extension
    typecheck/build. PRs cannot land until CI is green.
 

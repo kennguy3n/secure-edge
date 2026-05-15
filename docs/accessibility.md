@@ -7,7 +7,7 @@
 
 **Standards:** WCAG 2.1 Level AA, ARIA 1.2 authoring practices.
 
-**Date:** 2026-05-13 — Phase 5.
+**Date:** 2026-05-13.
 
 ## Summary
 
@@ -77,8 +77,8 @@
   the hint via `aria-describedby` on the affected control (via the existing
   `title` attribute → tooltip + accessible description).
 - The reduced-motion preference (`prefers-reduced-motion`) is currently honoured
-  because the UI does not animate state changes. If we introduce transitions in
-  Phase 6 we will wrap them in `@media (prefers-reduced-motion: no-preference)`.
+  because the UI does not animate state changes. If transitions are introduced,
+  they will be wrapped in `@media (prefers-reduced-motion: no-preference)`.
 
 ## Manual verification steps
 
@@ -92,13 +92,13 @@
    - Saving a category change announces `"Saved: AI Chat"` via the success toast.
    - Triggering a save error announces the error text with assertive priority.
 
-## Future work (out of scope for Phase 5)
+## Future work
 
 - Add an accessible visualization for the DLP scoring sliders' current value (we expose the value via the sibling `<span>` and via the slider's native value, but a `aria-valuetext` describing whether the score is "stricter" or "looser" would be friendlier).
 - Add `prefers-contrast: more` overrides to bump up border weights for high-contrast mode users.
 - Run `axe-core` automatically as part of CI once the Electron renderer is testable in a JSDOM environment.
 
-## Phase 6 manual verification checklist
+## Manual verification checklist
 
 The targets remain WCAG 2.1 AA. Re-run this checklist any time the
 renderer styles change.

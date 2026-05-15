@@ -92,10 +92,10 @@ guarantees that we consider in-scope for this policy are:
    installer, script, disk-image, and Java-archive extensions;
    `.js` intentionally excluded). The check runs synchronously
    before any content is read or sent to the agent, so the
-   filename and contents never leave the page when a B2 match
-   fires. Both the `<input type=file>` / drag-drop path **and**
+   filename and contents never leave the page when a risky
+   extension match fires. Both the `<input type=file>` / drag-drop path **and**
    the clipboard-paste path (`clipboardData.files` /
-   `clipboardData.items[].getAsFile()`, added in Phase 7 / B3)
+   `clipboardData.items[].getAsFile()`)
    are guarded. Operators may override the baked-in list via the
    agent's `risky_file_extensions` config key. A bypass that
    lets a file with a listed extension reach the page's upload
@@ -162,10 +162,10 @@ attestation stored in GitHub's [attestation store][gh-attest] and
 verifiable with `gh attestation verify`.
 
 Platform-native code signing (Apple Developer ID, Microsoft
-Authenticode, Linux GPG package signatures) is **not yet
-available** — see `PHASES.md`, "Code signing of release artifacts."
-Until those certificates are provisioned, the Sigstore-based
-verification below is the authoritative trust chain.
+Authenticode, Linux GPG package signatures) is **planned for a
+future release**. Until those certificates are provisioned, the
+Sigstore-based verification below is the authoritative trust
+chain.
 
 ### One-shot verification recipe (Linux / macOS / WSL / git-bash)
 

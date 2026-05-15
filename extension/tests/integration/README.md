@@ -54,9 +54,9 @@ Again: pass the `extension/` directory, not `extension/dist/`.
 
 ## What it covers
 
-- Phase 6 Task 24 (Acceptance): the extension's block toast appears
-  for an AI-tool host when a known-bad token is pasted into a
-  textarea, and the form submission is blocked.
+- Acceptance: the extension's block toast appears for an AI-tool
+  host when a known-bad token is pasted into a textarea, and the
+  form submission is blocked.
 
 ## What it does NOT cover
 

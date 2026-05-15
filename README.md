@@ -33,7 +33,7 @@ in the SQLite database and asserts none of those values reach disk.
 | Tier | Action | Mechanism |
 |------|--------|-----------|
 | 1 | Allow | Pass-through, no inspection |
-| 2 | Allow + DLP | Forwarded, inspected by the layered DLP pipeline (Phase 2) |
+| 2 | Allow + DLP | Forwarded, inspected by the layered DLP pipeline |
 | 3 | Block (AI) | DNS resolver returns NXDOMAIN |
 | 4 | Block (Other) | DNS resolver returns NXDOMAIN |
 
@@ -78,13 +78,13 @@ rule_paths:
 dlp_patterns: rules/dlp_patterns.json     # optional — enables /api/dlp/*
 dlp_exclusions: rules/dlp_exclusions.json # optional
 
-# Phase 3 rule updater. Leaving rule_update_url blank disables the
+# Rule updater. Leaving rule_update_url blank disables the
 # updater; everything else (DNS, policies, DLP) keeps working.
 rule_update_url: ""                       # e.g. https://example.com/manifest.json
 rule_update_interval: 6h                  # cadence; default 6h
 rules_dir: rules                          # output dir for downloaded rule files
 
-# Phase 4 local MITM proxy. proxy_enabled=false (default) leaves the
+# Local MITM proxy. proxy_enabled=false (default) leaves the
 # listener stopped — /api/proxy/enable can start it at runtime.
 proxy_listen: "127.0.0.1:8443"
 proxy_enabled: false
@@ -93,7 +93,7 @@ ca_key_path: ""                           # default ~/.secure-edge/ca.key
 proxy_pinning_bypass: []                  # hostnames to tunnel even if Tier-2
                                           # (e.g. apps that pin a specific CA)
 
-# Phase 6 DLP engine tuning. Omitting a field keeps the built-in default.
+# DLP engine tuning. Omitting a field keeps the built-in default.
 # large_content_threshold: 51200   # bytes; skip low/medium patterns above this
 # dlp_cache_ttl_seconds: 5         # 0 disables the scan-result cache
 # dlp_cache_capacity: 256          # max cache entries
@@ -104,13 +104,13 @@ proxy_pinning_bypass: []                  # hostnames to tunnel even if Tier-2
 # agent_update_manifest_url: ""    # e.g. https://github.com/.../manifest.json
 # agent_update_public_key: ""      # hex-encoded Ed25519 public key
 
-# A1 — pin extension IDs for control-path callers. Leave empty to
+# Pin extension IDs for control-path callers. Leave empty to
 # accept any non-empty extension origin (legacy posture).
 # allowed_extension_ids:
 #   - your-chrome-extension-id
 #   - "{01234567-89ab-cdef-0123-456789abcdef}"
 
-# A2 — per-install API capability token. Setting api_token_path
+# Per-install API capability token. Setting api_token_path
 # makes the agent generate a 32-byte hex token at that location
 # (mode 0600) and send it to the extension over Native Messaging
 # "hello". Set api_token_required=true once the matching Electron
@@ -129,24 +129,24 @@ working. Likewise, leaving `rule_update_url` blank returns `503` from
 
 ```
 secure-edge/
-├── README.md            PROPOSAL.md  ARCHITECTURE.md  PHASES.md  PROGRESS.md
+├── README.md            PROPOSAL.md  ARCHITECTURE.md
 ├── CONTRIBUTING.md      CHANGELOG.md  SECURITY.md  SECURITY_RULES.md  LICENSE
 ├── agent/                            # Go backend (single static binary)
 │   ├── cmd/agent/main.go
 │   ├── internal/
-│   │   ├── api/                      # HTTP API server + handlers + ratelimit.go (Phase 6 token bucket)
+│   │   ├── api/                      # HTTP API server + handlers + ratelimit.go (token bucket)
 │   │   ├── config/                   # YAML configuration loader
-│   │   ├── dlp/                      # Layered DLP pipeline (Phase 2) + cache.go (Phase 6 LRU)
+│   │   ├── dlp/                      # Layered DLP pipeline + cache.go (LRU)
 │   │   ├── dns/                      # Embedded DNS resolver (miekg/dns)
-│   │   ├── heartbeat/                # Optional outbound heartbeat (Phase 5)
+│   │   ├── heartbeat/                # Optional outbound heartbeat
 │   │   ├── policy/                   # Policy engine
-│   │   ├── profile/                  # Enterprise profile loader + lock (Phase 5)
-│   │   ├── proxy/                    # Selective MITM proxy (Phase 4)
-│   │   ├── rules/                    # Rule-file parser + lookup + updater + admin override (Phase 3/5)
+│   │   ├── profile/                  # Enterprise profile loader + lock
+│   │   ├── proxy/                    # Selective MITM proxy
+│   │   ├── rules/                    # Rule-file parser + lookup + updater + admin override
 │   │   ├── stats/                    # Anonymous aggregate counters
 │   │   ├── store/                    # SQLite (modernc.org/sqlite, WAL)
-│   │   ├── tamper/                   # OS DNS/proxy tamper detector (Phase 5)
-│   │   └── updater/                  # Agent self-update (Phase 6)
+│   │   ├── tamper/                   # OS DNS/proxy tamper detector
+│   │   └── updater/                  # Agent self-update
 │   ├── nfpm.yaml                     # .deb packaging
 │   ├── scripts/{post,pre}*.sh
 │   ├── go.mod / go.sum
@@ -239,7 +239,7 @@ Local HTTP API on `127.0.0.1:8080` (configurable):
 `action` is one of `allow`, `allow_with_dlp`, `deny`.
 
 The DLP endpoints return `503 Service Unavailable` when the agent is started
-without a `dlp_patterns` config entry (Phase 1 deployments). The `/api/rules/*`
+without a `dlp_patterns` config entry. The `/api/rules/*`
 endpoints return `503` when `rule_update_url` is blank. The `/api/proxy/*`
 endpoints return `503` when the proxy controller has not been configured (e.g.
 agents built without `proxy_listen`).
@@ -266,7 +266,7 @@ allowlist accepts `chrome-extension://`, `moz-extension://`, and
 > `ManagedConfigurationPerOrigin`, or Firefox enterprise policies) to
 > restrict which AI domains the browser can reach in the first place.
 
-## Enterprise Features (Phase 5)
+## Enterprise Features
 
 Optional features for managed deployments — every one of them
 honours the same privacy invariant as the base agent.
@@ -321,7 +321,7 @@ real AWS keys with hotword context (block), the AWS docs example key
 `AKIAIOSFODNN7EXAMPLE` (exclude), benign prose (allow), empty content, and
 large content embedding a real-looking key.
 
-Phase 5 tests live alongside the new packages: `profile/`, `tamper/`,
+Enterprise tests live alongside their packages: `profile/`, `tamper/`,
 `heartbeat/`, and `rules/override_test.go` / `dlp/override_test.go`
 verify the loader-lock interaction, platform-isolated tamper probes
 (via build tags), the heartbeat payload shape (assertion: no access /
@@ -351,8 +351,6 @@ table (name, severity, prefix, hotword requirement).
 
 - [PROPOSAL.md](./PROPOSAL.md) — scope, privacy model, layered DLP overview
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — components, DB schema, API, integration
-- [PHASES.md](./PHASES.md) — phased implementation plan
-- [PROGRESS.md](./PROGRESS.md) — per-item progress tracker
 - [CHANGELOG.md](./CHANGELOG.md) — release-by-release summary
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — development setup, PR process, coding standards
 - [SECURITY.md](./SECURITY.md) — responsible-disclosure policy + release-artefact verification recipe (SHA256SUMS, cosign keyless signatures, CycloneDX SBOMs, SLSA build provenance)

@@ -23,40 +23,54 @@ Columns:
 
 ---
 
-## Cloud Providers (15)
+## Cloud Providers (20)
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
 | AWS ARN | high | `arn:aws:` | yes |
 | AWS Access Key | critical | `AKIA` | no |
+| AWS ECR Login Token | critical | `ECR_` | no |
 | AWS Java SDK BasicAWSCredentials | critical | `BasicAWSCredentials` | no |
 | AWS MWS Key | critical | `amzn.mws.` | no |
 | AWS Secret Access Key | critical | `secret` | no |
+| AWS Secrets Manager SecretString Paste | critical | `"SecretString"` | yes |
 | AWS Session Token | critical | `aws_session_token` | no |
 | Azure AD Client Secret | critical | `client_secret` | yes |
 | Azure Connection String | critical | `DefaultEndpointsProtocol` | no |
 | Azure DevOps PAT | critical | `_(none)_` | no |
+| Azure Key Vault GetSecret Paste | critical | `vault.azure.net/secrets/` | no |
 | Azure SAS Token | critical | `sig=` | yes |
 | Azure Storage Account Key | critical | `AccountKey=` | no |
 | Azure Subscription ID | high | `_(none)_` | yes |
 | GCP OAuth Client Secret | critical | `GOCSPX-` | no |
+| GCP Secret Manager Payload Paste | critical | `"payload"` | yes |
 | GCP Service Account Key | critical | `service_account` | no |
+| GCR JSON Key Paste | critical | `service_account` | no |
 | Google Services JSON API Key | high | `current_key` | no |
 
-## Cloud Infrastructure (12)
+## Cloud Infrastructure (21)
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
+| Ansible Vault Block | critical | `$ANSIBLE_VAULT` | no |
+| Chef Encrypted Data Bag | critical | `"cipher"` | yes |
 | Cloudflare API Token | critical | `_(none)_` | no |
 | DigitalOcean OAuth Token | critical | `doo_v1_` | no |
 | DigitalOcean Personal Access Token | critical | `dop_v1_` | no |
 | Docker Registry Auth | critical | `"auths"` | no |
+| env0 API Key | critical | `ENV0_API_KEY` | no |
+| Harbor Robot Token | critical | `robot$` | no |
 | Helm Values Password | high | `Password` | yes |
 | Kubernetes Secret YAML | high | `kind: Secret` | yes |
 | Netlify Personal Access Token | critical | `nfp_` | no |
 | Pulumi Stack Config Secret | high | `secure:v1:` | no |
+| Puppet Hiera eyaml Block | critical | `ENC[PKCS7` | no |
+| Quay.io Encrypted Password | critical | `QUAY_` | no |
+| Scalr API Token | critical | `SCALR_TOKEN` | no |
+| Spacelift API Key | critical | `SPACELIFT_API_KEY` | no |
 | Supabase JWT Secret | critical | `SUPABASE_JWT_SECRET` | no |
 | Supabase Service Role Key | critical | `sbp_` | no |
+| Terraform Cloud API Token | critical | `.atlasv1.` | no |
 | Terraform State Sensitive Value | high | `"sensitive"` | yes |
 | Vercel Token | critical | `VERCEL_TOKEN` | no |
 
@@ -124,15 +138,19 @@ Columns:
 | Twilio Account SID | critical | `AC` | yes |
 | Vonage Nexmo API Secret | high | `_(none)_` | yes |
 
-## Auth / Identity (7)
+## Auth / Identity (11)
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
 | Auth0 Client Secret | critical | `AUTH0_CLIENT_SECRET` | no |
+| Auth0 Management API Token | critical | `AUTH0_` | yes |
 | Clerk Publishable Key | low | `pk_` | yes |
 | Clerk Secret Key | critical | `sk_` | yes |
 | Firebase Admin SDK Private Key | critical | `private_key_id` | no |
+| Keycloak Admin Token | critical | `KEYCLOAK_` | yes |
 | Keycloak Client Secret | high | `KEYCLOAK` | no |
+| OAuth2 Refresh Token Assignment | high | `refresh_token` | yes |
+| OIDC ID Token Assignment | high | `id_token` | yes |
 | Okta API Token | critical | `00` | yes |
 | OneLogin API Credentials | critical | `ONELOGIN` | no |
 
@@ -180,13 +198,14 @@ Columns:
 | Electron Forge Publish Token | critical | `_(none)_` | no |
 | Tauri Signing Private Key | critical | `_(none)_` | no |
 
-## iOS Native (5)
+## iOS Native (6)
 
 | Pattern | Severity | Prefix | Hotword required |
 | --- | --- | --- | --- |
 | Apple APNs Auth Key Filename | high | `AuthKey_` | yes |
 | Apple App Store Connect API Key ID | high | `key` | yes |
 | Apple Developer Team ID | medium | `team` | yes |
+| CocoaPods Trunk Session Cookie | high | `_pods_session` | no |
 | Cocoapods Trunk Token | critical | `COCOAPODS_TRUNK_TOKEN` | no |
 | Xcode Cloud Secret | critical | `XCODE_CLOUD_` | no |
 
@@ -252,6 +271,16 @@ Columns:
 | Phone Numbers (bulk, US) | medium | `_(none)_` | no |
 | US Social Security Number | critical | `_(none)_` | no |
 
+## Package Managers (5)
+
+| Pattern | Severity | Prefix | Hotword required |
+| --- | --- | --- | --- |
+| Composer Packagist Token | high | `packagist` | yes |
+| Hex.pm API Key | high | `HEX_` | yes |
+| NuGet API Key | critical | `oy2` | no |
+| Pub.dev OAuth Refresh Token | high | `PUB_DEV_TOKEN` | yes |
+| RubyGems API Key | critical | `rubygems_` | no |
+
 ## Other / Generic (10)
 
 | Pattern | Severity | Prefix | Hotword required |
@@ -267,52 +296,10 @@ Columns:
 | npm Token | critical | `npm_` | no |
 | PyPI API Token | critical | `pypi-` | no |
 
-## Phase 6 Additions (24)
-
-These patterns were added in Phase 6. They appear under their
-respective JSON categories in `rules/dlp_patterns.json` but are
-listed together here so reviewers can see what changed at a glance.
-
-| Pattern | Severity | Prefix | Hotword required |
-| --- | --- | --- | --- |
-| Terraform Cloud API Token | critical | `.atlasv1.` | no |
-| Spacelift API Key | critical | `SPACELIFT_API_KEY` | no |
-| env0 API Key | critical | `ENV0_API_KEY` | no |
-| Scalr API Token | critical | `SCALR_TOKEN` | no |
-| Harbor Robot Token | critical | `robot$` | no |
-| Quay.io Encrypted Password | critical | `QUAY_` | no |
-| AWS ECR Login Token | critical | `ECR_` | no |
-| GCR JSON Key Paste | critical | `service_account` | no |
-| AWS Secrets Manager SecretString Paste | critical | `"SecretString"` | yes |
-| Azure Key Vault GetSecret Paste | critical | `vault.azure.net/secrets/` | no |
-| GCP Secret Manager Payload Paste | critical | `"payload"` | yes |
-| OAuth2 Refresh Token Assignment | high | `refresh_token` | yes |
-| OIDC ID Token Assignment | high | `id_token` | yes |
-| Auth0 Management API Token | critical | `AUTH0_` | yes |
-| Keycloak Admin Token | critical | `KEYCLOAK_` | yes |
-| Ansible Vault Block | critical | `$ANSIBLE_VAULT` | no |
-| Puppet Hiera eyaml Block | critical | `ENC[PKCS7` | no |
-| Chef Encrypted Data Bag | critical | `"cipher"` | yes |
-| RubyGems API Key | critical | `rubygems_` | no |
-| Composer Packagist Token | high | `packagist` | yes |
-| NuGet API Key | critical | `oy2` | no |
-| Hex.pm API Key | high | `HEX_` | yes |
-| Pub.dev OAuth Refresh Token | high | `PUB_DEV_TOKEN` | yes |
-| CocoaPods Trunk Session Cookie | high | `_pods_session` | no |
-
 ---
 
 ## Coverage notes
 
-- **Phase 5 expansion (2026-05-13)** added ~95 new patterns spanning Java,
-  Rust, frontend (React/Angular/Vite/Next.js), desktop (Electron/Tauri),
-  AI/ML platforms (OpenAI/Anthropic/HF/Cohere/Replicate/Pinecone/Mistral/
-  W&B/LangSmith/Together/Groq), iOS, Android, Flutter/React Native,
-  databases, cloud infrastructure (Cloudflare/DigitalOcean/Vercel/Netlify/
-  Supabase/Pulumi/Helm/Terraform/Docker/K8s), CI/CD (CircleCI/Travis/Jenkins/
-  Azure DevOps/GitLab/Bitbucket), messaging (Discord/Telegram/Vonage), payment
-  (PayPal/Square/Braintree/Adyen/Plaid/Coinbase), and auth/identity (Auth0/
-  Okta/OneLogin/Keycloak/Firebase Admin/Supabase JWT/Clerk).
 - Patterns whose ambient shape is shared with benign text use
   `require_hotword: true` to keep the FP rate within budget.
 - Accuracy is enforced by

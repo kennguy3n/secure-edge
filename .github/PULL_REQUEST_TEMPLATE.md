@@ -18,7 +18,7 @@ one exists.
 - [ ] I have added or updated unit tests for the new behaviour.
 - [ ] I have updated `CHANGELOG.md` if the change is user-visible.
 - [ ] I have updated the relevant `.md` documentation (`README.md`,
-      `ARCHITECTURE.md`, `PHASES.md`, etc.) when behaviour changes.
+      `ARCHITECTURE.md`, etc.) when behaviour changes.
 - [ ] CI is green locally (`make test && make lint` in `agent/`,
       `npm run typecheck` in `electron/` and `extension/`,
       `npm test` in `extension/`).

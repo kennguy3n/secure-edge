@@ -86,18 +86,41 @@ guarantees that we consider in-scope for this policy are:
    being applied, or a profile signed by the wrong key being
    accepted — is **high-severity**.
 7. **Risky-extension upload block** — the browser extension's
-   `file-upload-interceptor` content script blocks uploads of
-   files whose extension is on a policy-controlled risky list
-   (default: 34 executable, installer, script, disk-image, and
-   Java-archive extensions; `.js` intentionally excluded). The
-   check runs synchronously before any content is read or sent
-   to the agent, so the filename and contents never leave the
-   page when a B2 match fires. Operators may override the
-   baked-in list via the agent's `risky_file_extensions` config
-   key. A bypass that lets a file with a listed extension reach
-   the page's upload handler (or a misuse that leaks the
-   filename / contents to the agent before the local check fires)
-   is **medium-severity**.
+   `file-upload-interceptor` and `paste-interceptor` content
+   scripts block uploads of files whose extension is on a
+   policy-controlled risky list (default: 34 executable,
+   installer, script, disk-image, and Java-archive extensions;
+   `.js` intentionally excluded). The check runs synchronously
+   before any content is read or sent to the agent, so the
+   filename and contents never leave the page when a B2 match
+   fires. Both the `<input type=file>` / drag-drop path **and**
+   the clipboard-paste path (`clipboardData.files` /
+   `clipboardData.items[].getAsFile()`, added in Phase 7 / B3)
+   are guarded. Operators may override the baked-in list via the
+   agent's `risky_file_extensions` config key. A bypass that
+   lets a file with a listed extension reach the page's upload
+   handler — through any of: `<input type=file>`, drag-drop, or
+   clipboard paste — or a misuse that leaks the filename or
+   contents to the agent before the local check fires, is
+   **medium-severity**.
+8. **Clipboard-paste file scanning** — pasting a file (the user
+   copied a file in their file manager, or pasted a screenshot
+   from a clipboard tool) is handled by the same scan path as
+   `<input type=file>` uploads. The paste interceptor reads
+   `clipboardData.files` AND
+   `clipboardData.items[i].getAsFile()`, deduplicates, then
+   routes the gesture through the synchronous-first contract:
+   `preventDefault()` and `stopPropagation()` fire **before**
+   any `await`, the risky-extension guard (#7 above) runs first,
+   and on a clean verdict the gesture is left suppressed (there
+   is no portable way to programmatically re-construct
+   `DataTransfer.files` on the page side, matching the
+   no-resume contract in `file-upload-interceptor`). On a mixed
+   text-and-file paste the file path wins and the text fragment
+   is never forwarded to the agent. A bypass that lets a file
+   pasted onto a Tier-2 AI tool surface reach the page's
+   upload handler without first passing the scan pipeline is
+   **medium-severity**.
 
 The following are explicitly **out of scope**:
 

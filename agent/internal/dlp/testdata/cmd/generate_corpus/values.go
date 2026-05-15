@@ -1536,4 +1536,50 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Mezmo Ingestion Key"] = func(r *rand.Rand) string {
 		return "MEZMO_INGESTION_KEY=" + randHex(r, 32)
 	}
+	// ---------------- Batch 9: Networking / VPN ----------------
+	valueGenerators["WireGuard Private Key"] = func(r *rand.Rand) string {
+		return "WG_PRIVATE_KEY=" + randFromAlphabet(r, alnum+"+/", 42) + randFromAlphabet(r, alnum+"+/=", 2)
+	}
+	valueGenerators["WireGuard Preshared Key"] = func(r *rand.Rand) string {
+		return "WG_PRESHARED_KEY=" + randFromAlphabet(r, alnum+"+/", 42) + randFromAlphabet(r, alnum+"+/=", 2)
+	}
+	valueGenerators["OpenVPN Static Key Block"] = func(r *rand.Rand) string {
+		return "-----BEGIN OpenVPN Static key V1-----\n" + randHex(r, 512) + "\n-----END OpenVPN Static key V1-----"
+	}
+	valueGenerators["OpenVPN Auth Username"] = func(r *rand.Rand) string {
+		return "OPENVPN_USERNAME=" + randLowerAlnum(r, 8) + "@" + randLowerAlnum(r, 6) + ".com"
+	}
+	valueGenerators["OpenVPN Auth Password"] = func(r *rand.Rand) string {
+		return "OPENVPN_PASSWORD=" + randAlnum(r, 20)
+	}
+	valueGenerators["Tailscale API Access Token"] = func(r *rand.Rand) string {
+		return "tskey-api-" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Tailscale Auth Key"] = func(r *rand.Rand) string {
+		return "tskey-auth-" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Tailscale OAuth Client Secret"] = func(r *rand.Rand) string {
+		return "tskey-client-" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["ZeroTier Central API Token"] = func(r *rand.Rand) string {
+		return "ZEROTIER_CENTRAL_TOKEN=" + randAlnum(r, 32)
+	}
+	valueGenerators["Cloudflare WARP Auth Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_WARP_TOKEN=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["NetBird Setup Key"] = func(r *rand.Rand) string {
+		return "NETBIRD_SETUP_KEY=" + randUpperAlnum(r, 8) + "-" + randUpperAlnum(r, 4) + "-" + randUpperAlnum(r, 4) + "-" + randUpperAlnum(r, 4) + "-" + randUpperAlnum(r, 12)
+	}
+	valueGenerators["Nebula Lighthouse Token"] = func(r *rand.Rand) string {
+		return "NEBULA_LIGHTHOUSE_TOKEN=" + randFromAlphabet(r, alnum+"+/=", 56)
+	}
+	valueGenerators["IPsec Pre-Shared Key"] = func(r *rand.Rand) string {
+		return "IPSEC_PSK=" + randAlnum(r, 32)
+	}
+	valueGenerators["Bastion SSH Tunnel Token"] = func(r *rand.Rand) string {
+		return "BASTION_TUNNEL_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Ngrok Authtoken"] = func(r *rand.Rand) string {
+		return "NGROK_AUTHTOKEN=" + randFromAlphabet(r, digits, 1) + randAlnum(r, 18) + "_" + randAlnum(r, 28)
+	}
 }

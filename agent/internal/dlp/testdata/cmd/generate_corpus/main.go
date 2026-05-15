@@ -575,6 +575,23 @@ var patternCategory = map[string]string{
 	"Rollbar Access Token":              "monitoring",
 	"Mezmo Ingestion Key":               "monitoring",
 
+	// Batch 9: Networking / VPN
+	"WireGuard Private Key":         "networking",
+	"WireGuard Preshared Key":       "networking",
+	"OpenVPN Static Key Block":      "networking",
+	"OpenVPN Auth Username":         "networking",
+	"OpenVPN Auth Password":         "networking",
+	"Tailscale API Access Token":    "networking",
+	"Tailscale Auth Key":            "networking",
+	"Tailscale OAuth Client Secret": "networking",
+	"ZeroTier Central API Token":    "networking",
+	"Cloudflare WARP Auth Token":    "networking",
+	"NetBird Setup Key":             "networking",
+	"Nebula Lighthouse Token":       "networking",
+	"IPsec Pre-Shared Key":          "networking",
+	"Bastion SSH Tunnel Token":      "networking",
+	"Ngrok Authtoken":               "networking",
+
 	// Batch 7: Container / Orchestration
 }
 

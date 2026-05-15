@@ -2170,11 +2170,21 @@ func (d *deadlineRecorderWriter) SetWriteDeadline(t time.Time) error {
 //
 // The expectation is that SetWriteDeadline is called with the zero
 // time.Time — net/http’s documented "no deadline" sentinel.
+//
+// Note on handleProfileImport's row: with an empty body the handler
+// calls allowLongWrite BEFORE it parses the body, then drops through
+// the URL/Profile switch to the default arm and returns 400
+// ("url or profile required"). That's the exact behaviour we want
+// to observe here — the deadline-mutation contract is independent
+// of the body parsing — so the test asserts wantStatus=400 for that
+// row and the zero-deadline call still gets recorded.
 func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
 	cases := []struct {
-		name  string
-		path  string
-		setup func(*Server)
+		name       string
+		path       string
+		body       []byte
+		setup      func(*Server)
+		wantStatus int
 	}{
 		{
 			name: "rules update",
@@ -2182,6 +2192,7 @@ func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
 			setup: func(s *Server) {
 				s.SetRuleUpdater(&stubUpdater{})
 			},
+			wantStatus: http.StatusOK,
 		},
 		{
 			name: "agent update",
@@ -2191,6 +2202,22 @@ func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
 					Version: "0.2.0",
 				}})
 			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			// Third long-IO handler (handleProfileImport). Empty
+			// body short-circuits to the 400 "url or profile
+			// required" arm of the switch, but allowLongWrite runs
+			// before that point, so the deadline-drop is still
+			// recorded. A regression that removes the allowLongWrite
+			// call would fail this case identically to the other two.
+			name: "profile import",
+			path: "/api/profile/import",
+			body: []byte{},
+			setup: func(s *Server) {
+				s.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})
+			},
+			wantStatus: http.StatusBadRequest,
 		},
 	}
 	for _, c := range cases {
@@ -2198,11 +2225,12 @@ func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
 			srv, _, _ := newTestServer(t)
 			c.setup(srv)
 			rec := &deadlineRecorderWriter{ResponseRecorder: httptest.NewRecorder()}
-			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(nil))
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(c.body))
 			srv.Handler().ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusOK {
-				t.Fatalf("status = %d body=%q", rec.Code, rec.Body.String())
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d body=%q, want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
 			}
 			// Exactly one SetWriteDeadline(zero) call expected per
 			// handler invocation — if the handler is wrapping more

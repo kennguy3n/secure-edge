@@ -820,4 +820,266 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Exoscale API Key"] = func(r *rand.Rand) string {
 		return "EXOSCALE_KEY=EXO" + randAlnum(r, 24)
 	}
+	// ---------------- Batch 2: SaaS Platform Tokens ----------------
+	valueGenerators["Salesforce OAuth Access Token"] = func(r *rand.Rand) string {
+		return "00D" + randAlnum(r, 15) + "!" + randFromAlphabet(r, alnum+"._-", 96)
+	}
+	valueGenerators["Salesforce Refresh Token"] = func(r *rand.Rand) string {
+		return "5Aep" + randFromAlphabet(r, alnum+"._-", 80)
+	}
+	valueGenerators["Salesforce Connected App Consumer Secret"] = func(r *rand.Rand) string {
+		return "SF_CONSUMER_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Salesforce Marketing Cloud Token"] = func(r *rand.Rand) string {
+		return "SFMC_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Salesforce Session ID"] = func(r *rand.Rand) string {
+		return "SF_SESSION_ID=00D" + randAlnum(r, 30)
+	}
+	valueGenerators["Salesforce Bulk API Token"] = func(r *rand.Rand) string {
+		return "SFDC_BULK_TOKEN=00D" + randAlnum(r, 12) + "!" + randAlnum(r, 80)
+	}
+	valueGenerators["HubSpot Private App Access Token"] = func(r *rand.Rand) string {
+		return "pat-na" + randFromAlphabet(r, digits, 1) + "-" + randUUID(r)
+	}
+	valueGenerators["HubSpot Legacy API Key"] = func(r *rand.Rand) string {
+		return "HUBSPOT_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["HubSpot OAuth Access Token"] = func(r *rand.Rand) string {
+		return "HUBSPOT_ACCESS_TOKEN=" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["HubSpot OAuth Refresh Token"] = func(r *rand.Rand) string {
+		return "HUBSPOT_REFRESH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["HubSpot App Client Secret"] = func(r *rand.Rand) string {
+		return "HUBSPOT_CLIENT_SECRET=" + randUUID(r)
+	}
+	valueGenerators["HubSpot Webhook Signing Secret"] = func(r *rand.Rand) string {
+		return "HUBSPOT_WEBHOOK_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Zendesk API Token"] = func(r *rand.Rand) string {
+		return "ZENDESK_API_TOKEN=" + randAlnum(r, 40)
+	}
+	valueGenerators["Zendesk OAuth Access Token"] = func(r *rand.Rand) string {
+		return "ZENDESK_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Zendesk Webhook Signing Secret"] = func(r *rand.Rand) string {
+		return "ZENDESK_WEBHOOK_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Zendesk Chat OAuth Token"] = func(r *rand.Rand) string {
+		return "ZOPIM_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Intercom Access Token"] = func(r *rand.Rand) string {
+		return "dG9rOl" + randFromAlphabet(r, alnum+"+/=", 56)
+	}
+	valueGenerators["Intercom Personal Access Token"] = func(r *rand.Rand) string {
+		return "INTERCOM_PAT=dG9rOl" + randFromAlphabet(r, alnum+"+/=", 56)
+	}
+	valueGenerators["Intercom Webhook Signing Secret"] = func(r *rand.Rand) string {
+		return "INTERCOM_HUB_SECRET=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Segment Write Key"] = func(r *rand.Rand) string {
+		return "SEGMENT_WRITE_KEY=" + randAlnum(r, 32)
+	}
+	valueGenerators["Segment Personal Access Token"] = func(r *rand.Rand) string {
+		return "SEGMENT_PAT=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Segment Workspace Token"] = func(r *rand.Rand) string {
+		return "SEGMENT_WORKSPACE_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["Amplitude API Key"] = func(r *rand.Rand) string {
+		return "AMPLITUDE_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Amplitude Secret Key"] = func(r *rand.Rand) string {
+		return "AMPLITUDE_SECRET_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Amplitude Cohort Token"] = func(r *rand.Rand) string {
+		return "AMPLITUDE_COHORT_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Mixpanel Project Token"] = func(r *rand.Rand) string {
+		return "MIXPANEL_PROJECT_TOKEN=" + randHex(r, 32)
+	}
+	valueGenerators["Mixpanel Service Account Secret"] = func(r *rand.Rand) string {
+		return "MIXPANEL_SERVICE_ACCOUNT_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Mixpanel Service Account Username"] = func(r *rand.Rand) string {
+		return "MIXPANEL_SERVICE_ACCOUNT_USER=" + randLowerAlnum(r, 12) + "." + randLowerAlnum(r, 8)
+	}
+	valueGenerators["LaunchDarkly SDK Key"] = func(r *rand.Rand) string {
+		return "sdk-" + randUUID(r)
+	}
+	valueGenerators["LaunchDarkly Mobile Key"] = func(r *rand.Rand) string {
+		return "mob-" + randUUID(r)
+	}
+	valueGenerators["LaunchDarkly Client-Side ID"] = func(r *rand.Rand) string {
+		return "LAUNCHDARKLY_CLIENT_SIDE_ID=" + randHex(r, 24)
+	}
+	valueGenerators["LaunchDarkly Access Token"] = func(r *rand.Rand) string {
+		return "api-" + randUUID(r)
+	}
+	valueGenerators["LaunchDarkly Relay Proxy Token"] = func(r *rand.Rand) string {
+		return "LD_RELAY_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Sentry Auth Token"] = func(r *rand.Rand) string {
+		return "sntrys_" + randFromAlphabet(r, alnum+"+/", 80)
+	}
+	valueGenerators["Sentry User Auth Token"] = func(r *rand.Rand) string {
+		return "sntryu_" + randAlnum(r, 64)
+	}
+	valueGenerators["Sentry Organization Auth Token"] = func(r *rand.Rand) string {
+		return "sntryo_" + randAlnum(r, 64)
+	}
+	valueGenerators["Sentry DSN with Secret Key"] = func(r *rand.Rand) string {
+		return "https://" + randHex(r, 32) + ":" + randHex(r, 32) + "@o" + randFromAlphabet(r, digits, 6) + ".ingest.sentry.io/" + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["Datadog Application Key"] = func(r *rand.Rand) string {
+		return "DD_APP_KEY=" + randHex(r, 40)
+	}
+	valueGenerators["Datadog Client Token"] = func(r *rand.Rand) string {
+		return "DD_CLIENT_TOKEN=pub" + randHex(r, 32)
+	}
+	valueGenerators["Datadog RUM Application ID"] = func(r *rand.Rand) string {
+		return "DD_RUM_APPLICATION_ID=" + randUUID(r)
+	}
+	valueGenerators["New Relic License Key"] = func(r *rand.Rand) string {
+		return randHex(r, 36) + "NRAL"
+	}
+	valueGenerators["New Relic User API Key"] = func(r *rand.Rand) string {
+		return "NRAK-" + randUpperAlnum(r, 27)
+	}
+	valueGenerators["New Relic Insert/Insights Key"] = func(r *rand.Rand) string {
+		return "NRII-" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["New Relic Browser Application Token"] = func(r *rand.Rand) string {
+		return "NEW_RELIC_BROWSER_TOKEN=NRJS-" + randHex(r, 24)
+	}
+	valueGenerators["PagerDuty REST API v2 Token"] = func(r *rand.Rand) string {
+		return "PAGERDUTY_API_TOKEN=u+" + randFromAlphabet(r, alnum+"+_-", 18)
+	}
+	valueGenerators["PagerDuty Events API v2 Routing Key"] = func(r *rand.Rand) string {
+		return "PAGERDUTY_ROUTING_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["PagerDuty Integration Key"] = func(r *rand.Rand) string {
+		return "PAGERDUTY_INTEGRATION_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["PagerDuty OAuth Access Token"] = func(r *rand.Rand) string {
+		return "PAGERDUTY_OAUTH_TOKEN=pdus+_" + randAlnum(r, 40)
+	}
+	valueGenerators["ServiceNow OAuth Access Token"] = func(r *rand.Rand) string {
+		return "SNOW_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["ServiceNow Basic Auth Credentials"] = func(r *rand.Rand) string {
+		return "SNOW_PASSWORD=" + randAlnum(r, 20)
+	}
+	valueGenerators["ServiceNow Instance URL"] = func(r *rand.Rand) string {
+		return "https://" + randLowerAlnum(r, 10) + ".service-now.com/api/now/table/incident"
+	}
+	valueGenerators["ServiceNow API Refresh Token"] = func(r *rand.Rand) string {
+		return "SNOW_REFRESH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Jira/Atlassian API Token"] = func(r *rand.Rand) string {
+		return "ATATT3" + randFromAlphabet(r, alnum+"_-", 200) + "=" + randFromAlphabet(r, upper+digits, 8)
+	}
+	valueGenerators["Atlassian OAuth Access Token"] = func(r *rand.Rand) string {
+		return "ATOAATT" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["Atlassian Cloud Client Secret"] = func(r *rand.Rand) string {
+		return "ATLASSIAN_CLIENT_SECRET=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Atlassian JIRA Personal Access Token"] = func(r *rand.Rand) string {
+		return "JIRA_PAT=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Atlassian Connect Shared Secret"] = func(r *rand.Rand) string {
+		return "ATLASSIAN_CONNECT_SHARED_SECRET=" + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Confluence API Token"] = func(r *rand.Rand) string {
+		return "CONFLUENCE_API_TOKEN=ATATT3" + randFromAlphabet(r, alnum+"_-", 200)
+	}
+	valueGenerators["Confluence Personal Access Token"] = func(r *rand.Rand) string {
+		return "CONFLUENCE_PAT=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Confluence Server Bearer Token"] = func(r *rand.Rand) string {
+		return "CONFLUENCE_BEARER_TOKEN=" + randFromAlphabet(r, alnum+"_-=", 56)
+	}
+	valueGenerators["Asana Personal Access Token"] = func(r *rand.Rand) string {
+		return "ASANA_PAT=" + randFromAlphabet(r, digits, 16) + "/" + randFromAlphabet(r, digits, 16) + ":" + randHex(r, 32)
+	}
+	valueGenerators["Trello API Key"] = func(r *rand.Rand) string {
+		return "TRELLO_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Trello API Token"] = func(r *rand.Rand) string {
+		return "TRELLO_API_TOKEN=" + randHex(r, 64)
+	}
+	valueGenerators["Notion Internal Integration Token"] = func(r *rand.Rand) string {
+		return "secret_" + randAlnum(r, 43)
+	}
+	valueGenerators["Notion OAuth Access Token"] = func(r *rand.Rand) string {
+		return "NOTION_ACCESS_TOKEN=secret_" + randAlnum(r, 43)
+	}
+	valueGenerators["Freshdesk API Key"] = func(r *rand.Rand) string {
+		return "FRESHDESK_API_KEY=" + randAlnum(r, 24)
+	}
+	valueGenerators["Freshsales API Key"] = func(r *rand.Rand) string {
+		return "FRESHSALES_API_KEY=" + randFromAlphabet(r, alnum+"_-", 24)
+	}
+	valueGenerators["Freshservice API Key"] = func(r *rand.Rand) string {
+		return "FRESHSERVICE_API_KEY=" + randFromAlphabet(r, alnum+"_-", 24)
+	}
+	valueGenerators["Bitbucket OAuth Access Token"] = func(r *rand.Rand) string {
+		return "BITBUCKET_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Bitbucket Repository Access Token"] = func(r *rand.Rand) string {
+		return "BITBUCKET_REPO_TOKEN=ATCTT3" + randFromAlphabet(r, alnum+"_-=", 60)
+	}
+	valueGenerators["Pipedrive API Token"] = func(r *rand.Rand) string {
+		return "PIPEDRIVE_API_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Customer.io Tracking API Key"] = func(r *rand.Rand) string {
+		return "CUSTOMERIO_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Drip API Token"] = func(r *rand.Rand) string {
+		return "DRIP_API_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Marketo OAuth Client Secret"] = func(r *rand.Rand) string {
+		return "MARKETO_CLIENT_SECRET=" + randAlnum(r, 48)
+	}
+	valueGenerators["Marketo Munchkin ID"] = func(r *rand.Rand) string {
+		return "MUNCHKIN_ID=" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, upper, 3) + "-" + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Klaviyo Private API Key"] = func(r *rand.Rand) string {
+		return "pk_" + randAlnum(r, 44)
+	}
+	valueGenerators["Iterable API Key"] = func(r *rand.Rand) string {
+		return "ITERABLE_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Calendly Personal Access Token"] = func(r *rand.Rand) string {
+		return "CALENDLY_PAT=eyJ" + randFromAlphabet(r, alnum+"_-.", 200)
+	}
+	valueGenerators["Typeform Personal Token"] = func(r *rand.Rand) string {
+		return "tfp_" + randFromAlphabet(r, alnum+"_", 60)
+	}
+	valueGenerators["Typeform Webhook Secret"] = func(r *rand.Rand) string {
+		return "TYPEFORM_WEBHOOK_SECRET=" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["SurveyMonkey API Token"] = func(r *rand.Rand) string {
+		return "SURVEYMONKEY_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Stripe Webhook Endpoint Secret"] = func(r *rand.Rand) string {
+		return "whsec_" + randAlnum(r, 32)
+	}
+	valueGenerators["Stripe OAuth Refresh Token"] = func(r *rand.Rand) string {
+		return "rt_" + randAlnum(r, 56)
+	}
+	valueGenerators["Shopify Custom App Access Token"] = func(r *rand.Rand) string {
+		return "shpat_" + randHex(r, 32)
+	}
+	valueGenerators["Shopify Private App Access Token"] = func(r *rand.Rand) string {
+		return "shppa_" + randHex(r, 32)
+	}
+	valueGenerators["Shopify Storefront API Token"] = func(r *rand.Rand) string {
+		return "shpss_" + randHex(r, 32)
+	}
+	valueGenerators["BigCommerce API Token"] = func(r *rand.Rand) string {
+		return "BIGCOMMERCE_AUTH_TOKEN=" + randLowerAlnum(r, 40)
+	}
 }

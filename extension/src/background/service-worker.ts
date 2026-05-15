@@ -17,6 +17,10 @@ import {
     EnforcementModeResponse,
     PopupRequest,
     PopupReply,
+    RISKY_EXTENSIONS_STORAGE_KEY,
+    RiskyExtensionsReply,
+    RiskyExtensionsRequest,
+    RiskyExtensionsResponse,
     ScanRequest,
     ScanReply,
     ScanResult,
@@ -41,6 +45,12 @@ const API_TOKEN_KEY = "secureEdgeAPIToken";
  *  request triggers a fresh fetch. */
 const ENFORCEMENT_MODE_TTL_MS = 5 * 60 * 1000;
 
+/** TTL for the cached risky-file-extension blocklist (Phase 7 / B2).
+ *  Same cadence as the enforcement-mode cache: an operator change
+ *  takes effect on the next refresh (or on a service-worker
+ *  cold-start). The cache is process-local. */
+const RISKY_EXTENSIONS_TTL_MS = 5 * 60 * 1000;
+
 /** In-memory cache for the active enforcement mode. Default is the
  *  privacy-first fall-open posture so the extension preserves its
  *  pre-C2 behaviour when the agent has never been reached. */
@@ -53,6 +63,16 @@ let cachedEnforcementModeAt = 0;
  *  shouldn't wait for the timer to expire before talking to the
  *  agent. */
 let enforcementModeEverFetched = false;
+
+/** In-memory cache for the risky-extension blocklist override. The
+ *  "default" mode (the agent omitted the `extensions` field) is the
+ *  cold-start default so a content script that races the bootstrap
+ *  still falls safe — it uses its baked-in list, which is the
+ *  always-block stance. */
+let cachedRiskyExtensionsMode: "default" | "configured" = "default";
+let cachedRiskyExtensions: ReadonlyArray<string> = [];
+let cachedRiskyExtensionsAt = 0;
+let riskyExtensionsEverFetched = false;
 
 // Boot the dynamic Tier-2 host updater. Polls /api/rules/status and
 // registers content scripts for any custom hosts the agent's rule
@@ -123,8 +143,12 @@ async function sessionStorageSet(key: string, value: string): Promise<void> {
     });
 }
 
-type IncomingMessage = PopupRequest | ScanRequest | EnforcementModeRequest;
-type OutgoingReply = PopupReply | ScanReply | EnforcementModeReply;
+type IncomingMessage =
+    | PopupRequest
+    | ScanRequest
+    | EnforcementModeRequest
+    | RiskyExtensionsRequest;
+type OutgoingReply = PopupReply | ScanReply | EnforcementModeReply | RiskyExtensionsReply;
 
 chrome.runtime.onMessage.addListener(
     (msg: IncomingMessage, _sender, sendResponse: (reply: OutgoingReply) => void) => {
@@ -141,6 +165,16 @@ chrome.runtime.onMessage.addListener(
         if (msg && msg.kind === "enforcement-mode") {
             void getEnforcementMode().then((mode) =>
                 sendResponse({ kind: "enforcement-mode-result", mode }),
+            );
+            return true;
+        }
+        if (msg && msg.kind === "risky-extensions") {
+            void getRiskyExtensions().then(({ mode, extensions }) =>
+                sendResponse({
+                    kind: "risky-extensions-result",
+                    mode,
+                    extensions,
+                }),
             );
             return true;
         }
@@ -277,6 +311,99 @@ async function persistEnforcementMode(mode: EnforcementMode): Promise<void> {
     }
 }
 
+/** Phase 7 / B2 risky-file-extension cache accessor. Returns the
+ *  current cache, refreshing from the agent when the cache is empty
+ *  or older than RISKY_EXTENSIONS_TTL_MS. Any fetch failure leaves
+ *  the cached value intact so a flaky agent doesn't flip every
+ *  page back to the baked-in default mid-session.
+ *
+ *  The return shape mirrors the wire contract:
+ *    mode: "default"     — agent omitted `extensions`; the
+ *                          content script should use its baked-in
+ *                          list. `extensions` is an empty array on
+ *                          this variant.
+ *    mode: "configured"  — agent supplied a list (possibly empty
+ *                          for opt-out); use it verbatim.
+ *
+ *  Exported for tests. */
+export async function getRiskyExtensions(): Promise<{
+    mode: "default" | "configured";
+    extensions: ReadonlyArray<string>;
+}> {
+    const now = Date.now();
+    if (
+        riskyExtensionsEverFetched &&
+        now - cachedRiskyExtensionsAt < RISKY_EXTENSIONS_TTL_MS
+    ) {
+        return { mode: cachedRiskyExtensionsMode, extensions: cachedRiskyExtensions };
+    }
+    const fresh = await fetchRiskyExtensions();
+    if (fresh !== null) {
+        cachedRiskyExtensionsMode = fresh.mode;
+        cachedRiskyExtensions = fresh.extensions;
+        cachedRiskyExtensionsAt = now;
+        riskyExtensionsEverFetched = true;
+        await persistRiskyExtensions(fresh);
+    }
+    return { mode: cachedRiskyExtensionsMode, extensions: cachedRiskyExtensions };
+}
+
+/** GET /api/config/risky-extensions and return the parsed reply.
+ *  Returns null on any transport / parse error so the caller can
+ *  keep the previous cached value. */
+async function fetchRiskyExtensions(): Promise<
+    { mode: "default" | "configured"; extensions: ReadonlyArray<string> } | null
+> {
+    try {
+        const r = await fetch(`${AGENT_BASE}/api/config/risky-extensions`, {
+            method: "GET",
+            mode: "cors",
+            credentials: "omit",
+        });
+        if (!r.ok) return null;
+        const body = (await r.json()) as RiskyExtensionsResponse;
+        // The wire contract: `extensions` absent → "default";
+        // present (including the empty array opt-out wire shape)
+        // → "configured". The agent already normalises entries to
+        // dot-less lowercase form; we accept whatever it sent.
+        if (!body || !Object.prototype.hasOwnProperty.call(body, "extensions")) {
+            return { mode: "default", extensions: [] };
+        }
+        const exts = Array.isArray(body.extensions)
+            ? body.extensions.filter((e): e is string => typeof e === "string")
+            : [];
+        return { mode: "configured", extensions: exts };
+    } catch {
+        return null;
+    }
+}
+
+/** Mirror the current risky-extension cache into
+ *  chrome.storage.session so a content-script fast path can read
+ *  it without a runtime.sendMessage round trip after a
+ *  service-worker eviction. Storage failures are silently
+ *  swallowed; runtime.sendMessage stays the source of truth.
+ *
+ *  Storage shape:
+ *    "default"  — baked-in list (mode === "default").
+ *    [..]       — configured list (mode === "configured");
+ *                 may be empty for the opt-out wire shape. */
+async function persistRiskyExtensions(value: {
+    mode: "default" | "configured";
+    extensions: ReadonlyArray<string>;
+}): Promise<void> {
+    try {
+        const c = typeof chrome !== "undefined" ? chrome : undefined;
+        const session = c?.storage?.session;
+        if (!session) return;
+        const stored: unknown =
+            value.mode === "default" ? "default" : Array.from(value.extensions);
+        await session.set({ [RISKY_EXTENSIONS_STORAGE_KEY]: stored });
+    } catch {
+        /* storage unavailable; cache stays in-process only. */
+    }
+}
+
 /** Exported test handle so unit tests can reset the cache between
  *  cases. Not part of the production surface. */
 export const __test__ = {
@@ -290,5 +417,26 @@ export const __test__ = {
         cachedEnforcementModeAt = at;
         enforcementModeEverFetched = true;
     },
+    /** Reset the B2 cache (Phase 7) to its post-import state.
+     *  Must be called from afterEach in any test that exercises
+     *  getRiskyExtensions / fetchRiskyExtensions, otherwise the
+     *  cached value bleeds across cases. */
+    resetRiskyExtensions(): void {
+        cachedRiskyExtensionsMode = "default";
+        cachedRiskyExtensions = [];
+        cachedRiskyExtensionsAt = 0;
+        riskyExtensionsEverFetched = false;
+    },
+    setRiskyExtensions(
+        mode: "default" | "configured",
+        extensions: ReadonlyArray<string>,
+        at: number,
+    ): void {
+        cachedRiskyExtensionsMode = mode;
+        cachedRiskyExtensions = extensions;
+        cachedRiskyExtensionsAt = at;
+        riskyExtensionsEverFetched = true;
+    },
     ENFORCEMENT_MODE_TTL_MS,
+    RISKY_EXTENSIONS_TTL_MS,
 };

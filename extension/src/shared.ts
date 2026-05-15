@@ -75,6 +75,60 @@ export type EnforcementModeReply = { kind: "enforcement-mode-result"; mode: Enfo
  *  truth. */
 export const ENFORCEMENT_MODE_STORAGE_KEY = "secureEdge:enforcementMode";
 
+/** Wire shape of GET /api/config/risky-extensions (Phase 7 / B2).
+ *  Three states are distinguished on the wire:
+ *
+ *    `{}`                          — `extensions` field absent. The
+ *                                    agent did not opt in; the
+ *                                    extension uses its built-in
+ *                                    baked-in default list.
+ *    `{"extensions": []}`          — operator explicitly opted
+ *                                    out of risky-extension blocking.
+ *    `{"extensions": ["exe",...]}` — operator-supplied override list.
+ *
+ *  Entries are lowercase dot-less file extensions (e.g. "exe",
+ *  "scr") — the agent's config loader normalises them on parse. */
+export interface RiskyExtensionsResponse {
+    extensions?: ReadonlyArray<string>;
+}
+
+/** Request from a content script asking the service worker for the
+ *  active risky-file-extension blocklist (Phase 7 / B2). The worker
+ *  holds the canonical cached value and refreshes it from
+ *  /api/config/risky-extensions on cold start so each content
+ *  script doesn't have to repeat that round trip. */
+export type RiskyExtensionsRequest = { kind: "risky-extensions" };
+
+/** Wire shape of the reply to a RiskyExtensionsRequest. mode
+ *  carries the distinguished-three-states contract from the agent
+ *  endpoint:
+ *
+ *    mode: "default"     — the agent omitted the `extensions` field
+ *                          (privacy-first default). The extension
+ *                          should use its baked-in list;
+ *                          `extensions` is an empty array on this
+ *                          variant to keep the type total.
+ *    mode: "configured"  — the operator opted in to an explicit
+ *                          override. `extensions` is the list,
+ *                          which may be empty (opt-out wire shape)
+ *                          or populated. */
+export type RiskyExtensionsReply = {
+    kind: "risky-extensions-result";
+    mode: "default" | "configured";
+    extensions: ReadonlyArray<string>;
+};
+
+/** chrome.storage.session key the service worker writes the cached
+ *  risky-file-extension override list to. Content scripts read
+ *  this as a fast-path after a service-worker eviction; the
+ *  runtime.sendMessage round trip remains the source of truth.
+ *
+ *  Stored values are either the literal string `"default"` (the
+ *  extension should fall back to its baked-in list) or a JSON
+ *  array of dot-less lowercase extension strings (operator
+ *  override, possibly empty). */
+export const RISKY_EXTENSIONS_STORAGE_KEY = "secureEdge:riskyExtensions";
+
 /** Tier-2 AI tool host suffixes — kept in sync with the
  *  content_scripts.matches list in extension/manifest.json. Used by
  *  the network interceptor to decide which requests to inspect. */

@@ -64,14 +64,65 @@ import {
     policyForUnavailable,
     scanContent,
 } from "./scan-client.js";
-import { showBlockedToast, showPolicyBlockedToast, showPolicyWarnToast } from "./toast.js";
+import {
+    ensureRiskyExtensionsBootstrapped,
+    extensionOf,
+    getCachedRiskyExtensions,
+    isRiskyExtension,
+} from "./risky-extensions.js";
+import {
+    showBlockedToast,
+    showPolicyBlockedToast,
+    showPolicyWarnToast,
+    showRiskyExtensionBlockedToast,
+} from "./toast.js";
 
 if (typeof document !== "undefined") {
     ensureEnforcementModeBootstrapped();
+    // B2 risky-extension cache bootstrap (Phase 7). Runs in parallel
+    // with the enforcement-mode bootstrap; both are fire-and-forget
+    // because the hot path defaults to safe values (always-block
+    // for B2, fall-open for C2 unavailability).
+    ensureRiskyExtensionsBootstrapped();
     // Capture-phase listeners so we see the event before the page's
     // own handlers and can preventDefault / clear the input.
     document.addEventListener("change", (ev) => void onChange(ev), { capture: true });
     document.addEventListener("drop", (ev) => void onDrop(ev), { capture: true });
+}
+
+/**
+ * Walk the supplied file list synchronously and return the first
+ * matched risky extension (lowercase, dot-less) or null when no
+ * file is risky. The list is read once from the module-local
+ * cache so a refresh racing this call cannot half-apply.
+ *
+ * Sync-first design (see file-upload-interceptor header
+ * comment): this function is the pre-await guard for both
+ * onChange and onDrop. It must not await; the active blocklist
+ * is the cache snapshot at call time. A subsequent
+ * runtime.sendMessage refresh trigger updates the cache for
+ * future calls but does not retroactively change the verdict
+ * for the in-flight gesture.
+ *
+ * Returns the first match rather than the full set so a
+ * 5,000-file mass-drop early-exits at the first risky entry.
+ * The matched extension is what surfaces in the toast.
+ */
+function firstRiskyExtensionMatch(files: ArrayLike<File>): string | null {
+    const list = getCachedRiskyExtensions();
+    if (list.length === 0) return null;
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (!f) continue;
+        // Use the cache snapshot via the second arg so a parallel
+        // refresh doesn't change the list mid-loop. extensionOf
+        // returns "" for files with no extension, which
+        // isRiskyExtension treats as a non-match.
+        if (isRiskyExtension(f.name, list)) {
+            return extensionOf(f.name);
+        }
+    }
+    return null;
 }
 
 /**
@@ -135,6 +186,25 @@ export async function onChange(ev: Event): Promise<void> {
         /* read-only / detached input — nothing we can do. */
     }
 
+    // B2 risky-extension guard (Phase 7). Runs BEFORE the async
+    // scan because the verdict is purely filename-driven — we
+    // don't need the file's text to know an .exe is blocked. A
+    // risky-extension match short-circuits the content scan
+    // entirely; the user sees the policy toast and the file
+    // contents are never read into the page's address space.
+    // Suppression is already in effect from the calls above; this
+    // branch only owns the toast UX.
+    //
+    // Always-block: B2 is mode-independent (personal / team /
+    // managed all see the same outcome). The policy is a tool to
+    // remove a class of file from the upload surface, not a
+    // fall-open ladder.
+    const risky = firstRiskyExtensionMatch(snapshot);
+    if (risky !== null) {
+        showRiskyExtensionBlockedToast(risky, "upload");
+        return;
+    }
+
     // Now scan async purely for the toast UX. We don't act on the
     // verdict — the suppression is already in effect, and a clean
     // scan does not resume (see header comment on why
@@ -186,6 +256,19 @@ export async function onDrop(ev: DragEvent): Promise<void> {
     ev.stopImmediatePropagation();
     ev.preventDefault();
     ev.stopPropagation();
+
+    // B2 risky-extension guard (Phase 7). Same contract as onChange
+    // above: short-circuit the content scan when any file in the
+    // drop's FileList matches the active blocklist. Mixed drops
+    // (one risky file + N benign files) block the whole gesture
+    // because re-constructing a FileList without the risky entry
+    // is not portable. The toast names the matched extension so
+    // the user knows which file caused the block.
+    const risky = firstRiskyExtensionMatch(files);
+    if (risky !== null) {
+        showRiskyExtensionBlockedToast(risky, "upload");
+        return;
+    }
 
     // Scan async for the toast. The verdict doesn't drive any
     // further action — the drop is already suppressed above.
@@ -296,4 +379,10 @@ async function readFilesText(
     return { text, truncated };
 }
 
-export const __test__ = { onChange, onDrop, scanFileList, readFilesText };
+export const __test__ = {
+    onChange,
+    onDrop,
+    scanFileList,
+    readFilesText,
+    firstRiskyExtensionMatch,
+};

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -209,6 +210,19 @@ type Config struct {
 	// fetch — preserving backwards compatibility with existing
 	// deployments while making the upgrade path opt-in.
 	RuleUpdatePublicKey string `yaml:"rule_update_public_key"`
+
+	// RiskyFileExtensions is the lowercase, dot-less list of file
+	// extensions the browser extension hard-blocks at the upload
+	// gesture (Phase 7 work item B2). The agent itself does not
+	// scan filenames — it only owns the canonical list and serves
+	// it through GET /api/config/risky-extensions so every
+	// extension build agrees on the policy. nil (the default at
+	// load time) tells the extension to use its built-in baked-in
+	// list; an explicit empty list ([]) opts out of risky-extension
+	// blocking entirely. Entries are normalised to lowercase
+	// without the leading dot at load time so the wire format the
+	// extension matches against is unambiguous.
+	RiskyFileExtensions []string `yaml:"risky_file_extensions"`
 }
 
 // Default returns a Config populated with the documented defaults.
@@ -265,8 +279,19 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse config: %w", err)
 	}
 
+	// phase7B2Overlay re-decodes risky_file_extensions into a
+	// pointer-to-slice so we can tell an absent key from an
+	// explicit empty list. YAML decoding folds both into a nil
+	// slice on the regular Config view, but the on-the-wire
+	// contract treats them differently.
+	var b2Overlay phase7B2Overlay
+	if err := yaml.Unmarshal(data, &b2Overlay); err != nil {
+		return Config{}, fmt.Errorf("parse config: %w", err)
+	}
+
 	merged := merge(cfg, parsed)
 	overlay.apply(&merged)
+	b2Overlay.apply(&merged)
 	if err := merged.validate(); err != nil {
 		return Config{}, err
 	}
@@ -285,6 +310,33 @@ type phase6IntOverlay struct {
 	DLPCacheTTLSeconds    *int `yaml:"dlp_cache_ttl_seconds"`
 	DLPCacheCapacity      *int `yaml:"dlp_cache_capacity"`
 	DLPRateLimitPerSec    *int `yaml:"dlp_rate_limit_per_sec"`
+}
+
+// phase7B2Overlay distinguishes an omitted risky_file_extensions key
+// (Default() / nil — extension uses its baked-in list) from an
+// operator who wrote `risky_file_extensions: []` explicitly to opt
+// out of blocking. YAML decoding into a `[]string` field can't tell
+// the two apart; a `*[]string` overlay can.
+type phase7B2Overlay struct {
+	RiskyFileExtensions *[]string `yaml:"risky_file_extensions"`
+}
+
+// apply copies the overlay onto cfg, preserving the explicit-empty
+// distinction. The list is normalised here so callers — including
+// merge(), which also calls normaliseExtensions — always see the
+// dot-less lowercase form.
+func (o phase7B2Overlay) apply(cfg *Config) {
+	if o.RiskyFileExtensions == nil {
+		return
+	}
+	cfg.RiskyFileExtensions = normaliseExtensions(*o.RiskyFileExtensions)
+	if cfg.RiskyFileExtensions == nil {
+		// normaliseExtensions returns an empty slice (not nil)
+		// when every entry is dropped or the input is empty. We
+		// keep that explicit-empty value so the API surface can
+		// tell "opt-out" apart from "use default".
+		cfg.RiskyFileExtensions = []string{}
+	}
 }
 
 // apply copies any explicitly-set overlay values onto cfg. nil
@@ -401,6 +453,34 @@ func merge(defaults, override Config) Config {
 	}
 	if override.RuleUpdatePublicKey != "" {
 		out.RuleUpdatePublicKey = override.RuleUpdatePublicKey
+	}
+	// RiskyFileExtensions distinguishes "absent" (use the
+	// extension's baked-in default) from "explicit empty list"
+	// (opt out of risky-extension blocking entirely). The merge
+	// helper sees both as a possibly-empty slice; the
+	// phase7B2Overlay applied after merge() runs is what recovers
+	// the distinction — see Load() / phase7B2Overlay below.
+	if override.RiskyFileExtensions != nil {
+		out.RiskyFileExtensions = normaliseExtensions(override.RiskyFileExtensions)
+	}
+	return out
+}
+
+// normaliseExtensions returns a copy of in with each entry trimmed,
+// lowercased, and stripped of a leading dot. Blank entries are
+// dropped. The wire format the extension matches against is the
+// dot-less lowercase form, so we normalise once at load time rather
+// than on every request.
+func normaliseExtensions(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, e := range in {
+		e = strings.TrimSpace(e)
+		e = strings.TrimPrefix(e, ".")
+		e = strings.ToLower(e)
+		if e == "" {
+			continue
+		}
+		out = append(out, e)
 	}
 	return out
 }

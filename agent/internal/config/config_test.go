@@ -340,20 +340,37 @@ func TestLoad_BridgeMACRequired(t *testing.T) {
 // step falls back to the documented "personal" default so the
 // effective value is never blank. The explicit modes pass through
 // unchanged.
+//
+// team and managed must carry the secure-default fields enforced by
+// ValidateEnforcementRequirements (allowed_extension_ids,
+// api_token_path, api_token_required, and — for managed —
+// bridge_mac_required + profile_public_key); a minimal-but-complete
+// preamble is included for those two cases so this acceptance test
+// stays focused on the EnforcementMode value rather than the
+// secure-default gate that has its own dedicated tests below.
 func TestLoad_EnforcementMode_AcceptsKnown(t *testing.T) {
+	const teamPreamble = `allowed_extension_ids:
+  - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+api_token_path: /tmp/api-token
+api_token_required: true
+`
+	const managedPreamble = teamPreamble + `bridge_mac_required: true
+profile_public_key: "abc123"
+`
 	cases := []struct {
-		in   string
-		want string
+		in       string
+		want     string
+		preamble string
 	}{
-		{"", "personal"}, // empty → default
-		{"personal", "personal"},
-		{"team", "team"},
-		{"managed", "managed"},
+		{"", "personal", ""}, // empty → default
+		{"personal", "personal", ""},
+		{"team", "team", teamPreamble},
+		{"managed", "managed", managedPreamble},
 	}
 	dir := t.TempDir()
 	for _, c := range cases {
 		path := filepath.Join(dir, "mode-"+c.in+".yaml")
-		body := "enforcement_mode: \"" + c.in + "\"\n"
+		body := c.preamble + "enforcement_mode: \"" + c.in + "\"\n"
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatalf("write %q: %v", c.in, err)
 		}
@@ -570,5 +587,93 @@ func TestLoad_RiskyFileExtensions_OnlyBlankEntriesYieldsEmpty(t *testing.T) {
 	}
 	if len(cfg.RiskyFileExtensions) != 0 {
 		t.Errorf("RiskyFileExtensions = %#v, want []", cfg.RiskyFileExtensions)
+	}
+}
+
+// TestValidateEnforcementRequirements_PersonalUnaffected confirms
+// Task 5's tightening does not creep into the personal-mode
+// boot path. Personal installs explicitly disclaim opinionated
+// defaults; the new validator must remain a no-op for them.
+func TestValidateEnforcementRequirements_PersonalUnaffected(t *testing.T) {
+	c := Config{EnforcementMode: "personal"}
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("personal mode rejected: %v", err)
+	}
+}
+
+// TestValidateEnforcementRequirements_TeamRequiresAllowedExtensionIDs
+// pins the first secure-default rule for team mode: an empty
+// allowed_extension_ids list lets any extension talk to the agent,
+// which is the opposite of what a team install wants.
+func TestValidateEnforcementRequirements_TeamRequiresAllowedExtensionIDs(t *testing.T) {
+	c := Config{
+		EnforcementMode:  "team",
+		APITokenPath:     "/var/lib/secure-edge/api.token",
+		APITokenRequired: true,
+	}
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing allowed_extension_ids")
+	}
+}
+
+// TestValidateEnforcementRequirements_TeamRequiresAPITokenPath pins
+// the second secure-default rule. A team install without
+// api_token_path cannot serve a Bearer token and any client can hit
+// the control-plane endpoints unauthenticated.
+func TestValidateEnforcementRequirements_TeamRequiresAPITokenPath(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenRequired:    true,
+	}
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing api_token_path")
+	}
+}
+
+// TestValidateEnforcementRequirements_TeamRequiresAPITokenRequired
+// pins the third secure-default rule: even if a token file is
+// configured, allowing the Bearer middleware to skip enforcement
+// silently downgrades the install.
+func TestValidateEnforcementRequirements_TeamRequiresAPITokenRequired(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+	}
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for api_token_required=false")
+	}
+}
+
+// TestValidateEnforcementRequirements_ManagedAddsMACAndPubKey pins
+// the two managed-only secure defaults: bridge_mac_required (so
+// Native-Messaging callers must present the C2-validated MAC) and
+// profile_public_key (so the operator-supplied profile is signed
+// rather than blindly trusted).
+func TestValidateEnforcementRequirements_ManagedAddsMACAndPubKey(t *testing.T) {
+	base := Config{
+		EnforcementMode:     "managed",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+		APITokenRequired:    true,
+	}
+
+	// Missing bridge_mac_required.
+	if err := base.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing bridge_mac_required")
+	}
+
+	// MAC required but no profile_public_key.
+	c := base
+	c.BridgeMACRequired = true
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing profile_public_key")
+	}
+
+	// Full set: every secure-default rule satisfied.
+	c.ProfilePublicKey = "abc123"
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("happy path rejected: %v", err)
 	}
 }

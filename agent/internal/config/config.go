@@ -306,7 +306,47 @@ func Load(path string) (Config, error) {
 	if err := merged.validate(); err != nil {
 		return Config{}, err
 	}
+	if err := merged.ValidateEnforcementRequirements(); err != nil {
+		return Config{}, err
+	}
 	return merged, nil
+}
+
+// ValidateEnforcementRequirements enforces the secure-default contract
+// for non-personal enforcement modes. team / managed deployments
+// require an opinionated baseline (pinned extension origins, an API
+// token, and — in managed mode — a profile public key and the
+// Native-Messaging MAC requirement) so the agent cannot silently boot
+// in a degraded posture that the operator did not opt into.
+//
+// Called from Load() after validate(); a successful return implies
+// the config is safe to wire into the rest of the agent. Each rule
+// fires with a stable, human-readable message so the systemd /
+// launchd / Windows-service unit logs are self-documenting when the
+// operator misconfigures a managed install.
+func (c Config) ValidateEnforcementRequirements() error {
+	mode := c.EnforcementMode
+	if mode != "team" && mode != "managed" {
+		return nil
+	}
+	if len(c.AllowedExtensionIDs) == 0 {
+		return errors.New("managed/team mode requires allowed_extension_ids to be configured")
+	}
+	if c.APITokenPath == "" {
+		return errors.New("managed/team mode requires api_token_path")
+	}
+	if !c.APITokenRequired {
+		return errors.New("managed/team mode requires api_token_required: true")
+	}
+	if mode == "managed" {
+		if !c.BridgeMACRequired {
+			return errors.New("managed mode requires bridge_mac_required: true")
+		}
+		if c.ProfilePublicKey == "" {
+			return errors.New("managed mode requires profile_public_key")
+		}
+	}
+	return nil
 }
 
 // phase6IntOverlay re-decodes the four DLP int fields whose

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -831,6 +832,10 @@ func (f *fakePolicyStore) SetDLPConfig(_ context.Context, _ profile.DLPConfigSna
 	atomic.AddInt64(&f.calls, 1)
 	return nil
 }
+func (f *fakePolicyStore) ApplyProfileTx(_ context.Context, _ []profile.CategoryPolicy, _ *profile.DLPConfigSnapshot) error {
+	atomic.AddInt64(&f.calls, 1)
+	return nil
+}
 
 func TestProfileGetReturnsHolderContents(t *testing.T) {
 	srv, _, _ := newTestServer(t)
@@ -1625,5 +1630,106 @@ func TestRiskyExtensions_AIPageOriginAllowed(t *testing.T) {
 	}
 	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://chatgpt.com" {
 		t.Errorf("Access-Control-Allow-Origin = %q, want chatgpt.com", got)
+	}
+}
+
+// TestStatus_StripsRuleFilePaths is the Task 6 regression: the
+// default /api/status payload must not echo full filesystem paths
+// in its rule-file metadata. Leaking install layouts to any
+// caller (the extension page included) gives free reconnaissance
+// information for negligible operational gain. The basename is
+// preserved so the existing operator-facing JSON still tells you
+// which file is which.
+func TestStatus_StripsRuleFilePaths(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d body=%s", w.Code, w.Body.String())
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	p := got.Rules[0].Path
+	if strings.ContainsAny(p, `/\`) {
+		t.Errorf("Path %q contains separator; expected basename", p)
+	}
+	if p != "block.txt" {
+		t.Errorf("Path = %q, want %q", p, "block.txt")
+	}
+}
+
+// TestStatus_DebugFlagFromLocalhostExposesFullPath proves the
+// debug-only escape hatch still works: ?debug=true from a loopback
+// caller re-enables the absolute path so operators tailing the
+// status JSON locally can still see the on-disk location.
+func TestStatus_DebugFlagFromLocalhostExposesFullPath(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	if got.Rules[0].Path != full {
+		t.Errorf("Path = %q, want %q (debug should expose full path)", got.Rules[0].Path, full)
+	}
+}
+
+// TestStatus_DegradedFlag covers Task 4's wire surface: SetDegraded
+// flips the top-level status response to expose a "degraded": true
+// hint so the extension / tray can warn the operator that the
+// agent booted without its expected baseline.
+func TestStatus_DegradedFlag(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Degraded {
+		t.Errorf("degraded=true before SetDegraded")
+	}
+
+	srv.SetDegraded(true)
+	r = newLocalRequest(http.MethodGet, "/api/status", nil)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	var got2 StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got2); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !got2.Degraded {
+		t.Errorf("degraded=false after SetDegraded(true)")
 	}
 }

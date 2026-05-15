@@ -566,7 +566,26 @@ func run(configPath string) error {
 	}
 
 	if err := loadProfileOnStartup(ctx, cfg, holder, applyStore, engine, pipeline, profileVerifier); err != nil {
-		fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
+		// Fail-closed for managed deployments: a managed mode that
+		// declared a profile_path / profile_url and failed to load
+		// it must NOT silently boot in personal-like posture. The
+		// operator wired a baseline; we won't run without it.
+		profileConfigured := cfg.ProfilePath != "" || cfg.ProfileURL != ""
+		switch cfg.EnforcementMode {
+		case "managed":
+			if profileConfigured {
+				return fmt.Errorf("agent: managed mode requires a successful profile load; refusing to start unmanaged: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
+		case "team":
+			fmt.Fprintf(os.Stderr, "agent: profile load failed (running degraded): %v\n", err)
+			apiServer.SetDegraded(true)
+		default:
+			// personal (or anything that slipped through validate)
+			// preserves the historic warn-and-continue behaviour
+			// so personal installs never block the boot path.
+			fmt.Fprintf(os.Stderr, "agent: profile load failed: %v\n", err)
+		}
 	}
 
 	// Phase 5: tamper detector goroutine.
@@ -959,6 +978,34 @@ func (a *profileApplyAdapter) SetDLPConfig(ctx context.Context, c profile.DLPCon
 		ExclusionPenalty:  c.ExclusionPenalty,
 		MultiMatchBoost:   c.MultiMatchBoost,
 	})
+}
+
+// ApplyProfileTx forwards the batched profile-apply to *store.Store,
+// translating profile.CategoryPolicy / profile.DLPConfigSnapshot
+// across the package boundary. The translation is a field-for-field
+// copy; the store package's validation runs inside ApplyProfileTx so
+// invalid inputs are rejected before the transaction is opened.
+func (a *profileApplyAdapter) ApplyProfileTx(ctx context.Context, categories []profile.CategoryPolicy, dlpConfig *profile.DLPConfigSnapshot) error {
+	out := make([]store.CategoryPolicy, len(categories))
+	for i, p := range categories {
+		out[i] = store.CategoryPolicy{Category: p.Category, Action: p.Action}
+	}
+	var dlpOut *store.DLPConfig
+	if dlpConfig != nil {
+		c := store.DLPConfig{
+			ThresholdCritical: dlpConfig.ThresholdCritical,
+			ThresholdHigh:     dlpConfig.ThresholdHigh,
+			ThresholdMedium:   dlpConfig.ThresholdMedium,
+			ThresholdLow:      dlpConfig.ThresholdLow,
+			HotwordBoost:      dlpConfig.HotwordBoost,
+			EntropyBoost:      dlpConfig.EntropyBoost,
+			EntropyPenalty:    dlpConfig.EntropyPenalty,
+			ExclusionPenalty:  dlpConfig.ExclusionPenalty,
+			MultiMatchBoost:   dlpConfig.MultiMatchBoost,
+		}
+		dlpOut = &c
+	}
+	return a.store.ApplyProfileTx(ctx, out, dlpOut)
 }
 
 // tamperAdapter bridges the *tamper.Detector to the api.TamperReporter

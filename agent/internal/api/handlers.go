@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -51,6 +53,12 @@ type StatusResponse struct {
 	// can show the active posture in its existing /api/status
 	// poll without an extra round trip.
 	EnforcementMode string `json:"enforcement_mode"`
+	// Degraded is true when the agent booted but a security-relevant
+	// subsystem failed to initialise (currently only "team mode
+	// profile load failed"). Omitted from the wire when false so the
+	// happy-path payload is unchanged; present as true so the
+	// extension / tray can render a "running degraded" warning.
+	Degraded bool `json:"degraded,omitempty"`
 }
 
 // EnforcementModeResponse is the body served by
@@ -160,29 +168,75 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Version:         Version,
 		Runtime:         rt,
 		EnforcementMode: s.EnforcementMode(),
+		Degraded:        s.Degraded(),
 	}
 	if s.DLP != nil {
 		resp.DLPPatterns = len(s.DLP.Patterns())
 	}
 	if len(s.RuleFiles) > 0 {
-		resp.Rules = collectRuleFileInfo(s.RuleFiles)
+		resp.Rules = collectRuleFileInfo(s.RuleFiles, statusDebugEnabled(r))
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// statusDebugEnabled reports whether the caller asked for the
+// debug-only full rule-file paths AND is connecting from loopback.
+// The default response strips paths to filepath.Base() so an
+// extension page (or any unauthenticated caller) cannot enumerate
+// the operator's filesystem layout via /api/status; the full paths
+// are still useful for local troubleshooting, which is why ?debug=true
+// from 127.0.0.1 / ::1 / unix-socket callers re-enables them.
+//
+// "Localhost" is intentionally strict: we only check the remote
+// address of the TCP connection, not any X-Forwarded-For header,
+// because the agent's listener binds to 127.0.0.1 and any other
+// remote address would be a misconfiguration (or worse).
+func statusDebugEnabled(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.URL == nil || r.URL.Query().Get("debug") != "true" {
+		return false
+	}
+	host := r.RemoteAddr
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	switch host {
+	case "", "127.0.0.1", "::1", "localhost":
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return true
+	}
+	return false
 }
 
 // collectRuleFileInfo gathers mtime + size for each rule file path
 // the agent was started with. Missing files are silently skipped so a
 // partial deployment (e.g. an upcoming rule file not yet present)
 // doesn't break the status endpoint.
-func collectRuleFileInfo(paths []string) []RuleFileInfo {
+//
+// When debug is false (the default), the returned Path field is the
+// basename of the on-disk file rather than the absolute path. The
+// default /api/status response is reachable from the browser
+// extension; exposing full filesystem paths there would leak the
+// operator's install layout for negligible operational value. Debug
+// mode (?debug=true from localhost) restores the full path so local
+// troubleshooting still has what it needs.
+func collectRuleFileInfo(paths []string, debug bool) []RuleFileInfo {
 	out := make([]RuleFileInfo, 0, len(paths))
 	for _, p := range paths {
 		fi, err := osStat(p)
 		if err != nil {
 			continue
 		}
+		shown := p
+		if !debug {
+			shown = filepath.Base(p)
+		}
 		out = append(out, RuleFileInfo{
-			Path:         p,
+			Path:         shown,
 			SizeBytes:    fi.Size(),
 			LastModified: fi.ModTime(),
 		})
@@ -470,6 +524,20 @@ func dlpConfigToSnapshot(c store.DLPConfig) profile.DLPConfigSnapshot {
 // bumpDLPStats increments dlp_scans_total (+1) and optionally
 // dlp_blocks_total (+1 when blocked). Errors are intentionally
 // swallowed by the caller — counter updates must not break a scan.
+//
+// This is a documented direct-to-store path that intentionally
+// bypasses *stats.Counter: the per-scan handler (handleDLPScan) and
+// the Native Messaging frame handler both run inside per-request
+// goroutines that have no reference to the Counter wired into them.
+// The store-level write is atomic (store.Store.AddStats serialises
+// through its own mutex), so the bypass cannot corrupt counter
+// values. It DOES mean that a stats reset issued by the operator
+// while a scan is in flight may persist the +1 on top of the freshly
+// zeroed row, but the same window already existed in the original
+// design and is acceptable for low-resolution telemetry counters.
+// If you add a new direct-to-store call site (e.g. for a future
+// proxy-side counter), update stats.Counter's package comment so the
+// audit list there stays accurate.
 func bumpDLPStats(ctx context.Context, s *store.Store, blocked bool) error {
 	if s == nil {
 		return nil

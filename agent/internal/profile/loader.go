@@ -91,18 +91,30 @@ func LoadFromURL(ctx context.Context, client *http.Client, rawURL string, v *Ver
 		client = &http.Client{
 			Timeout:       DefaultHTTPTimeout,
 			CheckRedirect: redirectGuard(ctx),
+			Transport:     pinnedDialTransport(),
 		}
-	} else if client.CheckRedirect == nil {
-		// Defensive: a caller-supplied client without its own redirect
-		// hook is the common case (config.Load, tests, etc.). Without
-		// this, the Go default follows up to 10 hops with no per-hop
-		// validation — see redirectGuard for the bypass it closes.
-		// We don't overwrite a caller's own CheckRedirect because that
-		// would clobber custom policies (e.g. tests that intentionally
-		// short-circuit redirects); the contract is "this loader
-		// guards redirects unless you bring your own policy".
+	} else {
+		// Defensive: a caller-supplied client may have neither its
+		// own redirect hook nor its own Transport. The two guard
+		// invariants are independent — we patch each one only if
+		// the caller hasn't already configured it.
 		clone := *client
-		clone.CheckRedirect = redirectGuard(ctx)
+		if clone.CheckRedirect == nil {
+			// Defensive: a caller-supplied client without its own
+			// redirect hook is the common case (config.Load, tests,
+			// etc.). Without this the Go default follows up to 10
+			// hops with no per-hop validation — see redirectGuard
+			// for the bypass it closes. We don't overwrite a
+			// caller's own CheckRedirect because that would clobber
+			// custom policies (e.g. tests that intentionally
+			// short-circuit redirects); the contract is "this
+			// loader guards redirects unless you bring your own
+			// policy".
+			clone.CheckRedirect = redirectGuard(ctx)
+		}
+		if clone.Transport == nil {
+			clone.Transport = pinnedDialTransport()
+		}
 		client = &clone
 	}
 
@@ -220,6 +232,89 @@ func redirectGuard(ctx context.Context) func(req *http.Request, via []*http.Requ
 			return err
 		}
 		return nil
+	}
+}
+
+// pinnedDialTransport returns an *http.Transport whose DialContext
+// performs DNS resolution itself, validates every returned IP against
+// isBlockedIP, and then dials a validated IP directly. The original
+// req.URL.Host is preserved on the wire (which keeps the Host header
+// and TLS SNI pointing at the configured profile URL), but the
+// underlying TCP connection is forced onto an address that has passed
+// the SSRF blocklist.
+//
+// This closes the time-of-check / time-of-use gap that the existing
+// hostCheck() alone leaves open: hostCheck resolves once at the start
+// of LoadFromURL, then Go's default Transport resolves *again* when
+// it actually dials, and a hostile DNS server can return a different
+// (loopback / RFC1918) address on the second lookup. By doing the
+// dial-time resolution inside one DialContext callback we both
+// validate and dial the same address, which a DNS-rebinding attack
+// cannot bypass.
+//
+// dialTimeout / TLS handshake / response-header timeouts mirror
+// http.DefaultTransport's relevant values so a stuck profile host
+// can't hang the boot indefinitely.
+func pinnedDialTransport() *http.Transport {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return &http.Transport{
+		// Conservative connection-pool sizing. The agent never
+		// loads more than one profile URL concurrently so a deep
+		// pool would be wasted; we still allow keep-alive so a
+		// future poll loop can reuse the connection cheaply.
+		MaxIdleConns:          2,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 15 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("profile: split host:port %q: %w", addr, err)
+			}
+			// Literal IP fast path: still apply the blocklist
+			// but skip the DNS round trip. Matches the
+			// checkProfileHost short-circuit.
+			if ip := net.ParseIP(host); ip != nil {
+				if isBlockedIP(ip) {
+					return nil, errors.New("profile: private/loopback IP not allowed")
+				}
+				return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+			}
+			addrs, err := profileResolver(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("profile: resolve %q: %w", host, err)
+			}
+			if len(addrs) == 0 {
+				return nil, fmt.Errorf("profile: resolve %q: no addresses", host)
+			}
+			// Pin the first non-blocked address. Iterating in
+			// the resolver's returned order matches what the
+			// default transport would do and lets operators
+			// steer resolution through /etc/hosts when needed
+			// for staging; any single blocked address fails
+			// the whole dial closed.
+			for _, a := range addrs {
+				ip := net.ParseIP(a)
+				if ip == nil {
+					continue
+				}
+				if isBlockedIP(ip) {
+					return nil, errors.New("profile: private/loopback IP not allowed")
+				}
+				conn, derr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+				if derr == nil {
+					return conn, nil
+				}
+				// Try next address; surface the last error
+				// if every option dials-fails.
+				err = derr
+			}
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("profile: resolve %q: no usable addresses", host)
+		},
 	}
 }
 

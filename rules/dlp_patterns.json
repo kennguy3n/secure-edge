@@ -6600,6 +6600,383 @@
       "require_hotword": false,
       "entropy_min": 4.0,
       "category": "cloud"
+    },
+    {
+      "name": "Twitter/X API Key",
+      "regex": "(?i)TWITTER_(?:API|CONSUMER)_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{25}",
+      "prefix": "twitter_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "twitter",
+        "x",
+        "consumer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Twitter/X API Secret",
+      "regex": "(?i)TWITTER_(?:API|CONSUMER)_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{50}",
+      "prefix": "twitter_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twitter",
+        "x",
+        "consumer secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twitter/X Access Token",
+      "regex": "(?i)TWITTER_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?\\d{19}-[A-Za-z0-9]{40}",
+      "prefix": "twitter_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twitter",
+        "x",
+        "access token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Twitter/X Access Token Secret",
+      "regex": "(?i)TWITTER_ACCESS_TOKEN_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{45}",
+      "prefix": "twitter_access_token_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twitter",
+        "x",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twitter/X Bearer Token (v2)",
+      "regex": "AAAAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,}",
+      "prefix": "aaaaaaaaaaaaaaaaaaaaa",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twitter",
+        "x",
+        "bearer",
+        "v2"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Facebook/Meta App Secret",
+      "regex": "(?i)FACEBOOK_APP_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "facebook_app_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "facebook",
+        "meta",
+        "app",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Facebook/Meta Access Token",
+      "regex": "EAA[A-Za-z0-9]{180,}",
+      "prefix": "eaa",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "facebook",
+        "meta",
+        "access token",
+        "graph"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Facebook/Meta Page Access Token",
+      "regex": "(?i)FACEBOOK_PAGE_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?EAA[A-Za-z0-9]{180,}",
+      "prefix": "facebook_page_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "facebook",
+        "page",
+        "access token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Facebook/Meta System User Token",
+      "regex": "(?i)FACEBOOK_SYSTEM_USER_TOKEN\\s*[:=]\\s*['\\\"]?EAA[A-Za-z0-9]{180,}",
+      "prefix": "facebook_system_user_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "facebook",
+        "system user",
+        "business"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Instagram Graph API Token",
+      "regex": "(?i)INSTAGRAM_TOKEN\\s*[:=]\\s*['\\\"]?IGQ[A-Za-z0-9_\\-]{100,}",
+      "prefix": "instagram_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "instagram",
+        "graph",
+        "meta"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Instagram Basic Display Token",
+      "regex": "IGQ[A-Za-z0-9_\\-]{150,}",
+      "prefix": "igq",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "instagram",
+        "basic display",
+        "creator"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "LinkedIn OAuth Access Token",
+      "regex": "(?i)LINKEDIN_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?AQX[A-Za-z0-9_\\-]{60,}",
+      "prefix": "linkedin_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linkedin",
+        "oauth",
+        "access"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "LinkedIn Client Secret",
+      "regex": "(?i)LINKEDIN_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{16}",
+      "prefix": "linkedin_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linkedin",
+        "client",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "TikTok Client Key",
+      "regex": "(?i)TIKTOK_CLIENT_KEY\\s*[:=]\\s*['\\\"]?aw[a-z0-9]{16,}",
+      "prefix": "tiktok_client_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "tiktok",
+        "client",
+        "developer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "TikTok Client Secret",
+      "regex": "(?i)TIKTOK_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "tiktok_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tiktok",
+        "client",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "TikTok Access Token",
+      "regex": "(?i)TIKTOK_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?act\\.[A-Za-z0-9!\\-]{30,}",
+      "prefix": "tiktok_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tiktok",
+        "access",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "YouTube Data API Key",
+      "regex": "(?i)YOUTUBE_API_KEY\\s*[:=]\\s*['\\\"]?AIza[A-Za-z0-9_\\-]{35}",
+      "prefix": "youtube_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "youtube",
+        "google",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Google Ads Developer Token",
+      "regex": "(?i)GOOGLE_ADS_DEVELOPER_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "google_ads_developer_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "google ads",
+        "developer",
+        "adwords"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Snapchat Marketing API Token",
+      "regex": "(?i)SNAPCHAT_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "snapchat_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "snapchat",
+        "snap",
+        "marketing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Pinterest API Access Token",
+      "regex": "(?i)PINTEREST_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?pina_[A-Za-z0-9]{50,}",
+      "prefix": "pinterest_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pinterest",
+        "pina",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Reddit OAuth Client Secret",
+      "regex": "(?i)REDDIT_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{27}",
+      "prefix": "reddit_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "reddit",
+        "oauth",
+        "praw"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Reddit Refresh Token",
+      "regex": "(?i)REDDIT_REFRESH_TOKEN\\s*[:=]\\s*['\\\"]?[0-9]+-[A-Za-z0-9_\\-]{27,}",
+      "prefix": "reddit_refresh_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "reddit",
+        "refresh",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

@@ -1304,4 +1304,71 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["SendGrid Subuser Token"] = func(r *rand.Rand) string {
 		return "SENDGRID_SUBUSER_TOKEN=SG." + randFromAlphabet(r, alnum+"_-", 22) + "." + randFromAlphabet(r, alnum+"_-", 43)
 	}
+	// ---------------- Batch 6: Social Media ----------------
+	valueGenerators["Twitter/X API Key"] = func(r *rand.Rand) string {
+		return "TWITTER_API_KEY=" + randAlnum(r, 25)
+	}
+	valueGenerators["Twitter/X API Secret"] = func(r *rand.Rand) string {
+		return "TWITTER_API_SECRET=" + randAlnum(r, 50)
+	}
+	valueGenerators["Twitter/X Access Token"] = func(r *rand.Rand) string {
+		return "TWITTER_ACCESS_TOKEN=" + randFromAlphabet(r, digits, 19) + "-" + randAlnum(r, 40)
+	}
+	valueGenerators["Twitter/X Access Token Secret"] = func(r *rand.Rand) string {
+		return "TWITTER_ACCESS_TOKEN_SECRET=" + randAlnum(r, 45)
+	}
+	valueGenerators["Twitter/X Bearer Token (v2)"] = func(r *rand.Rand) string {
+		return "AAAAAAAAAAAAAAAAAAAAA" + randAlnum(r, 100)
+	}
+	valueGenerators["Facebook/Meta App Secret"] = func(r *rand.Rand) string {
+		return "FACEBOOK_APP_SECRET=" + randHex(r, 32)
+	}
+	valueGenerators["Facebook/Meta Access Token"] = func(r *rand.Rand) string {
+		return "EAA" + randAlnum(r, 200)
+	}
+	valueGenerators["Facebook/Meta Page Access Token"] = func(r *rand.Rand) string {
+		return "FACEBOOK_PAGE_ACCESS_TOKEN=EAA" + randAlnum(r, 200)
+	}
+	valueGenerators["Facebook/Meta System User Token"] = func(r *rand.Rand) string {
+		return "FACEBOOK_SYSTEM_USER_TOKEN=EAA" + randAlnum(r, 200)
+	}
+	valueGenerators["Instagram Graph API Token"] = func(r *rand.Rand) string {
+		return "INSTAGRAM_TOKEN=IGQ" + randFromAlphabet(r, alnum+"_-", 150)
+	}
+	valueGenerators["Instagram Basic Display Token"] = func(r *rand.Rand) string {
+		return "IGQ" + randFromAlphabet(r, alnum+"_-", 180)
+	}
+	valueGenerators["LinkedIn OAuth Access Token"] = func(r *rand.Rand) string {
+		return "LINKEDIN_ACCESS_TOKEN=AQX" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["LinkedIn Client Secret"] = func(r *rand.Rand) string {
+		return "LINKEDIN_CLIENT_SECRET=" + randAlnum(r, 16)
+	}
+	valueGenerators["TikTok Client Key"] = func(r *rand.Rand) string {
+		return "TIKTOK_CLIENT_KEY=aw" + randLowerAlnum(r, 18)
+	}
+	valueGenerators["TikTok Client Secret"] = func(r *rand.Rand) string {
+		return "TIKTOK_CLIENT_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["TikTok Access Token"] = func(r *rand.Rand) string {
+		return "TIKTOK_ACCESS_TOKEN=act." + randFromAlphabet(r, alnum+"!-", 40)
+	}
+	valueGenerators["YouTube Data API Key"] = func(r *rand.Rand) string {
+		return "YOUTUBE_API_KEY=AIza" + randFromAlphabet(r, alnum+"_-", 35)
+	}
+	valueGenerators["Google Ads Developer Token"] = func(r *rand.Rand) string {
+		return "GOOGLE_ADS_DEVELOPER_TOKEN=" + randFromAlphabet(r, alnum+"_-", 24)
+	}
+	valueGenerators["Snapchat Marketing API Token"] = func(r *rand.Rand) string {
+		return "SNAPCHAT_ACCESS_TOKEN=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Pinterest API Access Token"] = func(r *rand.Rand) string {
+		return "PINTEREST_ACCESS_TOKEN=pina_" + randAlnum(r, 64)
+	}
+	valueGenerators["Reddit OAuth Client Secret"] = func(r *rand.Rand) string {
+		return "REDDIT_CLIENT_SECRET=" + randFromAlphabet(r, alnum+"_-", 27)
+	}
+	valueGenerators["Reddit Refresh Token"] = func(r *rand.Rand) string {
+		return "REDDIT_REFRESH_TOKEN=" + randFromAlphabet(r, digits, 6) + "-" + randFromAlphabet(r, alnum+"_-", 40)
+	}
 }

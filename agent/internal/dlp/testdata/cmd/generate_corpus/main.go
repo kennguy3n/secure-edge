@@ -492,6 +492,30 @@ var patternCategory = map[string]string{
 	"GetResponse API Key":             "email_marketing",
 	"Sendinblue API Key (legacy)":     "email_marketing",
 	"SendGrid Subuser Token":          "email_marketing",
+
+	// Batch 6: Social Media
+	"Twitter/X API Key":               "social_media",
+	"Twitter/X API Secret":            "social_media",
+	"Twitter/X Access Token":          "social_media",
+	"Twitter/X Access Token Secret":   "social_media",
+	"Twitter/X Bearer Token (v2)":     "social_media",
+	"Facebook/Meta App Secret":        "social_media",
+	"Facebook/Meta Access Token":      "social_media",
+	"Facebook/Meta Page Access Token": "social_media",
+	"Facebook/Meta System User Token": "social_media",
+	"Instagram Graph API Token":       "social_media",
+	"Instagram Basic Display Token":   "social_media",
+	"LinkedIn OAuth Access Token":     "social_media",
+	"LinkedIn Client Secret":          "social_media",
+	"TikTok Client Key":               "social_media",
+	"TikTok Client Secret":            "social_media",
+	"TikTok Access Token":             "social_media",
+	"YouTube Data API Key":            "social_media",
+	"Google Ads Developer Token":      "social_media",
+	"Snapchat Marketing API Token":    "social_media",
+	"Pinterest API Access Token":      "social_media",
+	"Reddit OAuth Client Secret":      "social_media",
+	"Reddit Refresh Token":            "social_media",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

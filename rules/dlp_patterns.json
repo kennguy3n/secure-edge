@@ -12423,6 +12423,532 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "financial"
+    },
+    {
+      "name": "EU IBAN (SEPA)",
+      "regex": "\\b(?:AT|BE|BG|CH|CY|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IE|IS|IT|LI|LT|LU|LV|MT|NL|NO|PL|PT|RO|SE|SI|SK)\\d{2}[A-Z0-9]{11,30}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "sepa",
+        "beneficiary",
+        "payee",
+        "swift code"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "EU VAT Number",
+      "regex": "(?i)\\b(?:DE|FR|IT|ES|NL|BE|AT|PL|PT|SE|FI|GR|EL|IE|DK|CZ|HU|RO|BG|HR|SK|SI|LT|LV|EE|CY|LU|MT|XI)[0-9A-Z]{8,12}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "vat-id",
+        "vat id",
+        "ust-id",
+        "ust id",
+        "mwst-id",
+        "intracom",
+        "intra-community",
+        "piva",
+        "num\u00e9ro de tva"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Personalausweis",
+      "regex": "\\b[CFGHJKLMNPRTVWXYZ0-9]{9}\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "personalausweis",
+        "ausweisnummer",
+        "identifikationsnummer",
+        "reisepass"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Steueridentifikationsnummer",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "steueridentifikationsnummer",
+        "steuer-id",
+        "steuerid",
+        "idnr",
+        "steuernummer",
+        "finanzamt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Sozialversicherungsnummer",
+      "regex": "\\b\\d{2}\\s?\\d{6}\\s?[A-Z]\\s?\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sozialversicherungsnummer",
+        "sv-nummer",
+        "rentenversicherung",
+        "versicherungsnummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French INSEE/NIR",
+      "regex": "\\b[12]\\d{2}(?:0[1-9]|1[0-2])(?:[0-9]{2}|2A|2B)\\d{6}\\d{2}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "insee",
+        "s\u00e9curit\u00e9 sociale",
+        "carte vitale",
+        "ameli",
+        "num\u00e9ro de s\u00e9curit\u00e9 sociale"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French CNI Number",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "carte nationale d'identit\u00e9",
+        "carte d'identit\u00e9",
+        "carte nationale",
+        "piece d'identite"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French SIRET",
+      "regex": "\\b\\d{14}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "siret",
+        "\u00e9tablissement",
+        "etablissement",
+        "insee"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French SIREN",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "siren",
+        "registre du commerce",
+        "num\u00e9ro de siren"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Italian Codice Fiscale",
+      "regex": "\\b[A-Z]{6}\\d{2}[A-Z]\\d{2}[A-Z]\\d{3}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "codice fiscale",
+        "tessera sanitaria",
+        "agenzia delle entrate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Italian Partita IVA",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "partita iva",
+        "piva",
+        "camera di commercio"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish DNI",
+      "regex": "\\b\\d{8}[A-HJ-NP-TV-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "documento nacional de identidad",
+        "documento de identidad"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish NIE",
+      "regex": "\\b[XYZ]\\d{7}[A-HJ-NP-TV-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "n\u00famero de identidad de extranjero",
+        "n\u00famero de extranjero"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish CIF",
+      "regex": "\\b[ABCDEFGHJNPQRSUVW]\\d{7}[A-J0-9]\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "c\u00f3digo de identificaci\u00f3n fiscal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Dutch BSN",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bsn",
+        "burgerservicenummer",
+        "sofi-nummer",
+        "sofinummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Belgian National Number",
+      "regex": "\\b\\d{2}\\.\\d{2}\\.\\d{2}-\\d{3}\\.\\d{2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rijksregisternummer",
+        "num\u00e9ro de registre national",
+        "nationaal nummer",
+        "nationaal registratienummer",
+        "nrn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Polish PESEL",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pesel",
+        "numer pesel",
+        "powszechny elektroniczny system ewidencji ludno\u015bci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Polish NIP",
+      "regex": "\\b\\d{3}-\\d{3}-\\d{2}-\\d{2}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "numer identyfikacji podatkowej",
+        "podatek"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Portuguese NIF",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "n\u00famero de contribuinte",
+        "contribuinte",
+        "finan\u00e7as"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Swedish Personnummer",
+      "regex": "\\b(?:19|20)?\\d{6}[-+]\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "personnummer",
+        "skatteverket"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Swedish Organisationsnummer",
+      "regex": "\\b\\d{6}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "organisationsnummer",
+        "bolagsverket"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Finnish HETU",
+      "regex": "\\b\\d{6}[-+A]\\d{3}[0-9A-Y]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "henkil\u00f6tunnus",
+        "syntym\u00e4aika",
+        "kansalainen"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Austrian SV-Nummer",
+      "regex": "\\b\\d{4}\\s?\\d{6}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sozialversicherungsnummer",
+        "sv-nummer",
+        "svnr",
+        "gesundheitskasse",
+        "\u00f6sterreich"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Greek AFM",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "\u03b1\u03c6\u03bc",
+        "\u03b1\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03c6\u03bf\u03c1\u03bf\u03bb\u03bf\u03b3\u03b9\u03ba\u03bf\u03cd \u03bc\u03b7\u03c4\u03c1\u03ce\u03bf\u03c5",
+        "\u03c6\u03bf\u03c1\u03bf\u03bb\u03bf\u03b3\u03b9\u03ba"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Greek AMKA",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "\u03b1\u03bc\u03ba\u03b1",
+        "\u03ba\u03bf\u03b9\u03bd\u03c9\u03bd\u03b9\u03ba\u03ae\u03c2 \u03b1\u03c3\u03c6\u03ac\u03bb\u03b9\u03c3\u03b7\u03c2",
+        "\u03b1\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03bc\u03b7\u03c4\u03c1\u03ce\u03bf\u03c5 \u03ba\u03bf\u03b9\u03bd\u03c9\u03bd\u03b9\u03ba\u03ae\u03c2 \u03b1\u03c3\u03c6\u03ac\u03bb\u03b9\u03c3\u03b7\u03c2"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Czech Rodne Cislo",
+      "regex": "\\b\\d{6}/\\d{3,4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rodn\u00e9 \u010d\u00edslo",
+        "rodne cislo",
+        "ob\u010dansk\u00fd pr\u016fkaz",
+        "obcansky prukaz"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Hungarian TAJ",
+      "regex": "\\b\\d{3}\\s?\\d{3}\\s?\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "tajsz\u00e1m",
+        "t\u00e1rsadalombiztos\u00edt\u00e1si azonos\u00edt\u00f3",
+        "oep",
+        "neak"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Romanian CNP",
+      "regex": "\\b[1-9]\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cod numeric personal",
+        "carte de identitate",
+        "buletin de identitate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Danish CPR",
+      "regex": "\\b\\d{6}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cpr-nummer",
+        "det centrale personregister"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Norwegian Fodselsnummer",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "f\u00f8dselsnummer",
+        "skatteetaten",
+        "norsk personnummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
     }
   ]
 }

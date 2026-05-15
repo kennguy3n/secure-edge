@@ -864,6 +864,38 @@ var patternCategory = map[string]string{
 	"Discharge Summary Header":                 "healthcare",
 
 	// Batch 7: Container / Orchestration
+
+	// W4 Batch 1: GDPR / EU national identifiers.
+	"EU IBAN (SEPA)":                     "pii_eu",
+	"EU VAT Number":                      "pii_eu",
+	"German Personalausweis":             "pii_eu",
+	"German Steueridentifikationsnummer": "pii_eu",
+	"German Sozialversicherungsnummer":   "pii_eu",
+	"French INSEE/NIR":                   "pii_eu",
+	"French CNI Number":                  "pii_eu",
+	"French SIRET":                       "pii_eu",
+	"French SIREN":                       "pii_eu",
+	"Italian Codice Fiscale":             "pii_eu",
+	"Italian Partita IVA":                "pii_eu",
+	"Spanish DNI":                        "pii_eu",
+	"Spanish NIE":                        "pii_eu",
+	"Spanish CIF":                        "pii_eu",
+	"Dutch BSN":                          "pii_eu",
+	"Belgian National Number":            "pii_eu",
+	"Polish PESEL":                       "pii_eu",
+	"Polish NIP":                         "pii_eu",
+	"Portuguese NIF":                     "pii_eu",
+	"Swedish Personnummer":               "pii_eu",
+	"Swedish Organisationsnummer":        "pii_eu",
+	"Finnish HETU":                       "pii_eu",
+	"Austrian SV-Nummer":                 "pii_eu",
+	"Greek AFM":                          "pii_eu",
+	"Greek AMKA":                         "pii_eu",
+	"Czech Rodne Cislo":                  "pii_eu",
+	"Hungarian TAJ":                      "pii_eu",
+	"Romanian CNP":                       "pii_eu",
+	"Danish CPR":                         "pii_eu",
+	"Norwegian Fodselsnummer":            "pii_eu",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

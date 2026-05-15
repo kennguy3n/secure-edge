@@ -2285,4 +2285,74 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Discharge Summary Header"] = func(r *rand.Rand) string {
 		return "DISCHARGE SUMMARY\nPatient: Jane Doe\nDOB: 05/12/1980\nAdmit Date: 2024-03-15"
 	}
+	// ---------------- Batch 17: Financial Services ----------------
+	valueGenerators["Plaid Client ID"] = func(r *rand.Rand) string {
+		return "PLAID_CLIENT_ID=" + randHex(r, 24)
+	}
+	valueGenerators["Plaid Production Secret"] = func(r *rand.Rand) string {
+		return "PLAID_SECRET=" + randHex(r, 30)
+	}
+	valueGenerators["Plaid Public Token"] = func(r *rand.Rand) string {
+		return "public-production-" + randHex(r, 8) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 12)
+	}
+	valueGenerators["Dwolla API Key"] = func(r *rand.Rand) string {
+		return "DWOLLA_KEY=" + randFromAlphabet(r, alnum+"+/=", 50)
+	}
+	valueGenerators["Dwolla API Secret"] = func(r *rand.Rand) string {
+		return "DWOLLA_SECRET=" + randFromAlphabet(r, alnum+"+/=", 50)
+	}
+	valueGenerators["Wise (TransferWise) Personal API Token"] = func(r *rand.Rand) string {
+		return "WISE_API_TOKEN=" + randHex(r, 8) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 12)
+	}
+	valueGenerators["Wise Live API Token Header"] = func(r *rand.Rand) string {
+		return "Authorization: Bearer " + randHex(r, 8) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 12) + "\n# wise live key"
+	}
+	valueGenerators["Adyen API Key (AQE...)"] = func(r *rand.Rand) string {
+		return "AQE" + randFromAlphabet(r, alnum+"+/=", 250)
+	}
+	valueGenerators["Adyen Client Key"] = func(r *rand.Rand) string {
+		return "ADYEN_CLIENT_KEY=live_" + randAlnum(r, 40) + "\n# adyen checkout client key"
+	}
+	valueGenerators["Adyen Webhook HMAC Key"] = func(r *rand.Rand) string {
+		return "ADYEN_HMAC_KEY=" + randHex(r, 64)
+	}
+	valueGenerators["Mollie API Key (live)"] = func(r *rand.Rand) string {
+		return "MOLLIE_API_KEY=live_" + randAlnum(r, 35) + "\n# mollie checkout"
+	}
+	valueGenerators["Mollie API Key (test)"] = func(r *rand.Rand) string {
+		return "MOLLIE_TEST_KEY=test_" + randAlnum(r, 35) + "\n# mollie test mode"
+	}
+	valueGenerators["GoCardless Live Access Token"] = func(r *rand.Rand) string {
+		return "GOCARDLESS_ACCESS_TOKEN=live_" + randFromAlphabet(r, alnum+"_-", 50) + "\n# gocardless direct debit"
+	}
+	valueGenerators["Stripe Webhook Signing Secret (whsec_)"] = func(r *rand.Rand) string {
+		return "STRIPE_WEBHOOK_SECRET=whsec_" + randAlnum(r, 40)
+	}
+	valueGenerators["Stripe Restricted API Key (rk_)"] = func(r *rand.Rand) string {
+		return "STRIPE_RESTRICTED_KEY=rk_live_" + randAlnum(r, 32)
+	}
+	valueGenerators["Square Application Secret"] = func(r *rand.Rand) string {
+		return "SQUARE_APPLICATION_SECRET=sq0csp-" + randFromAlphabet(r, alnum+"_-", 50)
+	}
+	valueGenerators["Square OAuth Bearer Token"] = func(r *rand.Rand) string {
+		return "Authorization: Bearer EAAA" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["PayPal REST Client Secret"] = func(r *rand.Rand) string {
+		return "PAYPAL_CLIENT_SECRET=E" + randFromAlphabet(r, alnum+"_-", 80) + "\n# paypal rest api"
+	}
+	valueGenerators["PayPal Live Access Token Header"] = func(r *rand.Rand) string {
+		return "Authorization: Bearer A21AA" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Razorpay Key ID"] = func(r *rand.Rand) string {
+		return "RAZORPAY_KEY_ID=rzp_live_" + randAlnum(r, 14)
+	}
+	valueGenerators["Razorpay Key Secret"] = func(r *rand.Rand) string {
+		return "RAZORPAY_KEY_SECRET=" + randAlnum(r, 24)
+	}
+	valueGenerators["ACH Routing+Account Numbers Together"] = func(r *rand.Rand) string {
+		return "Routing Number: " + randFromAlphabet(r, digits, 9) + "\nAccount Number: " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["SWIFT/BIC code with bank+account"] = func(r *rand.Rand) string {
+		return "SWIFT/BIC: " + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upper, 2) + randFromAlphabet(r, upper+digits, 2) + "\nIBAN: GB29NWBK60161331926819"
+	}
 }

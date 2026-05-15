@@ -12103,6 +12103,361 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "phi"
+    },
+    {
+      "name": "Plaid Client ID",
+      "regex": "(?i)PLAID_CLIENT_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{24}",
+      "prefix": "plaid_client_id",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "plaid",
+        "client id",
+        "banking"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "financial"
+    },
+    {
+      "name": "Plaid Production Secret",
+      "regex": "(?i)PLAID_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{30}",
+      "prefix": "plaid_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "plaid",
+        "secret",
+        "production"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "financial"
+    },
+    {
+      "name": "Plaid Public Token",
+      "regex": "(?i)public-(?:sandbox|production|development)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "public-",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "plaid",
+        "public token",
+        "link"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "financial"
+    },
+    {
+      "name": "Dwolla API Key",
+      "regex": "(?i)DWOLLA_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{40,}",
+      "prefix": "dwolla_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "dwolla",
+        "key",
+        "ach"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Dwolla API Secret",
+      "regex": "(?i)DWOLLA_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{40,}",
+      "prefix": "dwolla_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "dwolla",
+        "secret",
+        "ach"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Wise (TransferWise) Personal API Token",
+      "regex": "(?i)WISE_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "wise_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "wise",
+        "transferwise",
+        "api"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "financial"
+    },
+    {
+      "name": "Wise Live API Token Header",
+      "regex": "(?i)Authorization:\\s*Bearer\\s+[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[\\s\\S]{0,80}wise",
+      "prefix": "authorization:",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "wise",
+        "bearer",
+        "authorization"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "financial"
+    },
+    {
+      "name": "Adyen API Key (AQE...)",
+      "regex": "AQE[A-Za-z0-9+/=]{200,}",
+      "prefix": "aqe",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "adyen",
+        "api key",
+        "merchant"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.5,
+      "category": "financial"
+    },
+    {
+      "name": "Adyen Client Key",
+      "regex": "(?i)live_[A-Za-z0-9]{32,}",
+      "prefix": "live_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "adyen",
+        "client key",
+        "checkout"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Adyen Webhook HMAC Key",
+      "regex": "(?i)ADYEN_HMAC_KEY\\s*[:=]\\s*['\\\"]?[A-Fa-f0-9]{64}",
+      "prefix": "adyen_hmac_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "adyen",
+        "hmac",
+        "webhook"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Mollie API Key (live)",
+      "regex": "(?i)live_[a-zA-Z0-9]{30,}",
+      "prefix": "live_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mollie",
+        "api key",
+        "live"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "financial"
+    },
+    {
+      "name": "GoCardless Live Access Token",
+      "regex": "(?i)live_[A-Za-z0-9_\\-]{40,}",
+      "prefix": "live_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gocardless",
+        "access token",
+        "direct debit"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Stripe Webhook Signing Secret (whsec_)",
+      "regex": "whsec_[A-Za-z0-9]{32,}",
+      "prefix": "whsec_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "stripe",
+        "webhook",
+        "signing"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Stripe Restricted API Key (rk_)",
+      "regex": "(?:rk_live|rk_test)_[A-Za-z0-9]{24,}",
+      "prefix": "rk_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "stripe",
+        "restricted",
+        "api key"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Square Application Secret",
+      "regex": "sq0[a-z]{3}-[A-Za-z0-9_\\-]{40,}",
+      "prefix": "sq0",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "square",
+        "application secret",
+        "oauth"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "Square OAuth Bearer Token",
+      "regex": "(?i)Authorization:\\s*Bearer\\s+EAAA[A-Za-z0-9_\\-]{60,}",
+      "prefix": "authorization:",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "square",
+        "bearer",
+        "oauth"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "PayPal REST Client Secret",
+      "regex": "E[A-Za-z0-9_\\-]{79,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "paypal",
+        "client_secret",
+        "rest api"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 5.0,
+      "category": "financial"
+    },
+    {
+      "name": "PayPal Live Access Token Header",
+      "regex": "(?i)Authorization:\\s*Bearer\\s+A21AA[A-Za-z0-9_\\-]{50,}",
+      "prefix": "authorization:",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "paypal",
+        "bearer",
+        "authorization"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.5,
+      "category": "financial"
+    },
+    {
+      "name": "Razorpay Key ID",
+      "regex": "rzp_(?:live|test)_[A-Za-z0-9]{14}",
+      "prefix": "rzp_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "razorpay",
+        "key id"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "financial"
+    },
+    {
+      "name": "Razorpay Key Secret",
+      "regex": "(?i)RAZORPAY_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24}",
+      "prefix": "razorpay_key_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "razorpay",
+        "key secret"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "financial"
+    },
+    {
+      "name": "ACH Routing+Account Numbers Together",
+      "regex": "(?i)(?:routing|aba)\\s*(?:number|#)?\\s*[:=]\\s*\\d{9}[\\s\\S]{0,80}(?:account|acct)\\s*(?:number|#)?\\s*[:=]\\s*\\d{6,17}",
+      "prefix": "routing",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ach",
+        "routing",
+        "account"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "financial"
     }
   ]
 }

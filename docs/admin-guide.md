@@ -5,8 +5,8 @@ organization. End-user documentation lives in [user-guide.md](./user-guide.md).
 
 ## 1. Installation
 
-Secure Edge ships as a single Go binary plus an Electron tray app. The Phase 4
-release artifacts are produced by the `release.yml` GitHub Actions workflow and
+Secure Edge ships as a single Go binary plus an Electron tray app. Release
+artifacts are produced by the `release.yml` GitHub Actions workflow and
 attached to GitHub Releases. See [README.md](../README.md) for the per-platform
 download/install commands.
 
@@ -16,7 +16,7 @@ download/install commands.
 | macOS (Intel) | Download `secure-edge-darwin-amd64.tar.gz` and run `install.sh` |
 | Linux (amd64) | `curl -fsSL https://shieldnet.io/install.sh | sh` |
 | Linux (arm64) | Download `secure-edge-linux-arm64.tar.gz` and run `install.sh` |
-| Windows | Run `secure-edge-setup.exe` (signed with the Authenticode cert; see Phase 6) |
+| Windows | Run `secure-edge-setup.exe` |
 
 All builds embed a build-time SHA-256 of `rules/manifest.json` so tamper
 detection works even before the first rule update.
@@ -30,10 +30,9 @@ verification recipe in [SECURITY.md](../SECURITY.md#verifying-a-release)
 before pushing a build to managed endpoints — it confirms the artefact
 was emitted by this repository's `Release` workflow on a `v*` tag and
 has not been tampered with in transit. Platform-native code signing
-(Apple Developer ID / Windows Authenticode / Linux GPG) is still
-pending certificate provisioning (`PHASES.md`, "Code signing of release
-artifacts"); the Sigstore chain is the authoritative trust path until
-then.
+(Apple Developer ID / Windows Authenticode / Linux GPG) is planned for
+a future release; the Sigstore chain is the authoritative trust path
+until then.
 
 ## 2. Configuration (`config.yaml`)
 
@@ -70,7 +69,7 @@ the repository root and copy it into the location §2 enumerates:
 | --- | --- | --- |
 | Personal | `config.personal.example.yaml` | Fall-open, individual developer use. No per-install token; no Native Messaging HMAC pinning; no profile signature pinning. Mirrors the packaged `config.yaml` defaults. |
 | Team | `config.team.example.yaml` | Intermediate rollout. Per-install API token required; warn-toast on agent-unavailable; Native Messaging HMAC still lenient (warn-once log); unsigned profiles still accepted. |
-| Managed | `config.managed.example.yaml` | Fail-closed end-state for MDM-deployed fleets. Every Phase 7 control surface enabled, every signed artefact verified, fail-closed on agent-unavailable gestures. |
+| Managed | `config.managed.example.yaml` | Fail-closed end-state for MDM-deployed fleets. Every control surface enabled, every signed artefact verified, fail-closed on agent-unavailable gestures. |
 
 Copy the appropriate file to the install location (e.g. `cp
 config.managed.example.yaml /etc/secure-edge/config.yaml`) and fill in
@@ -80,21 +79,22 @@ pre-select sensible groupings.
 
 Do not deploy the managed preset to your full fleet without first
 validating it on a single pilot endpoint (every signed surface
-requires matching plumbing — an unsigned profile or a pre-C1
-extension build on the wire will fail-closed under the managed
-posture). The recommended sequence is personal → team → managed.
+requires matching plumbing — an unsigned profile or an extension
+build that pre-dates Native Messaging HMAC support on the wire will
+fail-closed under the managed posture). The recommended sequence is
+personal → team → managed.
 See §10.1 for the MDM deployment bundle and §3.1 / §4 / §2.1 for the
 staged rollout posture under each signing surface.
 
 ### 2.1 Native Messaging bridge HMAC (`bridge_mac_required`)
 
-Phase 7 added an HMAC-SHA256 message-authentication code to every
+The agent adds an HMAC-SHA256 message-authentication code to every
 non-`hello` frame on the Native Messaging bridge that connects the
 browser extension's service worker to the locally installed agent
 binary (the program registered under `NativeMessagingHosts`).
 
 The MAC is keyed by the per-install API token (the 32-byte hex value
-under `api_token_path`, see A2). The agent mints a fresh 16-byte
+under `api_token_path`). The agent mints a fresh 16-byte
 nonce per connection and surfaces it on the (intentionally
 unsigned) `hello` reply. The extension caches the nonce + token for
 the lifetime of the port and includes the MAC on every subsequent
@@ -104,8 +104,8 @@ same key.
 Two knobs govern the behaviour:
 
 ```yaml
-# Path to the per-install API token. Already documented under A2;
-# the same file is reused as the HMAC key (no separate secret).
+# Path to the per-install API token. The same file is reused as the
+# HMAC key (no separate secret).
 api_token_path: /var/lib/secure-edge/api-token
 
 # Bridge MAC enforcement. Default is false (lenient) — the agent
@@ -124,13 +124,14 @@ Recommended rollout sequence for a managed fleet:
    `%LOCALAPPDATA%\secure-edge\agent.log` (Windows) for the
    one-time `agent: bridge MAC missing on Native Messaging request`
    warning. If you see it after the rollout completes, an
-   endpoint is still on the pre-C1 extension build.
+   endpoint is still on an extension build that pre-dates Native
+   Messaging HMAC support.
 3. Once the warning stops appearing across your fleet, flip
    `bridge_mac_required: true`. Any subsequent missing or
    tampered MAC will be rejected with `bridge MAC required` /
    `bridge MAC mismatch` in the response, and the extension's
    scan will fall through to the HTTP fallback (which has its
-   own bearer-token guard from A2).
+   own bearer-token guard via `api_token_required`).
 
 The MAC check is automatically skipped when no `api_token_path` is
 configured — without a shared secret there is nothing to verify
@@ -141,12 +142,12 @@ not gated by `bridge_mac_required`.
 
 ### 2.2 Risky file extensions (`risky_file_extensions`)
 
-Phase 7 (B2) added a policy lever that hard-blocks file uploads
+Secure Edge includes a policy lever that hard-blocks file uploads
 whose extension is on a configurable risky list. The block is
 evaluated **on the page**, inside the browser extension's
 `file-upload-interceptor` content script, **before** any content is
 read or sent to the agent — so the filename and contents never
-leave the page for a B2 verdict.
+leave the page for a risky-extension verdict.
 
 The extension ships with a baked-in default list of 34 extensions
 covering Windows / macOS / Linux executables, installers (`.msi`,
@@ -166,8 +167,9 @@ Operators override the baked-in list via a single config key:
 ```yaml
 # Optional risky-extension override. Three states:
 #   1) Omit the key entirely    → extension uses the baked-in 34-entry default.
-#   2) Empty list `[]`          → opts out of B2 entirely (no extension is
-#                                 blocked at this layer; content scan still runs).
+#   2) Empty list `[]`          → opts out of risky-extension blocking entirely
+#                                 (no extension is blocked at this layer;
+#                                 content scan still runs).
 #   3) Populated list           → replaces the baked-in default verbatim.
 # Entries are case-insensitive; leading dots are stripped; blanks are dropped.
 risky_file_extensions:
@@ -185,19 +187,20 @@ worker eviction without a re-fetch. The wire shape distinguishes
 the three states above:
 
 - `{}` (no `extensions` field) — extension uses the baked-in default
-- `{"extensions": []}` — opt-out, no B2 blocking
+- `{"extensions": []}` — opt-out, no risky-extension blocking
 - `{"extensions": ["exe", ...]}` — operator override
 
 A risky-extension block fires **regardless of enforcement mode**.
-B2 is a policy lever to remove a class of file from the upload
-surface entirely; it does not fall open in `personal` or `team`
+The risky-extension blocklist is a policy lever to remove a class
+of file from the upload surface entirely; it does not fall open in
+`personal` or `team`
 modes the way the content scan does. The toast reads
 `Secure Edge blocked this upload — .exe files are blocked by
 policy.` (with the matched extension substituted in).
 
 ## 3. Enterprise Profiles (managed mode)
 
-Phase 5 added managed-mode profiles for enrolled fleets. A profile is a YAML
+Secure Edge supports managed-mode profiles for enrolled fleets. A profile is a YAML
 file with the same shape as `config.yaml` plus an `overrides` block. It is
 loaded from `profile_path` or fetched from `profile_url` on agent start and on
 every rule update.
@@ -224,7 +227,7 @@ falls back to the last good profile and logs a single line to the agent log
 When `managed: true`, the Electron tray UI hides the category toggles and the
 Settings page shows a read-only banner with the profile ID + version.
 
-### 3.1 Signing enterprise profiles (`profile_public_key`, Phase 7 / D2)
+### 3.1 Signing enterprise profiles (`profile_public_key`)
 
 The agent verifies an Ed25519 signature on every loaded profile when
 `profile_public_key` is configured. The same verifier covers all three
@@ -444,8 +447,8 @@ the scanner, an unrelated string of mojibake.
 
 This affects two surfaces specifically:
 
-- **Clipboard screenshot paste** (`extension/src/content/paste-interceptor.ts`,
-  Phase 7 / B3). The interceptor blocks the upload **gesture** by
+- **Clipboard screenshot paste** (`extension/src/content/paste-interceptor.ts`).
+  The interceptor blocks the upload **gesture** by
   calling `preventDefault` / `stopPropagation` before any await,
   so a pasted screenshot never reaches the page's `paste`
   listeners. The agent then runs its UTF-8 decode + DLP scan on
@@ -454,7 +457,7 @@ This affects two surfaces specifically:
   tool**, but Secure Edge cannot tell the operator whether the
   screenshot contained sensitive content.
 - **Drag-and-drop / `<input type=file>` of image / PDF files**
-  (`file-upload-interceptor.ts`, Phase 7 / B1). Same shape — the
+  (`file-upload-interceptor.ts`). Same shape — the
   gesture is suppressed; the content scan is best-effort UTF-8.
 
 What the scanner **does** cover for binary payloads:
@@ -466,7 +469,7 @@ What the scanner **does** cover for binary payloads:
   the body at the network layer; the content question is
   irrelevant because the network refused to forward it at all.
 
-What the scanner does **not** support, and is not on the Phase 7
+What the scanner does **not** support, and is not on the current
 roadmap:
 
 - OCR over screenshot pixels.
@@ -492,7 +495,7 @@ recommended postures are:
    gesture for text-shape DLP; the endpoint product blocks the
    gesture for image-shape DLP).
 
-The extension's B3 toast text intentionally does not claim that
+The extension's paste-block toast text intentionally does not claim that
 the screenshot was scanned — it only signals that the paste was
 suppressed. See the header comment in
 `extension/src/content/paste-interceptor.ts` for the same caveat
@@ -513,10 +516,10 @@ pipeline timing (without logging scan content).
 
 ## 10. Managed Deployments (MDM)
 
-This section pulls together every Phase 7 control surface — the
-per-install bearer token (PR #18 / A2), the signed rule manifest
-(PR #20 / A3), the signed enterprise profile (PR #28 / D2), and
-the HMAC-authenticated Native Messaging bridge (PR #26 / C1) —
+This section pulls together every control surface — the
+per-install bearer token, the signed rule manifest,
+the signed enterprise profile, and
+the HMAC-authenticated Native Messaging bridge —
 into one end-to-end walkthrough for deploying the agent + the
 companion extension to a fleet of managed endpoints via a Mobile
 Device Management (MDM) platform.
@@ -599,20 +602,20 @@ enforcement_mode: managed
 # Pinned signing keys — endpoints reject any profile / manifest
 # that does not verify under these. Replace with the hex strings
 # captured in step 5 above.
-profile_public_key: "9b1ac8..."        # PR #28 / D2
-rule_update_public_key: "5cf472..."    # PR #20 / A3
+profile_public_key: "9b1ac8..."        # signed enterprise profile
+rule_update_public_key: "5cf472..."    # signed rule manifest
 
 # Bearer token + HMAC posture (defence-in-depth on the
 # extension ↔ agent hop).
-api_token_required: true               # PR #18 / A2
-bridge_mac_required: true              # PR #26 / C1
+api_token_required: true               # per-install bearer token
+bridge_mac_required: true              # Native Messaging HMAC bridge
 
 # Layout of the signed bundle on disk.
 profile_path: "/Library/Application Support/secure-edge/profile.json"
 rule_update_path: "/Library/Application Support/secure-edge/manifest.json"
 api_token_path: "/var/lib/secure-edge/api_token"
 
-# Risky-extension blocklist (PR #27 / B2). Omit to use the
+# Risky-extension blocklist. Omit to use the
 # baked-in 34-entry default.
 # risky_file_extensions: ["exe", "scr", "msi", ...]
 ```
@@ -824,11 +827,11 @@ Linux endpoints with only the file-system layout changing.
 | Layer | Where it lives | Verified by |
 | --- | --- | --- |
 | Chrome browser policy | MDM-managed `ExtensionInstallForcelist` + `ExtensionSettings` | Browser admin console — extension cannot be removed by the user |
-| Per-install bearer token (A2) | `api_token_path` on disk, `api_token_required: true` in `config.yaml` | `GET /api/status` returns 401 without `Authorization: Bearer …` (see §2.0) |
-| Native-Messaging HMAC bridge (C1) | `bridge_mac_required: true` in `config.yaml` (reuses `api_token` as the HMAC key) | Agent stderr emits `bridge MAC verification failed` when an older extension talks to a strict-mode agent (§2.1) |
-| Signed rule manifest (A3) | `rule_update_public_key` in `config.yaml`, `manifest.json` produced by `sign-rule-manifest` | Agent log emits one line on rule update; refuses to load any manifest that does not verify (§4) |
-| Signed enterprise profile (D2) | `profile_public_key` in `config.yaml`, `profile.json` produced by `sign-enterprise-profile` | Agent log emits one line on profile load; refuses to load any unsigned profile when the key is configured (§3.1) |
-| Risky-extension blocklist (B2) | Optional `risky_file_extensions` override in `config.yaml`; extension reads the baked-in 34-entry list otherwise | Extension surfaces the policy toast on `<input type=file>`, drag-drop, AND clipboard paste of any matched filename (§2.2) |
+| Per-install bearer token | `api_token_path` on disk, `api_token_required: true` in `config.yaml` | `GET /api/status` returns 401 without `Authorization: Bearer …` (see §2.0) |
+| Native-Messaging HMAC bridge | `bridge_mac_required: true` in `config.yaml` (reuses `api_token` as the HMAC key) | Agent stderr emits `bridge MAC verification failed` when an older extension talks to a strict-mode agent (§2.1) |
+| Signed rule manifest | `rule_update_public_key` in `config.yaml`, `manifest.json` produced by `sign-rule-manifest` | Agent log emits one line on rule update; refuses to load any manifest that does not verify (§4) |
+| Signed enterprise profile | `profile_public_key` in `config.yaml`, `profile.json` produced by `sign-enterprise-profile` | Agent log emits one line on profile load; refuses to load any unsigned profile when the key is configured (§3.1) |
+| Risky-extension blocklist | Optional `risky_file_extensions` override in `config.yaml`; extension reads the baked-in 34-entry list otherwise | Extension surfaces the policy toast on `<input type=file>`, drag-drop, AND clipboard paste of any matched filename (§2.2) |
 
 Each row is independently verifiable from the agent log or a
 single API probe — the bundle is "deployed correctly" when every

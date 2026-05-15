@@ -9,307 +9,67 @@ may introduce breaking changes between feature releases.
 
 ## [Unreleased]
 
-### Added — Phase 7: Security Posture
+### Added
 
-- **A1**: Pin browser-extension IDs accepted by the API control
-  plane. New `allowed_extension_ids` config key restricts which
-  `chrome-extension://` / `moz-extension://` /
-  `safari-web-extension://` origins may drive state-changing
-  endpoints. Empty list keeps the legacy "any non-empty ID"
-  behaviour and logs a startup warning.
-- **A2**: Per-install API capability token. The agent generates a
-  32-byte hex token at `api_token_path` (mode 0600) on first
-  start, hands it to the browser extension over a new Native
-  Messaging `hello` handshake, and the Electron tray reads it
-  from the same file. `api_token_required` toggles enforcement
-  between staged (wrong tokens 401, missing header falls through)
-  and full (missing header also 401).
-- **A2 follow-up**: Added `api.DefaultAPITokenPath()` in the Go
-  agent so the per-OS default matches the Electron tray's
-  `DEFAULT_API_TOKEN_PATH` byte-for-byte (XDG / Application
-  Support / APPDATA). The agent prints the resolved value as a
-  startup hint when `api_token_path` is empty so operators see
-  exactly what to drop into `config.yaml` to enable bearer-token
-  auth without any further tray configuration. Clarified the
-  `NativeMessagingOptions.APIToken` doc comment to match the
-  actual hello-without-token behaviour (successful reply with the
-  `api_token` field stripped, no protocol-level error).
-- **C2 follow-up**: `paste-interceptor.ts` now reuses the shared
-  `MAX_SCAN_BYTES` constant instead of its own local
-  `MAX_PASTE_BYTES`. The two were already 1 MiB so this is not a
-  behavioural change, but it removes the only remaining interceptor
-  that could drift from the shared threshold a future PR might
-  retune. Pinned `/api/config/enforcement-mode` in
-  `TestCORS_AIPageOriginsAllowedOnReadEndpoints` so a future
-  attempt to add the endpoint to `isControlPath` fails at CI
-  rather than silently breaking the extension service-worker's
-  auth-free poll.
-- **B1**: File upload DLP scanning. The MAIN-world fetch / XHR
-  hook now reads Blob, File, ArrayBuffer, and ArrayBufferView
-  bodies asynchronously (up to `MAX_SCAN_BYTES`), and walks
-  FormData File entries so file uploads are scanned alongside
-  text fields. A new `file-upload-interceptor.ts` content script
-  closes the remaining gap by snooping `<input type="file">`
-  change events and file-drop events at capture phase. The
-  interceptor suppresses the gesture SYNCHRONOUSLY before any
-  await (`preventDefault` / `stopPropagation` /
-  `stopImmediatePropagation` / clearing `input.value`) so the
-  page's own handlers never see the file; the scan runs after to
-  drive the toast UX. Clean scans do not resume the gesture
-  (re-injecting a `File` into `input.files` / a drop target is
-  not portable across browsers). ReadableStream bodies still
-  fall open (no safe tee without rewriting `init.body`); the
-  agent-unavailable + oversize policy hooks from C2 cover the
-  fall-open path in managed mode.
-- **B1 follow-up**: Review-pass tightening on the file-upload
-  path. `drag-interceptor.ts` now short-circuits on
-  `dataTransfer.files.length > 0` so it cedes file drops to
-  `file-upload-interceptor.ts` cleanly — previously, OS file
-  managers that attach a `text/plain` path string alongside the
-  File could trick drag-interceptor into `resumeDrop`-ing a stale
-  path string into the focused textarea while file-upload-interceptor
-  was simultaneously blocking the file. `file-upload-interceptor`'s
-  `onDrop` now also calls `stopImmediatePropagation` synchronously
-  for parity with `onChange`'s same-phase suppression. Added a
-  `MAX_SCAN_BYTES` parity test that fails CI if the constant ever
-  drifts between `scan-client.ts` (isolated world) and
-  `main-world-network.ts` (MAIN world). Tightened the JSDoc on
-  `readFormDataText` to document `encodeURIComponent` inflation (up
-  to 3× on special characters) — the raw read budget holds, the
-  encoded output is caught downstream by the oversize policy hook.
-  Clarified the `onChange` header comment to accurately describe
-  what capture-phase `stopPropagation` / `stopImmediatePropagation`
-  do and do not prevent (the only remaining race is a page's own
-  document-level capture listener registered before our
-  `document_start` injection; the network interceptor closes the
-  exfil path in that case). Re-framed the `manifestBody` doc
-  comment to make clear that drift between `Manifest` and
-  `manifestBody` is enforced by the run-time
-  `TestManifestBody_MirrorsManifestMinusSignature` reflection test,
-  not by the compiler (the two structs are independent types).
-- **D1a**: Release-artefact hardening (signing + supply-chain
-  transparency). The `release.yml` workflow now publishes, alongside
-  every release: a `SHA256SUMS` manifest of every artefact; per-
-  artefact and SHA256SUMS-level Sigstore keyless signatures
-  (`.sig` + `.pem`) issued under the workflow's GitHub OIDC
-  identity (no maintainer-held private keys); CycloneDX 1.6 SBOMs
-  for the Go agent, Electron tray, and browser extension; and a
-  SLSA Build Level 3 provenance attestation via
-  `actions/attest-build-provenance@v2`. `SECURITY.md` gains a new
-  "Verifying a release" section with a copy-paste recipe covering
-  `sha256sum -c`, `cosign verify-blob` (with `--certificate-
-  identity-regexp` pinned to this repo's workflow on a `v*` tag),
-  and `gh attestation verify`. Platform-native code signing
-  (Apple Developer ID, Windows Authenticode, Linux GPG) remains
-  deferred to D1b until the respective certificates are provisioned
-  (`PHASES.md:156`).
-
-  Adjacent release-pipeline fixes uncovered while validating the
-  D1a signing workflow end-to-end (the first time `release.yml`
-  ran on a tag push to completion): refactored
-  `agent/internal/tamper/proxy_check.go` from a `switch
-  runtime.GOOS` against per-platform stubs into a per-platform
-  dispatch (`proxyCheckImpl` in each `proxy_{darwin,windows,other}.go`
-  under its own build tag) so the agent cross-compiles cleanly for
-  darwin and windows targets; added `homepage` + `author{name,email}`
-  to `electron/package.json` for electron-builder Linux `.deb`
-  packaging; set `directories.output: dist-electron` and a dotless
-  `artifactName` in `electron/electron-builder.yml` so installer
-  filenames survive GitHub's release-upload "spaces→dots"
-  normalisation; replaced WiX v3 `heat dir` with the native v4+
-  `<Files Include="…">` element in `scripts/windows/secure-edge.wxs`
-  and pinned the WiX dotnet tool to v5.0.2 (the last release before
-  v6's Open Source Maintenance Fee EULA gate); and switched the
-  `SHA256SUMS` pipeline to NUL-separated piping so artefacts whose
-  names contain spaces hash correctly.
-- **C1**: HMAC-authenticated Native Messaging bridge. Every non-
-  `hello` frame on the extension ↔ agent Native Messaging
-  connection now carries an HMAC-SHA256 MAC over `nonce ||
-  direction_byte || id || kind || (content | blocked + token +
-  error)`, keyed by the per-install API token issued in A2. The
-  `hello` reply additionally surfaces a 16-byte `bridge_nonce`
-  (TOFU bootstrap; the very reply that hands out the secret +
-  nonce is intentionally unsigned). A new `bridge_mac_required`
-  config knob mirrors `api_token_required`: false (default)
-  emits a one-time stderr warning per connection and keeps
-  serving scans for staged rollout, true rejects any
-  mismatched / missing MAC with a `bridge MAC required` /
-  `bridge MAC mismatch` error reply. The agent also enforces a
-  strict-monotonic request id (`bridge id rollback` reply) and
-  rejects a second `hello` on the same connection (`hello
-  already issued`). A cross-language reference vector is pinned
-  byte-for-byte in both `agent/internal/api/bridge_mac_test.go`
-  and `extension/src/background/__tests__/bridge-mac.test.ts`
-  so any drift in the HMAC input layout is caught on both sides.
-- **D2**: Sign enterprise profiles with Ed25519. The
-  `agent/internal/profile` package now carries a `Signature` field
-  alongside a dedicated `profileBody` canonical-form struct (the
-  same belt-and-suspenders pattern shipped for the A3 rule
-  manifest in PR #20). `CanonicalForSigning` marshals through
-  `profileBody`, which physically lacks a Signature field, so a
-  future addition to `Profile` that forgets `omitempty` cannot
-  silently change the bytes a previously-valid signature was
-  computed over; a reflection test
-  (`TestProfileBody_MirrorsProfileMinusSignature`) catches drift
-  at every CI run. A new `profile.Verifier` enforces the
-  operator's trust posture on every load: the disk-load
-  (`LoadFromFile`), URL-fetch (`LoadFromURL`), and inline-import
-  paths (`POST /api/profile/import` for both `{"url": …}` and
-  `{"profile": {…}}` payloads) all route through the same
-  verifier, so the three import surfaces share one posture. The
-  staged rollout mirrors the rule-manifest verifier: when the new
-  `profile_public_key` config key is absent the agent runs in
-  warn-once mode (accepts unsigned profiles, logs a single line
-  per process); when configured, the agent rejects unsigned /
-  malformed / tampered / wrong-key-signed profiles before any
-  policy is applied. A companion CLI
-  (`agent/cmd/sign-enterprise-profile`) mirrors
-  `sign-rule-manifest` so operators sign profile JSON with one
-  command before distribution. An orphaned-key startup warning
-  fires when `profile_public_key` is set but both `profile_path`
-  and `profile_url` are empty (the key still applies to runtime
-  `POST /api/profile/import`, but the warning surfaces the
-  partial-rollout footgun the same way the rule-manifest variant
-  did).
-- **B2**: Block risky file extensions at the upload gesture. The
-  `file-upload-interceptor` content script now matches every
-  selected / dropped file's extension against a baked-in 34-entry
-  blocklist (Windows / macOS / Linux executables, installers,
-  scripts, disk images, Java archives; `.js` intentionally
-  excluded) BEFORE any content is read or sent to the agent. The
-  check runs in the same synchronous prelude as the existing
-  suppression (`preventDefault` / `stopImmediatePropagation` /
-  clearing `input.value`), so a blocked upload short-circuits the
-  async content scan entirely — the filename and contents never
-  leave the page for the B2 verdict. A risky-extension match
-  always blocks, regardless of enforcement mode (`personal` /
-  `team` / `managed` all see the same outcome); B2 is a policy
-  lever to remove a class of file from the upload surface, not a
-  fall-open ladder. Operators may override the baked-in list via
-  a new `risky_file_extensions` config key on the agent, surfaced
-  to the extension over a new `GET /api/config/risky-extensions`
-  endpoint. The wire shape distinguishes three states: field
-  absent (`{}`) means the extension uses its baked-in default;
-  explicit empty array (`{"extensions": []}`) opts out of risky-
-  extension blocking entirely; explicit list
-  (`{"extensions": ["exe",...]}`) replaces the baked-in default
-  verbatim. Entries are normalised on the agent side (trim,
-  strip leading dot, lowercase, drop blanks). The extension
-  service worker caches the override on cold start with a 5-min
-  TTL and mirrors it into `chrome.storage.session` so a content
-  script can fall back after a worker eviction. Toast: a new
-  `risky-extension` `PolicyReason` variant surfaces `Secure Edge
-  blocked this upload — .exe files are blocked by policy.`
-- **C3**: Adversarial test table for the MAIN ↔ ISO postMessage
-  bridge. New
-  `extension/src/content/__tests__/network-interceptor.adversarial.test.ts`
-  pins the bridge's threat-model boundary in 10 named rows:
-  the `isScanRequest` type guard rejects mistyped / missing
-  fields and accepts forward-compatible extra fields;
-  `handleBridgeMessage` no-ops on guard-rejected shapes;
-  `requestScan` ignores `scan-resp` messages with an unknown id;
-  the relay does not respond to its own `scan-resp` echoed back
-  as a `scan-req`; concurrent `handleBridgeMessage` calls keep
-  their replies separate; a throwing scan collapses to a `null`
-  verdict (no unhandled rejection); the relay forwards the
-  content field byte-for-byte (no in-bridge sanitisation). Two
-  rows pin the documented "cannot defend at the content-script
-  layer" failure modes (well-formed page-forged `scan-req` runs
-  the scan; matching-id forgery on `scan-resp` wins the race)
-  with cross-references to the C1 HMAC bridge (extension ↔
-  agent native messaging) and A2 bearer token (agent HTTP
-  loopback) — the actual defences for those cells live on the
-  next hop, not in the postMessage relay.
-- **B3**: Clipboard-paste file scanning. The `paste-interceptor`
-  content script now reads `clipboardData.files` AND
-  `clipboardData.items[i].getAsFile()` for every paste gesture
-  on a Tier-2 AI tool surface. The file path runs through the
-  same risky-extension guard (B2 / PR #27) and DLP scan
-  pipeline (B1 / PR #22) as `<input type=file>` uploads, with
-  the same synchronous-first contract: `preventDefault()` and
-  `stopPropagation()` fire BEFORE any `await`. The pre-B3
-  text-paste behaviour is unchanged; the FILE path is a
-  separate branch in `onPaste`. On a mixed text+file paste the
-  FILE path wins (more-conservative rule); the text fragment is
-  never forwarded to the agent. On a clean file verdict the
-  gesture stays suppressed (no portable way to programmatically
-  re-construct `DataTransfer.files` on the page side, matching
-  the no-resume contract in `file-upload-interceptor`). Tests:
-  new `paste-interceptor.test.ts` with 22 cases covering the
-  helper exports plus 13 numbered rows for text-only / file-only
-  / mixed / risky / oversize / agent-unavailable / null-data
-  scenarios.
-- **D4**: Managed-deployment (MDM) admin guide. New §10 in
+- Browser-extension ID pinning for the agent's control-plane
+  endpoints via the new `allowed_extension_ids` config key.
+- Per-install API capability token. The agent issues a
+  32-byte hex token at `api_token_path` and hands it to the
+  browser extension over Native Messaging; the Electron tray
+  reads it from the same path. Enforcement is staged
+  (`api_token_required` toggles between warn-only and reject).
+- HMAC-authenticated Native Messaging bridge keyed by the
+  per-install API token. The `bridge_mac_required` knob
+  mirrors `api_token_required` for staged rollout, and the
+  agent rejects rolled-back request ids or duplicate `hello`
+  frames on the same connection.
+- File-upload DLP scanning. The MAIN-world fetch / XHR hook
+  reads Blob, File, ArrayBuffer, and ArrayBufferView bodies
+  and walks FormData entries, and a new
+  `file-upload-interceptor` content script blocks risky
+  uploads from `<input type="file">` and file drops before
+  any content leaves the page.
+- Risky-file-extension blocklist. The upload interceptor
+  blocks a baked-in 34-entry executable / installer /
+  script / disk-image / Java-archive set before any read,
+  with a new `risky_file_extensions` config key and
+  `GET /api/config/risky-extensions` endpoint so operators
+  can override the default.
+- Clipboard-paste file scanning. The `paste-interceptor`
+  reads `clipboardData.files` and `items[].getAsFile()`,
+  applies the same risky-extension guard and DLP scan as
+  uploads, and suppresses the gesture synchronously on a
+  blocking verdict.
+- Signed enterprise configuration profiles. Profiles carry an
+  Ed25519 `signature` field, the disk / URL / inline-import
+  paths share one `profile.Verifier`, and a companion
+  `agent/cmd/sign-enterprise-profile` CLI mirrors the rule-
+  manifest signer.
+- Release-artefact hardening: every release publishes a
+  `SHA256SUMS` manifest, Sigstore keyless signatures
+  (`.sig` + `.pem`) under the workflow's GitHub OIDC identity,
+  CycloneDX 1.6 SBOMs for the Go agent / Electron tray /
+  browser extension, and a SLSA Build Level 3 provenance
+  attestation. `SECURITY.md` carries the verification recipe.
+- Three reference config presets at the repo root:
+  `config.personal.example.yaml`,
+  `config.team.example.yaml`, and
+  `config.managed.example.yaml`, plus an admin-guide section
+  recommending a personal → team → managed graduation path.
+- Managed-deployment (MDM) admin guide. New section in
   `docs/admin-guide.md` covers per-organisation bundle
-  generation (signed `profile.json`, signed `manifest.json`,
-  bearer token, agent binary, browser extension); Chrome
-  Enterprise managed policies (`ExtensionInstallForcelist`,
-  `ExtensionSettings`, `ManagedConfigurationPerOrigin`); and
-  per-platform walkthroughs for JAMF Pro (macOS, Configuration
-  Profile + Files & Processes + Restricted Software), Microsoft
-  Intune (Windows, Win32 app + ADMX device-configuration
-  policy), and VMware Workspace ONE (cross-platform, Files /
-  Actions + Custom Settings). A "see also" line points to the
-  Apple device-management docs for Kandji, Mosyle, and
-  SimpleMDM (same payload shape, different upload mechanism).
-  Closes with a six-row defence-in-depth checklist mapping
-  every Phase 7 control (A2 bearer, C1 HMAC, A3 signed
-  manifest, D2 signed profile, B2 risky-extension blocklist,
-  browser policy) to where it lives in the bundle and how to
-  verify it from the agent log or a single API probe.
-- **Config presets**: three reference configs at the repo root —
-  `config.personal.example.yaml` (fall-open, individual developer
-  use; mirrors the packaged `config.yaml` defaults),
-  `config.team.example.yaml` (per-install token + warn-toast on
-  agent-unavailable; Native Messaging HMAC and profile signing
-  still lenient for a staged rollout), and
-  `config.managed.example.yaml` (every Phase 7 control surface
-  enabled, every signed artefact verified, fail-closed posture
-  for an MDM-deployed fleet). New §2.0 in `docs/admin-guide.md`
-  cross-references all three and recommends a personal → team →
-  managed graduation path. The personal and managed presets
-  DELIBERATELY leave `risky_file_extensions` unset so the
-  extension falls through to the baked-in 34-entry default
-  (Windows / macOS / Linux executables, installers, scripts,
-  disk images, Java archives — see `BAKED_IN_RISKY_EXTENSIONS`
-  in `extension/src/content/risky-extensions.ts`); the managed
-  preset's comment includes an extension-hook example for fleets
-  that need to ADD entries on top of the default. The team
-  preset documents the wire-protocol gotcha that an explicit
-  populated list REPLACES (not augments) the baked-in default,
-  and its conservative 7-entry subset is therefore strictly
-  fewer entries than personal/managed (intentional for staged
-  rollout). New `config-presets.test.ts` pins the no-key-set
-  contract on personal + managed so a future PR cannot silently
-  reintroduce a coverage-shrinking explicit list, and asserts
-  that every team-preset entry is a strict subset of the
-  baked-in default.
-- **Screenshot / image DLP limitation**: explicit
-  `docs/admin-guide.md §8.1` subsection documents that the DLP
-  scanner is text-only, that binary payloads (screenshots,
-  images, PDFs) are decoded as best-effort UTF-8, and that OCR /
-  image classification are out-of-scope for Phase 7. The B3
-  paste interceptor blocks the upload gesture; it does not give
-  a content-aware verdict on image pixels. Recommended postures
-  for managed deployments needing screenshot DLP: a Chrome
-  Enterprise `DefaultClipboardSetting: BlockClipboard` policy on
-  Tier-2 AI tool origins, or a complementary endpoint DLP
-  product with OCR. The same caveat is mirrored as a new
-  `SCREENSHOT / IMAGE LIMITATION` block in
-  `extension/src/content/paste-interceptor.ts`'s header comment.
-- **B3 test gap-fills**: five additional rows in
-  `paste-interceptor.test.ts` covering posture branches not
-  exercised by the original 22-test suite: text-only oversize in
-  team mode (silent-allow, matches personal), text-only
-  agent-unavailable in personal / team / managed (silent /
-  warn-toast / block-toast), and an `items[]`-only screenshot
-  paste integration that drives the full `onPaste` handler
-  through the `clipboardData.items[].getAsFile()` surface (the
-  previous coverage only unit-tested `collectClipboardFiles`
-  directly).
-
-### Added — Phase 6: Hardening, Ecosystem Expansion & Community
-
+  generation, Chrome Enterprise managed policies, and
+  per-platform walkthroughs for JAMF Pro, Microsoft Intune,
+  and VMware Workspace ONE.
+- Explicit screenshot / image DLP limitation called out in
+  `docs/admin-guide.md` and the `paste-interceptor` header.
+  The DLP scanner is text-only; binary payloads are decoded
+  as best-effort UTF-8 and OCR / image classification are
+  out of scope.
+- Adversarial test coverage for the MAIN ↔ ISO postMessage
+  relay and additional paste-interceptor posture rows
+  (oversize in team mode, agent-unavailable across
+  personal / team / managed, `items[]`-only screenshot paste).
 - Expanded the DLP pattern library by ~30 patterns across Terraform,
   container registries, secret managers, OAuth2/OIDC, IaC vault
   strings, and package-manager ecosystems.
@@ -333,7 +93,36 @@ may introduce breaking changes between feature releases.
 - Community files: `CONTRIBUTING.md`, this changelog, `SECURITY.md`,
   GitHub issue/PR templates.
 
-## [0.5.0] — 2026-05-13 — Phase 5
+### Changed
+
+- `paste-interceptor.ts` now shares the `MAX_SCAN_BYTES`
+  constant with the other interceptors, and the constant is
+  pinned across the isolated and MAIN worlds by a parity
+  test.
+- `drag-interceptor.ts` cedes file drops to
+  `file-upload-interceptor.ts` so OS file managers that
+  attach a `text/plain` path alongside the `File` cannot
+  trick `drag-interceptor` into resuming a stale path string
+  while the file is being blocked.
+
+### Fixed
+
+- Cross-compilation: `agent/internal/tamper/proxy_check.go`
+  now dispatches per platform via build-tagged
+  `proxy_{darwin,windows,other}.go` files instead of a
+  `switch runtime.GOOS` against per-platform stubs, so the
+  agent cross-builds cleanly for darwin and windows targets.
+- Electron-builder Linux `.deb` packaging now picks up
+  `homepage` + `author{name,email}` from `package.json`,
+  and the dotless `artifactName` in `electron-builder.yml`
+  survives GitHub's release-upload filename normalisation.
+- Windows MSI build now uses native WiX v4+
+  `<Files Include="…">` and is pinned to the WiX dotnet
+  tool v5.0.2.
+- The release `SHA256SUMS` pipeline uses NUL-separated piping
+  so artefacts whose names contain spaces hash correctly.
+
+## [0.5.0] — 2026-05-13
 
 ### Added
 
@@ -368,7 +157,7 @@ may introduce breaking changes between feature releases.
   arrow-key navigation, visible focus rings, and labelled form
   controls. See `docs/accessibility.md`.
 
-## [0.4.0] — 2026-05-12 — Phase 4
+## [0.4.0] — 2026-05-12
 
 ### Added
 
@@ -383,7 +172,7 @@ may introduce breaking changes between feature releases.
   build (`manifest.firefox.json`) alongside the existing Chrome
   Manifest V3.
 
-## [0.3.0] — 2026-05-12 — Phase 3
+## [0.3.0] — 2026-05-12
 
 ### Added
 
@@ -394,7 +183,7 @@ may introduce breaking changes between feature releases.
 - CI workflow (`.github/workflows/ci.yml`) that runs the Go test
   suite, Electron typecheck, and extension typecheck on every push.
 
-## [0.2.0] — 2026-05-12 — Phase 2
+## [0.2.0] — 2026-05-12
 
 ### Added
 
@@ -409,7 +198,7 @@ may introduce breaking changes between feature releases.
 - Native messaging bridge between the extension and the local
   agent for hosts where the loopback HTTP API is unreachable.
 
-## [0.1.0] — 2026-05-12 — Phase 1
+## [0.1.0] — 2026-05-12
 
 ### Added
 

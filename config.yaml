@@ -144,7 +144,7 @@ proxy_pinning_bypass: []
 # always blocks, regardless of `enforcement_mode`. Three states:
 #
 #   - Key omitted (default)         → extension uses its baked-in
-#                                     31-entry default (Windows /
+#                                     34-entry default (Windows /
 #                                     macOS / Linux executables,
 #                                     installers, scripts, disk
 #                                     images, Java archives;

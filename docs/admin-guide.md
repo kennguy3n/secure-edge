@@ -44,18 +44,19 @@ service definitions point at the canonical managed-install location:
 | macOS | `/etc/secure-edge/config.yaml` | [`scripts/macos/com.secureedge.agent.plist`](../scripts/macos/com.secureedge.agent.plist) |
 | Windows | `%ProgramData%\secure-edge\config.yaml` | [`scripts/windows/register-service.ps1`](../scripts/windows/register-service.ps1) |
 
-Minimal example:
+Minimal example (YAML keys match the struct tags in
+[`agent/internal/config/config.go`](../agent/internal/config/config.go)):
 
 ```yaml
-upstream_dns:
-  - 1.1.1.1
-  - 9.9.9.9
-listen_dns: 127.0.0.1:53053
-listen_proxy: 127.0.0.1:8443
-listen_api: 127.0.0.1:7878
-rules_dir: ~/.local/share/secure-edge/rules
-log_level: info
+upstream_dns: "1.1.1.1:53"
+dns_listen: "127.0.0.1:53053"
+proxy_listen: "127.0.0.1:8443"
+api_listen: "127.0.0.1:7878"
+rules_dir: "~/.local/share/secure-edge/rules"
 ```
+
+Log verbosity is controlled by the `LOG_LEVEL` environment variable
+(`debug` / `info` / `warn`), not a YAML key — see §9 Troubleshooting.
 
 Full reference is in
 [`agent/internal/config/config.go`](../agent/internal/config/config.go).
@@ -176,9 +177,12 @@ import (
     "crypto/ed25519"; "crypto/rand"; "encoding/hex"; "fmt"; "os"
 )
 func main() {
-    pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-    os.WriteFile("ed25519-priv.hex",
-        []byte(hex.EncodeToString(priv)), 0o600)
+    pub, priv, err := ed25519.GenerateKey(rand.Reader)
+    if err != nil { panic(err) }
+    if err := os.WriteFile("ed25519-priv.hex",
+        []byte(hex.EncodeToString(priv)), 0o600); err != nil {
+        panic(err)
+    }
     fmt.Println(hex.EncodeToString(pub))
 }
 EOF
@@ -418,22 +422,226 @@ rules_dir: "/etc/secure-edge/rules"
 api_token_path: "/var/lib/secure-edge/api_token"
 ```
 
-### 10.2 Vendor mechanics
+### 10.2 Chrome Enterprise managed policies
 
-Every MDM vendor (JAMF, Intune, Workspace ONE, Kandji, Mosyle, …)
-deploys the bundle the same way: a configuration profile that drops
-the files in §10.1 onto the endpoint, plus a managed-browser policy
-that force-installs the extension. The vendor's own documentation is
-authoritative for payload upload mechanics and policy syntax —
-Secure Edge has no per-vendor logic.
+The extension is force-installed via Chrome Enterprise managed
+policies; the same JSON works for Edge for Business and any
+Chromium-derived browser that honours
+`HKLM\Software\Policies\Google\Chrome` (Windows) or
+`/Library/Managed Preferences/com.google.Chrome.plist` (macOS). For
+Firefox use the equivalent `policies.json` syntax — the extension ID
+and force-install semantics carry over.
 
-Force-install the extension via the standard
-`ExtensionInstallForcelist` (Chromium / Edge), `policies.json`
-(Firefox), or the equivalent in your MDM. Pin the extension ID to the
-value shown on `chrome://extensions` after a manual install on a test
-endpoint.
+```json
+{
+    "ExtensionInstallForcelist": [
+        "<extension-id>;https://clients2.google.com/service/update2/crx"
+    ],
+    "ExtensionSettings": {
+        "<extension-id>": {
+            "installation_mode": "force_installed",
+            "update_url": "https://clients2.google.com/service/update2/crx",
+            "blocked_install_message": "Secure Edge is required by IT. Contact security@example.com if it is missing.",
+            "runtime_blocked_hosts": [],
+            "runtime_allowed_hosts": ["*://*/*"]
+        }
+    },
+    "ManagedConfigurationPerOrigin": [
+        {
+            "origin": "chrome-extension://<extension-id>/",
+            "configuration": {
+                "agent_base": "http://127.0.0.1:8080",
+                "enforcement_mode_hint": "managed"
+            }
+        }
+    ]
+}
+```
 
-### 10.3 Defence-in-depth checklist
+- `ExtensionInstallForcelist` pins the exact extension ID — replace
+  `<extension-id>` with the value shown on `chrome://extensions` after a
+  manual install on a test endpoint. This is the same string that
+  belongs in `allowed_extension_ids` (§10.1).
+- `runtime_allowed_hosts` defaults to every host because Secure Edge
+  intercepts AI-tool surfaces by URL match. If your fleet only uses a
+  known subset (e.g. just `chatgpt.com` and `claude.ai`), narrow this
+  list to reduce the extension's exposure.
+- `ManagedConfigurationPerOrigin` is **optional** — the extension reads
+  the enforcement mode from the agent over loopback; the policy entry
+  only matters for early-bootstrap before the agent first responds.
+
+### 10.3 Per-platform recipes
+
+The three subsections below are shape-only walkthroughs — they show
+the payload layout for each platform but do not include
+operator-specific values (paths, group names, signing identities, the
+HTTPS endpoint hosting your signed `manifest.json`). Substitute your
+organisation's values when uploading the bundle.
+
+Across all three platforms the deployment shape is the same:
+`config.yaml`, the signed `profile.json`, and the per-install
+`api_token` ship as MDM payload files. The signed `manifest.json` and
+`rules/` directory are **not** staged on disk by the MDM — the agent
+fetches the manifest from `rule_update_url` and unpacks the rule files
+into `rules_dir` at runtime (§4).
+
+#### 10.3.1 JAMF Pro (macOS)
+
+JAMF deploys the bundle in three pieces: a **Configuration Profile**
+for `config.yaml` and the two public keys, a **Files & Processes**
+policy for the signed `profile.json` and the agent binary, and a
+**Restricted Software** entry to prevent users from uninstalling the
+agent.
+
+1. **Configuration Profile** — *Computers → Configuration Profiles →
+   New*. Add a **Custom Settings** payload with preference domain
+   `com.shieldnet.secure-edge.config` and the plist below (one-to-one
+   mapping of the `config.yaml` fields in §10.1):
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+      <dict>
+        <key>enforcement_mode</key>
+        <string>managed</string>
+        <key>profile_public_key</key>
+        <string>9b1ac8...</string>
+        <key>rule_update_public_key</key>
+        <string>5cf472...</string>
+        <key>api_token_required</key>
+        <true/>
+        <key>bridge_mac_required</key>
+        <true/>
+        <key>allowed_extension_ids</key>
+        <array>
+          <string>your-chrome-extension-id</string>
+        </array>
+        <key>profile_path</key>
+        <string>/etc/secure-edge/profile.json</string>
+        <key>rule_update_url</key>
+        <string>https://rules.example.com/manifest.json</string>
+        <key>rules_dir</key>
+        <string>/etc/secure-edge/rules</string>
+        <key>api_token_path</key>
+        <string>/var/lib/secure-edge/api_token</string>
+      </dict>
+    </plist>
+    ```
+
+    The agent on macOS reads `config.yaml` from `/etc/secure-edge/`
+    (the path the shipped LaunchDaemon at
+    [`scripts/macos/com.secureedge.agent.plist`](../scripts/macos/com.secureedge.agent.plist)
+    points at). A postinstall script in step 2 translates the plist
+    into the YAML the agent expects (or, equivalently, you can ship a
+    static `config.yaml` as a payload file).
+
+2. **Files & Processes policy** — *Computers → Policies → New*. Upload
+   the signed `profile.json` as a package payload. Target distribution
+   point: `/etc/secure-edge/`. Trigger: **Recurring Check-in** (default
+   30 min) and **At Login** for the first roll-out window.
+
+3. **Restricted Software** — *Computers → Restricted Software*. Match
+   on the agent binary path; action = **Restrict and Kill**. Pair with
+   a JAMF Self Service entry so a user can request reinstall if the
+   binary is removed in error.
+
+#### 10.3.2 Microsoft Intune (Windows)
+
+Intune deploys the bundle as a **Win32 app** plus an **ADMX-backed
+device configuration policy**. The Win32 app installs the agent
+binary, writes `config.yaml`, and drops the signed `profile.json` into
+`%ProgramData%\SecureEdge\`. The ADMX policy pins the browser-side
+`ExtensionInstallForcelist`.
+
+1. **Package the agent as a Win32 app.** Use the
+   `IntuneWinAppUtil.exe` tool against a folder containing:
+
+    ```
+    secure-edge-windows-amd64.exe
+    install.ps1
+    profile.json
+    config.yaml
+    ```
+
+    `install.ps1` is a thin wrapper that:
+
+    ```powershell
+    # Halt on first error so a partial install never silently
+    # leaves the endpoint in a half-configured state.
+    $ErrorActionPreference = 'Stop'
+    $PSNativeCommandUseErrorActionPreference = $true
+
+    $installDir = "$env:ProgramFiles\SecureEdge"
+    $dataDir = "$env:ProgramData\SecureEdge"
+
+    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+    Copy-Item secure-edge-windows-amd64.exe "$installDir\secure-edge-agent.exe"
+    Copy-Item config.yaml "$dataDir\"
+    Copy-Item profile.json "$dataDir\"
+
+    # The first-run bootstrap mints the api_token, writes
+    # %ProgramData%\SecureEdge\api_token, and starts fetching the
+    # signed manifest from rule_update_url. See §1 and §4.
+    & "$installDir\secure-edge-agent.exe" --install-service
+    ```
+
+    Detection rule: file exists at
+    `%ProgramFiles%\SecureEdge\secure-edge-agent.exe` AND
+    `%ProgramData%\SecureEdge\api_token`.
+
+2. **Device configuration policy — ADMX.** Use the Chrome ADMX
+   templates already installed in your Intune tenant. Configure:
+
+    - `ExtensionInstallForcelist`: append
+      `<extension-id>;https://clients2.google.com/service/update2/crx`.
+    - `ExtensionSettings`: paste the JSON from §10.2 inline.
+
+3. **Assignment scope.** Assign both the Win32 app and the ADMX policy
+   to the same Entra ID group. Stage the rollout: assign to a 5 % pilot
+   group with the lenient `bridge_mac_required: false` posture, watch
+   the agent log for `bridge MAC verification failed` warnings for one
+   week, then flip the policy to `bridge_mac_required: true` and
+   expand the assignment.
+
+#### 10.3.3 VMware Workspace ONE (cross-platform)
+
+Workspace ONE uses one **Product** per platform target. The
+cross-platform appeal is that the same `profile.json` plus public-key
+set ships to macOS, Windows, and Linux endpoints with only the
+file-system layout changing.
+
+1. **Files / Actions** payload — *Resources → Profiles & Baselines →
+   Files / Actions*. Upload `profile.json` as a single archive.
+   Per-platform extraction path:
+
+    | Platform | Extract to |
+    | --- | --- |
+    | macOS | `/etc/secure-edge/` |
+    | Windows | `%ProgramData%\SecureEdge\` |
+    | Linux | `/etc/secure-edge/` |
+
+2. **Custom Settings** payload — per platform, ship the `config.yaml`
+   from §10.1. Workspace ONE renders the YAML inline; no
+   plist-to-YAML translation step is required.
+
+3. **Sensors and compliance** — define a sensor that watches for the
+   agent's heartbeat (§7) and a compliance policy that flags any
+   endpoint where the heartbeat endpoint has not received a 200 OK in
+   the last 24 h. This catches an agent that has been killed without
+   the tray icon turning red.
+
+> **Workspace ONE signature gotcha.** Workspace ONE re-archives
+> uploaded payloads before deploying them. The on-disk filename has to
+> match what `config.yaml` references via `profile_path` — Workspace
+> ONE will rename files inside an archive in some configurations.
+> Verify with a single test endpoint before rolling out: the agent log
+> emits one line on profile load failure with the absolute path it
+> tried.
+
+### 10.4 Defence-in-depth checklist
 
 | Layer | Where it lives | Verified by |
 | --- | --- | --- |

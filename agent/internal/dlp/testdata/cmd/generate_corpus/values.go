@@ -1740,4 +1740,89 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["AWS Temporary Session Credentials"] = func(r *rand.Rand) string {
 		return "AWS_SESSION_TOKEN=" + randFromAlphabet(r, alnum+"+/=", 320)
 	}
+	// ---------------- Batch 12: Regional Cloud ----------------
+	valueGenerators["Yandex Cloud OAuth Token"] = func(r *rand.Rand) string {
+		return "y0_" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["Yandex Cloud IAM Token"] = func(r *rand.Rand) string {
+		return "t1." + randFromAlphabet(r, alnum+"_-", 100) + "." + randFromAlphabet(r, alnum+"_-", 100)
+	}
+	valueGenerators["Yandex Cloud Service Account Key"] = func(r *rand.Rand) string {
+		return "AQVN" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["Tencent Cloud Secret ID"] = func(r *rand.Rand) string {
+		return "AKID" + randAlnum(r, 32)
+	}
+	valueGenerators["Tencent Cloud Secret Key"] = func(r *rand.Rand) string {
+		return "TENCENT_SECRET_KEY=" + randAlnum(r, 32)
+	}
+	valueGenerators["Tencent COS Object Storage Token"] = func(r *rand.Rand) string {
+		return "COS_TOKEN=q-sign-algorithm=sha1&q-ak=AKID" + randAlnum(r, 32) + "&q-sign-time=1715000000;1715003600"
+	}
+	valueGenerators["Tencent SMS App Key"] = func(r *rand.Rand) string {
+		return "TENCENT_SMS_APPKEY=" + randHex(r, 32)
+	}
+	valueGenerators["Baidu Cloud Access Key"] = func(r *rand.Rand) string {
+		return "BAIDU_BCE_AK=" + randAlnum(r, 32)
+	}
+	valueGenerators["Baidu Cloud Secret Key"] = func(r *rand.Rand) string {
+		return "BAIDU_BCE_SK=" + randAlnum(r, 32)
+	}
+	valueGenerators["Baidu AI Open Platform Key"] = func(r *rand.Rand) string {
+		return "BAIDU_AI_API_KEY=" + randAlnum(r, 32)
+	}
+	valueGenerators["Alibaba Cloud Access Key ID"] = func(r *rand.Rand) string {
+		return "LTAI" + randAlnum(r, 18)
+	}
+	valueGenerators["Alibaba Cloud Access Key Secret"] = func(r *rand.Rand) string {
+		return "ALIBABA_CLOUD_ACCESS_KEY_SECRET=" + randAlnum(r, 30)
+	}
+	valueGenerators["Alibaba Cloud STS Token"] = func(r *rand.Rand) string {
+		return "ALIBABA_CLOUD_STS_TOKEN=CAIS" + randFromAlphabet(r, alnum+"+/=_-", 320)
+	}
+	valueGenerators["Alibaba Aliyun OSS Bucket Token"] = func(r *rand.Rand) string {
+		return "OSS LTAI" + randAlnum(r, 18) + ":" + randFromAlphabet(r, alnum+"+/=", 28)
+	}
+	valueGenerators["Huawei Cloud Access Key ID"] = func(r *rand.Rand) string {
+		return "HUAWEI_CLOUD_AK=" + randUpperAlnum(r, 20)
+	}
+	valueGenerators["Huawei Cloud Secret Access Key"] = func(r *rand.Rand) string {
+		return "HUAWEI_CLOUD_SK=" + randAlnum(r, 40)
+	}
+	valueGenerators["Naver Cloud Platform Access Key"] = func(r *rand.Rand) string {
+		return "NCP_ACCESS_KEY=" + randAlnum(r, 20)
+	}
+	valueGenerators["Naver Cloud Platform Secret Key"] = func(r *rand.Rand) string {
+		return "NCP_SECRET_KEY=" + randAlnum(r, 40)
+	}
+	valueGenerators["Naver Maps Client ID"] = func(r *rand.Rand) string {
+		return "NAVER_CLIENT_ID=" + randAlnum(r, 24)
+	}
+	valueGenerators["KT Cloud Access Token"] = func(r *rand.Rand) string {
+		return "KTCLOUD_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["KT Cloud Access Key"] = func(r *rand.Rand) string {
+		return "KTCLOUD_ACCESS_KEY=" + randAlnum(r, 24)
+	}
+	valueGenerators["NHN Cloud Auth Token"] = func(r *rand.Rand) string {
+		return "NHN_AUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["NHN Cloud App Key"] = func(r *rand.Rand) string {
+		return "NHN_APP_KEY=" + randAlnum(r, 32)
+	}
+	valueGenerators["Open Telekom Cloud Token"] = func(r *rand.Rand) string {
+		return "OTC_X_AUTH_TOKEN=gAAAAAB" + randFromAlphabet(r, alnum+"+/=_-", 280)
+	}
+	valueGenerators["Deutsche Telekom Cloud Key"] = func(r *rand.Rand) string {
+		return "DTAG_API_KEY=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Orange Flexible Engine Token"] = func(r *rand.Rand) string {
+		return "OFE_AUTH_TOKEN=MIIE" + randFromAlphabet(r, alnum+"+/=", 280)
+	}
+	valueGenerators["Rackspace Cloud Files API Key"] = func(r *rand.Rand) string {
+		return "RACKSPACE_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Scaleway Secret Key"] = func(r *rand.Rand) string {
+		return "SCW_SECRET_KEY=" + randUUID(r)
+	}
 }

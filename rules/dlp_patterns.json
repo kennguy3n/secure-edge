@@ -9040,6 +9040,481 @@
       "require_hotword": false,
       "entropy_min": 4.0,
       "category": "credential"
+    },
+    {
+      "name": "Yandex Cloud OAuth Token",
+      "regex": "y0_[A-Za-z0-9_\\-]{60,}",
+      "prefix": "y0_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "yandex",
+        "cloud",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Yandex Cloud IAM Token",
+      "regex": "t1\\.[A-Za-z0-9_\\-]{80,}\\.[A-Za-z0-9_\\-]{80,}",
+      "prefix": "t1.",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "yandex",
+        "iam",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Yandex Cloud Service Account Key",
+      "regex": "AQVN[A-Za-z0-9_\\-]{40,}",
+      "prefix": "aqvn",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "yandex",
+        "service account",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Tencent Cloud Secret ID",
+      "regex": "AKID[A-Za-z0-9]{32}",
+      "prefix": "akid",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "tencent",
+        "cloud",
+        "secret id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Tencent Cloud Secret Key",
+      "regex": "(?i)TENCENT_SECRET_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32}",
+      "prefix": "tencent_secret_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tencent",
+        "cloud",
+        "secret key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Tencent COS Object Storage Token",
+      "regex": "(?i)COS_TOKEN\\s*[:=]\\s*['\\\"]?q-sign-algorithm=sha1&q-ak=AKID[A-Za-z0-9]{30,}&q-sign-time=\\d+",
+      "prefix": "q-sign-algorithm=",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tencent",
+        "cos",
+        "object storage"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Tencent SMS App Key",
+      "regex": "(?i)TENCENT_SMS_APPKEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "tencent_sms_appkey",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tencent",
+        "sms",
+        "appkey"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Baidu Cloud Access Key",
+      "regex": "(?i)BAIDU_BCE_AK\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32}",
+      "prefix": "baidu_bce_ak",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "baidu",
+        "bce",
+        "access key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Baidu Cloud Secret Key",
+      "regex": "(?i)BAIDU_BCE_SK\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32}",
+      "prefix": "baidu_bce_sk",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "baidu",
+        "bce",
+        "secret key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Baidu AI Open Platform Key",
+      "regex": "(?i)BAIDU_AI_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24,}",
+      "prefix": "baidu_ai_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "baidu",
+        "ai",
+        "api key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Alibaba Cloud Access Key ID",
+      "regex": "LTAI[A-Za-z0-9]{12,20}",
+      "prefix": "ltai",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "alibaba",
+        "aliyun",
+        "access key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Alibaba Cloud Access Key Secret",
+      "regex": "(?i)ALIBABA_CLOUD_ACCESS_KEY_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{30}",
+      "prefix": "alibaba_cloud_access_key_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "alibaba",
+        "aliyun",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Alibaba Cloud STS Token",
+      "regex": "(?i)ALIBABA_CLOUD_STS_TOKEN\\s*[:=]\\s*['\\\"]?CAIS[A-Za-z0-9+/=_\\-]{200,}",
+      "prefix": "alibaba_cloud_sts_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "alibaba",
+        "sts",
+        "temporary"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Alibaba Aliyun OSS Bucket Token",
+      "regex": "OSS\\s+LTAI[A-Za-z0-9]{12,20}:[A-Za-z0-9+/=]{20,}",
+      "prefix": "oss ltai",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aliyun",
+        "oss",
+        "object storage"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Huawei Cloud Access Key ID",
+      "regex": "(?i)HUAWEI_CLOUD_AK\\s*[:=]\\s*['\\\"]?[A-Z0-9]{20}",
+      "prefix": "huawei_cloud_ak",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "huawei",
+        "cloud",
+        "hcs"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Huawei Cloud Secret Access Key",
+      "regex": "(?i)HUAWEI_CLOUD_SK\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40}",
+      "prefix": "huawei_cloud_sk",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "huawei",
+        "cloud",
+        "sk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Naver Cloud Platform Access Key",
+      "regex": "(?i)NCP_ACCESS_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20}",
+      "prefix": "ncp_access_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "naver",
+        "ncp",
+        "access key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Naver Cloud Platform Secret Key",
+      "regex": "(?i)NCP_SECRET_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40}",
+      "prefix": "ncp_secret_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "naver",
+        "ncp",
+        "secret key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Naver Maps Client ID",
+      "regex": "(?i)NAVER_CLIENT_ID\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9]{20,30}",
+      "prefix": "naver_client_id",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "naver",
+        "maps",
+        "clova"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "KT Cloud Access Token",
+      "regex": "(?i)KTCLOUD_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "ktcloud_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kt cloud",
+        "korea",
+        "ucloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "KT Cloud Access Key",
+      "regex": "(?i)KTCLOUD_ACCESS_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "ktcloud_access_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kt cloud",
+        "korea"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "NHN Cloud Auth Token",
+      "regex": "(?i)NHN_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "nhn_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "nhn",
+        "toast",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "NHN Cloud App Key",
+      "regex": "(?i)NHN_APP_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "nhn_app_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nhn",
+        "toast",
+        "app key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Open Telekom Cloud Token",
+      "regex": "(?i)OTC_X_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?gAAAAAB[A-Za-z0-9+/=_\\-]{200,}",
+      "prefix": "otc_x_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "open telekom",
+        "otc",
+        "keystone"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Deutsche Telekom Cloud Key",
+      "regex": "(?i)DTAG_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "dtag_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "deutsche telekom",
+        "dtag",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Orange Flexible Engine Token",
+      "regex": "(?i)OFE_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?MIIE[A-Za-z0-9+/=]{200,}",
+      "prefix": "ofe_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "orange",
+        "flexible engine",
+        "ofe"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Rackspace Cloud Files API Key",
+      "regex": "(?i)RACKSPACE_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "rackspace_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rackspace",
+        "cloud files",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Scaleway Secret Key",
+      "regex": "(?i)SCW_SECRET_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "scw_secret_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "scaleway",
+        "scw",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
     }
   ]
 }

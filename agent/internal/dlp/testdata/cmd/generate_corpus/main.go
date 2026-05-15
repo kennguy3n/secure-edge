@@ -648,6 +648,36 @@ var patternCategory = map[string]string{
 	"HashiCorp Boundary Token":                "secret_formats",
 	"AWS Temporary Session Credentials":       "secret_formats",
 
+	// Batch 12: Regional Cloud
+	"Yandex Cloud OAuth Token":         "regional_cloud",
+	"Yandex Cloud IAM Token":           "regional_cloud",
+	"Yandex Cloud Service Account Key": "regional_cloud",
+	"Tencent Cloud Secret ID":          "regional_cloud",
+	"Tencent Cloud Secret Key":         "regional_cloud",
+	"Tencent COS Object Storage Token": "regional_cloud",
+	"Tencent SMS App Key":              "regional_cloud",
+	"Baidu Cloud Access Key":           "regional_cloud",
+	"Baidu Cloud Secret Key":           "regional_cloud",
+	"Baidu AI Open Platform Key":       "regional_cloud",
+	"Alibaba Cloud Access Key ID":      "regional_cloud",
+	"Alibaba Cloud Access Key Secret":  "regional_cloud",
+	"Alibaba Cloud STS Token":          "regional_cloud",
+	"Alibaba Aliyun OSS Bucket Token":  "regional_cloud",
+	"Huawei Cloud Access Key ID":       "regional_cloud",
+	"Huawei Cloud Secret Access Key":   "regional_cloud",
+	"Naver Cloud Platform Access Key":  "regional_cloud",
+	"Naver Cloud Platform Secret Key":  "regional_cloud",
+	"Naver Maps Client ID":             "regional_cloud",
+	"KT Cloud Access Token":            "regional_cloud",
+	"KT Cloud Access Key":              "regional_cloud",
+	"NHN Cloud Auth Token":             "regional_cloud",
+	"NHN Cloud App Key":                "regional_cloud",
+	"Open Telekom Cloud Token":         "regional_cloud",
+	"Deutsche Telekom Cloud Key":       "regional_cloud",
+	"Orange Flexible Engine Token":     "regional_cloud",
+	"Rackspace Cloud Files API Key":    "regional_cloud",
+	"Scaleway Secret Key":              "regional_cloud",
+
 	// Batch 7: Container / Orchestration
 }
 

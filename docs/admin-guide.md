@@ -409,6 +409,9 @@ rule_update_public_key: "<32-byte hex>"    # signed rule manifest
 api_token_required: true                   # bearer-token guard
 bridge_mac_required: true                  # Native Messaging HMAC
 
+allowed_extension_ids:
+  - "<your-chrome-extension-id>"           # pin to your managed extension build
+
 profile_path: "/etc/secure-edge/profile.json"
 rule_update_url: "https://rules.example.com/manifest.json"
 rules_dir: "/etc/secure-edge/rules"

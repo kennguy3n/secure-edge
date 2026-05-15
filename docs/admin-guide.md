@@ -385,7 +385,7 @@ published anywhere public.
 | --- | --- | --- | --- |
 | `config.yaml` | macOS / Linux: `/etc/secure-edge/`<br>Windows: `%ProgramData%\secure-edge\` | Hand-authored from §2 | No (operator-controlled) |
 | `profile.json` | Path referenced by `profile_path` | `sign-enterprise-profile` (§3.1) | Yes — Ed25519 |
-| `manifest.json` + `rules/` | Path referenced by `rule_update_path` | `sign-rule-manifest` (§4) | Yes — Ed25519 |
+| `manifest.json` + `rules/` | Manifest fetched from `rule_update_url`; rule files unpacked into `rules_dir` | `sign-rule-manifest` (§4) | Yes — Ed25519 |
 | `api_token` | macOS / Linux: `/var/lib/secure-edge/api_token`<br>Windows: `%ProgramData%\secure-edge\api_token` | Generated per install on first run | n/a — secret |
 | `secure-edge-agent` binary | platform-canonical bin dir | GitHub Releases (verified per §1.1) | Yes — cosign + SLSA L3 |
 | Extension `.crx` / `.xpi` | Managed by browser policy | Web Store / signed `.crx` | Yes — Web Store key |
@@ -410,7 +410,8 @@ api_token_required: true                   # bearer-token guard
 bridge_mac_required: true                  # Native Messaging HMAC
 
 profile_path: "/etc/secure-edge/profile.json"
-rule_update_path: "/etc/secure-edge/manifest.json"
+rule_update_url: "https://rules.example.com/manifest.json"
+rules_dir: "/etc/secure-edge/rules"
 api_token_path: "/var/lib/secure-edge/api_token"
 ```
 

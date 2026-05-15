@@ -62,6 +62,18 @@ type Pattern struct {
 	// still sees them.
 	Category string `json:"category,omitempty"`
 
+	// ContentTypes restricts which classifier verdicts this pattern
+	// is allowed to fire on. An empty / nil slice means "any content
+	// type" (backwards compatible — patterns loaded before the
+	// classifier wiring landed have no ContentTypes set and continue
+	// to match every classification). When non-empty, candidates
+	// produced from content classified as something not in this list
+	// are dropped at the filterCandidates step before the
+	// regex-validation pass, which is the expensive one. The intent
+	// is to keep language-specific code patterns (e.g. Java password
+	// literals) from firing on prose containing the word "String".
+	ContentTypes []ContentType `json:"content_types,omitempty"`
+
 	// Compiled is populated by LoadPatterns; nil until compiled.
 	Compiled *regexp.Regexp `json:"-"`
 }

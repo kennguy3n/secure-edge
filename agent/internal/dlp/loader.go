@@ -48,8 +48,34 @@ func ParsePatterns(raw []byte) ([]*Pattern, error) {
 		if p.Category == "" {
 			p.Category = CategoryUncategorized
 		}
+		for _, ct := range p.ContentTypes {
+			if !isKnownContentType(ct) {
+				return nil, fmt.Errorf(
+					"dlp: pattern %q: unknown content_type %q "+
+						"(must be one of %q, %q, %q, %q)",
+					p.Name, ct,
+					CodeContent, StructuredData,
+					CredentialsBlock, NaturalLanguage,
+				)
+			}
+		}
 	}
 	return body.Patterns, nil
+}
+
+// isKnownContentType reports whether ct is one of the four classifier
+// verdicts. ContentTypes is parsed from JSON, so a typo like "Code" or
+// "natual" would deserialise cleanly into a string that never matches
+// any classifier output and silently disables the owning pattern for
+// every scan. We reject such values at load time instead so misspelled
+// content_types fail loudly.
+func isKnownContentType(ct ContentType) bool {
+	switch ct {
+	case CodeContent, StructuredData, CredentialsBlock, NaturalLanguage:
+		return true
+	default:
+		return false
+	}
 }
 
 // LoadExclusions reads exclusions from path and compiles each regex

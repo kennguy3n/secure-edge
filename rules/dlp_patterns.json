@@ -731,7 +731,10 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "code_secret"
+      "category": "code_secret",
+      "content_types": [
+        "code"
+      ]
     },
     {
       "name": "Internal URLs",
@@ -1811,7 +1814,11 @@
       "hotword_boost": 1,
       "require_hotword": true,
       "entropy_min": 3.0,
-      "category": "database_registry"
+      "category": "database_registry",
+      "content_types": [
+        "credentials",
+        "structured"
+      ]
     },
     {
       "name": "Docker Registry Auth",

@@ -54,6 +54,15 @@ type Pipeline struct {
 	// categories active).
 	disabledCategories map[string]struct{}
 
+	// hasContentTypeFilter is true iff at least one loaded pattern
+	// has a non-empty Pattern.ContentTypes. Cached at Rebuild time so
+	// the hot per-scan path does not need to walk the entire pattern
+	// set to discover that nobody uses the content_types field. When
+	// false, Scan skips ClassifyContent entirely and filterCandidates
+	// reaches its original fast-path early return when no other
+	// adaptive filter (large payload, disabled categories) is active.
+	hasContentTypeFilter bool
+
 	// cache deduplicates identical pastes that arrive in rapid
 	// succession (paste + form-submit + fetch interceptors).
 	cache *ScanCache
@@ -160,10 +169,18 @@ func (p *Pipeline) Categories() []string {
 // updated (POST /api/rules/update or future automatic rule sync).
 func (p *Pipeline) Rebuild(patterns []*Pattern, exclusions []Exclusion) {
 	auto := BuildAutomaton(patterns)
+	hasContentTypeFilter := false
+	for _, pat := range patterns {
+		if pat != nil && len(pat.ContentTypes) > 0 {
+			hasContentTypeFilter = true
+			break
+		}
+	}
 	p.mu.Lock()
 	p.patterns = patterns
 	p.automaton = auto
 	p.exclusions = exclusions
+	p.hasContentTypeFilter = hasContentTypeFilter
 	cache := p.cache
 	p.mu.Unlock()
 	cache.Reset()
@@ -238,6 +255,7 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	threshold := p.threshold
 	largeThreshold := p.largeThreshold
 	disabledCats := p.disabledCategories
+	hasContentTypeFilter := p.hasContentTypeFilter
 	cache := p.cache
 	p.mu.RUnlock()
 
@@ -254,18 +272,27 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 		largeThreshold = LargeContentThreshold
 	}
 
-	// Step 1: classify content — currently used to short-circuit
-	// scans of obviously-empty input and to label the result for
-	// future per-class pattern subsets.
-	_ = ClassifyContent(content)
+	// Step 1: classify content — but only when at least one loaded
+	// pattern actually declares a content_types restriction. The flag
+	// is precomputed at Rebuild time so the common case (no pattern
+	// scoped to a classifier verdict) skips the classifier entirely
+	// and lets filterCandidates take its existing fast-path early
+	// return. ClassifyContent is documented to never return "", so we
+	// use the empty value here as a sentinel for "no content-type
+	// filtering requested".
+	var contentType ContentType
+	if hasContentTypeFilter {
+		contentType = ClassifyContent(content)
+	}
 
 	// Step 2: Aho-Corasick prefix scan.
 	candidates := auto.Scan(content)
 
-	// Adaptive scanning + category filter: drop candidates whose
-	// patterns are disabled by category or de-prioritised for very
-	// large payloads.
-	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats)
+	// Adaptive scanning + category filter + content-type filter: drop
+	// candidates whose patterns are disabled by category, are
+	// de-prioritised for very large payloads, or are scoped to a
+	// classifier verdict that does not match contentType.
+	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats, contentType)
 
 	// Step 3: regex validation of candidates.
 	matches := ValidateCandidates(content, candidates)
@@ -416,21 +443,35 @@ func scanConcurrent(
 	return best
 }
 
-// filterCandidates implements adaptive scanning and category
-// filtering. For payloads larger than largeThreshold we drop candidates
-// whose Pattern severity is "low" or "medium" — large pastes pay the
-// per-candidate regex cost on critical/high patterns only.
+// filterCandidates implements adaptive scanning, category filtering,
+// and content-type filtering. For payloads larger than largeThreshold
+// we drop candidates whose Pattern severity is "low" or "medium" —
+// large pastes pay the per-candidate regex cost on critical/high
+// patterns only. A pattern with a non-empty ContentTypes list is
+// dropped when contentType is not in that list; patterns with an
+// empty ContentTypes list match every classification (backwards
+// compatible).
+//
+// A zero-value contentType is the caller's signal that no
+// content-type filtering should be applied — e.g. when the owning
+// Pipeline detected at Rebuild time that no loaded pattern declares a
+// ContentTypes list, Scan skips ClassifyContent entirely and passes
+// the empty value here so the fast-path early return below (no large
+// payload, no disabled categories, no content-type filter) can fire
+// just like it did before the classifier wiring landed.
 func filterCandidates(
 	in []Candidate,
 	contentLen int,
 	largeThreshold int,
 	disabledCategories map[string]struct{},
+	contentType ContentType,
 ) []Candidate {
 	if len(in) == 0 {
 		return in
 	}
 	large := contentLen >= largeThreshold
-	if !large && len(disabledCategories) == 0 {
+	hasContentType := contentType != ""
+	if !large && len(disabledCategories) == 0 && !hasContentType {
 		return in
 	}
 	out := in[:0]
@@ -448,6 +489,9 @@ func filterCandidates(
 				continue
 			}
 		}
+		if hasContentType && len(pat.ContentTypes) > 0 && !contentTypeAllowed(pat.ContentTypes, contentType) {
+			continue
+		}
 		if large {
 			switch pat.Severity {
 			case SeverityCritical, SeverityHigh:
@@ -459,4 +503,16 @@ func filterCandidates(
 		out = append(out, c)
 	}
 	return out
+}
+
+// contentTypeAllowed reports whether ct appears in allowed. Tiny
+// helper kept separate from filterCandidates so the per-candidate
+// loop stays readable.
+func contentTypeAllowed(allowed []ContentType, ct ContentType) bool {
+	for _, a := range allowed {
+		if a == ct {
+			return true
+		}
+	}
+	return false
 }

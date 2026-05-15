@@ -10,6 +10,29 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP classifier-scoped patterns.** `Pattern` now accepts an optional
+  `content_types` field (any subset of `code`, `structured`, `credentials`,
+  `natural`) that restricts which `ClassifyContent` verdicts a pattern is
+  allowed to fire on. The pipeline captures the classifier verdict and the
+  AC filter step drops candidates whose pattern is scoped to a verdict the
+  current content does not match — so language-specific shapes such as
+  `String x = "..."` cannot fire on prose that happens to share the prefix.
+  Patterns with no `content_types` continue to match every classification
+  (backwards compatible). The loader rejects unknown verdicts (typos like
+  `"Code"` or `"natual"`) at load time so a misspelled value cannot
+  silently disable a pattern. The pipeline precomputes a
+  `hasContentTypeFilter` flag at `Rebuild` time and skips `ClassifyContent`
+  entirely when no loaded pattern uses the field, so installs that do not
+  rely on classifier scoping pay zero per-scan classifier cost. Initial
+  scoping is intentionally conservative: only `Source Code Imports`
+  (`["code"]`, regex already requires ≥1 import/package line by
+  construction) and `Kubernetes Secret YAML`
+  (`["credentials", "structured"]`, already gated by `require_hotword:
+  true`) are tagged in this PR — the JSON-paste-style patterns whose own
+  regex captures enclosing JSON braces were left untagged to avoid the
+  document-level-classifier FN edge case (a secret pasted inside a
+  prose-dominant document would otherwise be dropped). Documented in
+  [`docs/dlp-pattern-authoring-guide.md`](docs/dlp-pattern-authoring-guide.md).
 - **Capability tokens and extension pinning.** Per-install API capability
   token issued at `api_token_path` (32-byte hex, mode `0600`), with
   `api_token_required` enforcing the `Authorization: Bearer` header on

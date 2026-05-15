@@ -20,6 +20,7 @@ graph TD
     subgraph "Layer 2 — DLP inspection"
         I["Browser extension"] -->|"Native Messaging / HTTP"| B
         B -->|"layered pipeline"| J["DLP scanner"]
+        J -->|"score below threshold"| L["Allow"]
         J -->|"score ≥ threshold"| K["Block + ephemeral notification"]
     end
 

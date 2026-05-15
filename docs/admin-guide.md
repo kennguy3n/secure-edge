@@ -26,7 +26,7 @@ detection works even before the first rule update.
 
 Every release ships with a `SHA256SUMS` manifest, a Sigstore keyless
 signature over that manifest, per-artefact `.sig` / `.pem` files,
-CycloneDX 1.5 SBOMs, and a SLSA build provenance attestation. Run the
+CycloneDX 1.6 SBOMs, and a SLSA build provenance attestation. Run the
 verification recipe in [SECURITY.md](../SECURITY.md#verifying-a-release)
 before pushing a build to managed endpoints — it confirms the artefact
 was emitted by this repository's `Release` workflow on a `v*` tag and

@@ -130,9 +130,6 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 - Aho-Corasick automaton switched to `MatchThreadSafe()`, so the
   worker-pool path no longer drops hits under concurrent access.
-- Several accessibility regressions in the Electron tray: tablist
-  arrow-key navigation, visible focus rings, and labelled form
-  controls.
 
 ## [0.4.0] — 2026-05-12
 

@@ -355,6 +355,157 @@ func TestFilterCandidates_RespectsContentTypeAndPreservesCategoryFilter(t *testi
 	}
 }
 
+// TestContentTypes_LoaderRejectsUnknownValue locks the contract that
+// ParsePatterns refuses to load a pattern whose content_types contains
+// a value that is not one of the four ContentType constants. The risk
+// the validation defends against: a misspelled or wrong-case value
+// like "Code" or "natual" would deserialise into a string that never
+// matches any ClassifyContent verdict, which would silently disable
+// the owning pattern for every scan instead of failing loudly. The
+// behaviour is part of the loader's API and any change here is a
+// rule-format change that needs to be deliberate.
+func TestContentTypes_LoaderRejectsUnknownValue(t *testing.T) {
+	cases := []struct {
+		label string
+		body  string
+	}{
+		{
+			label: "wrong case",
+			body: `{"patterns":[{"name":"P","regex":"A[A-Z]{5}",` +
+				`"prefix":"A","severity":"low","score_weight":1,` +
+				`"hotwords":[],"hotword_window":0,"hotword_boost":0,` +
+				`"require_hotword":false,"entropy_min":0,` +
+				`"content_types":["Code"]}]}`,
+		},
+		{
+			label: "typo",
+			body: `{"patterns":[{"name":"P","regex":"A[A-Z]{5}",` +
+				`"prefix":"A","severity":"low","score_weight":1,` +
+				`"hotwords":[],"hotword_window":0,"hotword_boost":0,` +
+				`"require_hotword":false,"entropy_min":0,` +
+				`"content_types":["natual"]}]}`,
+		},
+		{
+			label: "mixed valid+invalid",
+			body: `{"patterns":[{"name":"P","regex":"A[A-Z]{5}",` +
+				`"prefix":"A","severity":"low","score_weight":1,` +
+				`"hotwords":[],"hotword_window":0,"hotword_boost":0,` +
+				`"require_hotword":false,"entropy_min":0,` +
+				`"content_types":["code","credentialz"]}]}`,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.label, func(t *testing.T) {
+			pats, err := ParsePatterns([]byte(tc.body))
+			if err == nil {
+				t.Fatalf("expected ParsePatterns to fail on %q, got patterns=%+v", tc.label, pats)
+			}
+		})
+	}
+}
+
+// TestContentTypes_PipelineSkipsClassifierWhenNoPatternTagged guards
+// the fast-path optimisation: when no loaded pattern has a non-empty
+// ContentTypes, Pipeline.Rebuild precomputes hasContentTypeFilter as
+// false and Scan must skip ClassifyContent entirely. The contract we
+// pin here is the externally visible one: an untagged pattern fires
+// on prose content (which the classifier would label NaturalLanguage)
+// exactly as it did before the wiring landed. The "skipped" part is
+// not directly observable from outside the pipeline, but the
+// behaviour assertion is the one that actually matters for
+// correctness, and the unit test for filterCandidates above already
+// covers the contentType=="" sentinel path.
+func TestContentTypes_PipelineSkipsClassifierWhenNoPatternTagged(t *testing.T) {
+	raw := []byte(`{"patterns":[
+{"name":"Untagged Demo","regex":"UNTAGDEMO[A-Z0-9]{15}","prefix":"UNTAGDEMO",
+ "severity":"critical","score_weight":1,"hotwords":[],"hotword_window":0,
+ "hotword_boost":0,"require_hotword":false,"entropy_min":0}
+]}`)
+	pats, err := ParsePatterns(raw)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+	p := NewPipeline(DefaultScoreWeights(), nil)
+	p.Rebuild(pats, nil)
+	prose := "Yesterday afternoon we caught an UNTAGDEMOABCDEFGHIJKLMNO " +
+		"floating in the activity feed of the platform; please rotate it."
+	if ct := ClassifyContent(prose); ct != NaturalLanguage {
+		t.Fatalf("fixture classified as %q, want natural", ct)
+	}
+	res := p.Scan(context.Background(), prose)
+	if !res.Blocked {
+		t.Fatalf("untagged pattern must fire on prose with hasContentTypeFilter=false, got %+v", res)
+	}
+}
+
+// TestContentTypes_MixedContentDocumentsTradeoff pins the known
+// limitation of the document-level classifier raised in the PR #41
+// review: ClassifyContent operates on the whole content string, so a
+// pattern scoped to ContentTypes=["structured"] is dropped when the
+// dominant content shape is natural-language prose even though the
+// pattern's regex matches a substring of it. The test exists so the
+// tradeoff is visible to future contributors and so any change to it
+// (e.g. a future window-based classifier) is deliberate.
+//
+// Note for production-pattern authors: the classifier's looksLikeJSON
+// check fires on any document that contains both `{` and `}` plus a
+// `":` token, so paste-style patterns whose own regex captures the
+// surrounding JSON braces (AWS Secrets Manager SecretString, Azure
+// Key Vault GetSecret, GCR JSON key, …) effectively force the
+// document to classify as structured by virtue of their own match —
+// the FN documented here only bites patterns whose regex does NOT
+// require enclosing JSON shape, which is why the W2 PR shipped with
+// the structured-scoped paste patterns un-tagged.
+func TestContentTypes_MixedContentDocumentsTradeoff(t *testing.T) {
+	patternsJSON := []byte(`{"patterns":[
+{"name":"Structured-Only Demo","regex":"MIXDEMO[A-Z0-9]{12}","prefix":"MIXDEMO",
+ "severity":"critical","score_weight":1,"hotwords":[],"hotword_window":400,
+ "hotword_boost":2,"require_hotword":false,"entropy_min":0,
+ "content_types":["structured"]}
+]}`)
+	pats, err := ParsePatterns(patternsJSON)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+	p := NewPipeline(DefaultScoreWeights(), nil)
+	p.Rebuild(pats, nil)
+
+	purelyStructured := `{"token": "MIXDEMOABCDEF123456", "scope": "prod"}`
+	if ct := ClassifyContent(purelyStructured); ct != StructuredData {
+		t.Fatalf("pure JSON classified as %q, want structured", ct)
+	}
+	if res := p.Scan(context.Background(), purelyStructured); !res.Blocked {
+		t.Fatalf("structured-scoped pattern must fire on pure JSON, got %+v", res)
+	}
+
+	// The fixture below is deliberately a prose paragraph that
+	// quotes the token without enclosing JSON braces or any `":`
+	// sequence, so looksLikeJSON, looksLikeCSV, and the kv-line gate
+	// all decline and ClassifyContent falls through to
+	// NaturalLanguage. Adding `{`, `}`, or `":` here would flip the
+	// verdict to structured and the FN below would no longer
+	// reproduce.
+	mixed := "Hello team. During the migration window today we noticed " +
+		"an unexpected error from the upstream rotation service. The " +
+		"on-call engineer shared the token (MIXDEMOABCDEF123456) from " +
+		"the incident ticket; please verify it lands in vault before " +
+		"we close the bridge. Let me know once you have rotated it."
+	if ct := ClassifyContent(mixed); ct != NaturalLanguage {
+		t.Fatalf("mixed-content fixture classified as %q, want natural "+
+			"(test depends on this so the FN documented below is observable)", ct)
+	}
+	res := p.Scan(context.Background(), mixed)
+	if res.Blocked {
+		t.Fatalf("documented tradeoff: structured-scoped pattern is "+
+			"DROPPED in a prose-dominant document, but Scan returned "+
+			"Blocked=true with %+v — either the classifier got smarter "+
+			"or the filterCandidates contract changed; revisit which "+
+			"production patterns are tagged ['structured'] in light of "+
+			"the new behaviour", res)
+	}
+}
+
 func candidateNames(cs []Candidate) []string {
 	out := make([]string, 0, len(cs))
 	for _, c := range cs {

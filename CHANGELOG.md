@@ -18,10 +18,20 @@ changes between feature releases — breaking entries are flagged explicitly.
   current content does not match — so language-specific shapes such as
   `String x = "..."` cannot fire on prose that happens to share the prefix.
   Patterns with no `content_types` continue to match every classification
-  (backwards compatible). Initial scoping is intentionally conservative
-  (Source Code Imports → code; Kubernetes Secret YAML →
-  credentials+structured; the four cloud Secret-Manager paste patterns +
-  Docker registry auth + GCP service account → structured). Documented in
+  (backwards compatible). The loader rejects unknown verdicts (typos like
+  `"Code"` or `"natual"`) at load time so a misspelled value cannot
+  silently disable a pattern. The pipeline precomputes a
+  `hasContentTypeFilter` flag at `Rebuild` time and skips `ClassifyContent`
+  entirely when no loaded pattern uses the field, so installs that do not
+  rely on classifier scoping pay zero per-scan classifier cost. Initial
+  scoping is intentionally conservative: only `Source Code Imports`
+  (`["code"]`, regex already requires ≥1 import/package line by
+  construction) and `Kubernetes Secret YAML`
+  (`["credentials", "structured"]`, already gated by `require_hotword:
+  true`) are tagged in this PR — the JSON-paste-style patterns whose own
+  regex captures enclosing JSON braces were left untagged to avoid the
+  document-level-classifier FN edge case (a secret pasted inside a
+  prose-dominant document would otherwise be dropped). Documented in
   [`docs/dlp-pattern-authoring-guide.md`](docs/dlp-pattern-authoring-guide.md).
 - **Capability tokens and extension pinning.** Per-install API capability
   token issued at `api_token_path` (32-byte hex, mode `0600`), with

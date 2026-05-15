@@ -226,10 +226,7 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "cloud",
-      "content_types": [
-        "structured"
-      ]
+      "category": "cloud"
     },
     {
       "name": "GCP OAuth Client Secret",
@@ -1840,10 +1837,7 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 3.0,
-      "category": "database_registry",
-      "content_types": [
-        "structured"
-      ]
+      "category": "database_registry"
     },
     {
       "name": "Helm Values Password",
@@ -2696,10 +2690,7 @@
       "hotword_boost": 2,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "database_registry",
-      "content_types": [
-        "structured"
-      ]
+      "category": "database_registry"
     },
     {
       "name": "AWS Secrets Manager SecretString Paste",
@@ -2718,10 +2709,7 @@
       "hotword_boost": 2,
       "require_hotword": true,
       "entropy_min": 3.0,
-      "category": "cloud",
-      "content_types": [
-        "structured"
-      ]
+      "category": "cloud"
     },
     {
       "name": "Azure Key Vault GetSecret Paste",
@@ -2739,10 +2727,7 @@
       "hotword_boost": 2,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "cloud",
-      "content_types": [
-        "structured"
-      ]
+      "category": "cloud"
     },
     {
       "name": "GCP Secret Manager Payload Paste",
@@ -2761,10 +2746,7 @@
       "hotword_boost": 2,
       "require_hotword": true,
       "entropy_min": 3.5,
-      "category": "cloud",
-      "content_types": [
-        "structured"
-      ]
+      "category": "cloud"
     },
     {
       "name": "OAuth2 Refresh Token Assignment",

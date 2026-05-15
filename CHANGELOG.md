@@ -200,6 +200,63 @@ may introduce breaking changes between feature releases.
   script can fall back after a worker eviction. Toast: a new
   `risky-extension` `PolicyReason` variant surfaces `Secure Edge
   blocked this upload — .exe files are blocked by policy.`
+- **C3**: Adversarial test table for the MAIN ↔ ISO postMessage
+  bridge. New
+  `extension/src/content/__tests__/network-interceptor.adversarial.test.ts`
+  pins the bridge's threat-model boundary in 10 named rows:
+  the `isScanRequest` type guard rejects mistyped / missing
+  fields and accepts forward-compatible extra fields;
+  `handleBridgeMessage` no-ops on guard-rejected shapes;
+  `requestScan` ignores `scan-resp` messages with an unknown id;
+  the relay does not respond to its own `scan-resp` echoed back
+  as a `scan-req`; concurrent `handleBridgeMessage` calls keep
+  their replies separate; a throwing scan collapses to a `null`
+  verdict (no unhandled rejection); the relay forwards the
+  content field byte-for-byte (no in-bridge sanitisation). Two
+  rows pin the documented "cannot defend at the content-script
+  layer" failure modes (well-formed page-forged `scan-req` runs
+  the scan; matching-id forgery on `scan-resp` wins the race)
+  with cross-references to the C1 HMAC bridge (extension ↔
+  agent native messaging) and A2 bearer token (agent HTTP
+  loopback) — the actual defences for those cells live on the
+  next hop, not in the postMessage relay.
+- **B3**: Clipboard-paste file scanning. The `paste-interceptor`
+  content script now reads `clipboardData.files` AND
+  `clipboardData.items[i].getAsFile()` for every paste gesture
+  on a Tier-2 AI tool surface. The file path runs through the
+  same risky-extension guard (B2 / PR #27) and DLP scan
+  pipeline (B1 / PR #22) as `<input type=file>` uploads, with
+  the same synchronous-first contract: `preventDefault()` and
+  `stopPropagation()` fire BEFORE any `await`. The pre-B3
+  text-paste behaviour is unchanged; the FILE path is a
+  separate branch in `onPaste`. On a mixed text+file paste the
+  FILE path wins (more-conservative rule); the text fragment is
+  never forwarded to the agent. On a clean file verdict the
+  gesture stays suppressed (no portable way to programmatically
+  re-construct `DataTransfer.files` on the page side, matching
+  the no-resume contract in `file-upload-interceptor`). Tests:
+  new `paste-interceptor.test.ts` with 22 cases covering the
+  helper exports plus 13 numbered rows for text-only / file-only
+  / mixed / risky / oversize / agent-unavailable / null-data
+  scenarios.
+- **D4**: Managed-deployment (MDM) admin guide. New §10 in
+  `docs/admin-guide.md` covers per-organisation bundle
+  generation (signed `profile.json`, signed `manifest.json`,
+  bearer token, agent binary, browser extension); Chrome
+  Enterprise managed policies (`ExtensionInstallForcelist`,
+  `ExtensionSettings`, `ManagedConfigurationPerOrigin`); and
+  per-platform walkthroughs for JAMF Pro (macOS, Configuration
+  Profile + Files & Processes + Restricted Software), Microsoft
+  Intune (Windows, Win32 app + ADMX device-configuration
+  policy), and VMware Workspace ONE (cross-platform, Files /
+  Actions + Custom Settings). A "see also" line points to the
+  Apple device-management docs for Kandji, Mosyle, and
+  SimpleMDM (same payload shape, different upload mechanism).
+  Closes with a six-row defence-in-depth checklist mapping
+  every Phase 7 control (A2 bearer, C1 HMAC, A3 signed
+  manifest, D2 signed profile, B2 risky-extension blocklist,
+  browser policy) to where it lives in the bundle and how to
+  verify it from the agent log or a single API probe.
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

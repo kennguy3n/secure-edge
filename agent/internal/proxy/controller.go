@@ -88,6 +88,18 @@ func (c *Controller) Enable(ctx context.Context) (string, error) {
 			return "", err
 		}
 		c.ca = ca
+	} else {
+		// On every subsequent Enable() the in-memory CA is the
+		// source of truth for leaf signing, but a runtime
+		// permission widening on the on-disk key would still let
+		// a second user re-load the same key out-of-band. Re-stat
+		// the file here so a tampered key surface fails closed
+		// even when c.ca is already populated. checkKeyPermissions
+		// is a no-op on Windows where mode bits are not the
+		// access-control mechanism.
+		if err := checkKeyPermissions(c.cfg.KeyPath); err != nil {
+			return "", err
+		}
 	}
 	if c.server == nil {
 		srv, err := New(c.ca, c.cfg.Policy, c.cfg.Scanner, c.cfg.Stats)

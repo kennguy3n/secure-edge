@@ -536,11 +536,25 @@ func (s *Server) Handler() http.Handler {
 
 // ListenAndServe starts the HTTP server in a background goroutine and
 // returns the *http.Server so callers can shut it down gracefully.
+//
+// Timeouts mirror the local-loopback usage of this server: the
+// Electron tray, browser extension, and CLI tools are the only
+// callers, and they hit short JSON endpoints. Anything that takes
+// longer than a few seconds is either a misbehaving client or a
+// resource leak, so the wall-clock budgets below cap both. The
+// 16 KiB MaxHeaderBytes is well above the largest Authorization +
+// Origin + UA + Host header tuple any real caller sends and below
+// the default 1 MiB ceiling that would let a hostile client buffer
+// megabytes of headers per connection.
 func (s *Server) ListenAndServe(addr string) (*http.Server, error) {
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10, // 16 KiB
 	}
 	errCh := make(chan error, 1)
 	go func() {

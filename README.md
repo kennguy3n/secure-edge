@@ -180,6 +180,114 @@ invariant as the base agent.
   `POST /api/rules/override` and DLP threshold sliders backed by
   `PUT /api/dlp/config`.
 
+## Security posture
+
+### Enforcement modes
+
+The agent ships with three enforcement presets. The decision is
+driven by `enforcement_mode` in `config.yaml`; the secure-defaults
+validator (`ValidateEnforcementRequirements` in
+`agent/internal/config/config.go`) refuses to start `team` or
+`managed` unless every required control is configured.
+
+| Mode       | Default auth                        | MAC mismatch     | Agent unavailable | Oversize body | Profiles         | Target                       |
+|------------|-------------------------------------|------------------|-------------------|----------------|------------------|------------------------------|
+| `personal` | None (permissive)                   | Warn & fall open | Fall open silent  | Fall open      | Unsigned ok      | Individual developer         |
+| `team`     | Bearer token + extension pinning    | Warn & fall open | Warn toast        | Fall open      | Unsigned ok      | Small team pilots            |
+| `managed`  | Bearer + pinning + bridge HMAC + signed profiles + signed rules | **Block** | **Block**  | **Block**      | **Signed required** | MDM-deployed enterprise |
+
+`team` and `managed` modes **refuse to start** unless every required
+control is configured. This is not optional — a misconfigured
+managed install fails at boot with a human-readable error naming
+the missing field (see `config_test.go` for the full matrix of
+rejected shapes).
+
+In `managed`, the extension matches the agent's fail-closed posture:
+a missing or mismatched Native Messaging response MAC discards the
+result and routes the upload through `policyForUnavailable("managed")
+=== "block"`. The same path catches `ReadableStream` fetch bodies
+(which `bodyValueToTextAsync` cannot tee safely) and any scan
+timeout. In `personal` and `team` those failure modes preserve the
+legacy fall-open / warn-and-allow posture so the privacy-first
+defaults are unchanged.
+
+### Extension vs. proxy enforcement boundary
+
+The browser extension is a **coaching layer** for honest-user DLP.
+It catches paste / drop / submit / fetch / XHR in the patched
+content-script bridge and surfaces a block toast in the page. It
+cannot prevent:
+
+- A hostile page that runs JS before the extension's
+  `document_start` injection point and bypasses the patched
+  `fetch` / `XHR` entirely.
+- A compromised or removed extension (the agent has no way to
+  cryptographically attest the extension is the one it pinned).
+- A non-browser client (a CLI tool, a packaged Electron app, a
+  Python script) that talks directly to the AI provider's API.
+- A page that exfiltrates via a side channel the extension does not
+  hook (WebSockets after `Sec-WebSocket-Key`, `navigator.sendBeacon`
+  bodies that arrive on a different event loop tick, server-sent
+  events, etc.).
+
+For hard enforcement, deploy:
+
+- The local MITM proxy (`proxy_enabled: true`) so every Tier-2 host's
+  TLS is terminated locally and the DLP pipeline sees the cleartext
+  request body before it leaves the box.
+- Managed browser policies — Chrome `URLBlocklist` /
+  `URLAllowlist`, Firefox `policies.json`, Edge group-policy
+  equivalents — so the user cannot uninstall the extension or
+  override its allowlist.
+- OS-level egress controls (WFP filters on Windows, Network
+  Extension content filters on macOS, nftables / iptables on Linux)
+  that block direct connections to Tier-2 hostnames bypassing the
+  MITM proxy.
+
+The full boundary analysis lives in
+[docs/admin-guide.md §8](./docs/admin-guide.md). The agent's CA
+private key for the MITM proxy is mode-checked on every load:
+group / world bits on the key file fail the proxy boot with a
+human-readable error (see
+[`agent/internal/proxy/ca.go`](./agent/internal/proxy/ca.go)).
+
+### DLP accuracy methodology
+
+163 patterns across 13 categories (the full breakdown is in the
+[DLP coverage](#dlp-coverage) section below). Accuracy is enforced
+by three CI-gated layers, each pinned in `agent/internal/dlp/`:
+
+| Layer        | Corpus size | Budget                                                       | Source                                                                 |
+|--------------|-------------|--------------------------------------------------------------|------------------------------------------------------------------------|
+| Smoke        | 50          | FP rate < 10 %, FN rate < 5 %                                | [`accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)        |
+| Large        | 5 000+      | FP rate < 5 %, FN rate < 3 %, per-category FN < 10 %         | [`accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)        |
+| Regression   | full corpus | per-category recall must not drop > 2 pp; FP must not rise > 1 pp vs the committed baseline | [`accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go) |
+
+The smoke test runs on every `go test` (no tag); large and
+regression runs are gated behind `-tags=large` so the default
+developer workflow stays fast. CI runs all three.
+
+The corpus is fully synthetic — no real secrets are committed.
+True-positive samples are generated by a deterministic generator;
+true-negatives are realistic benign content (code, logs, docs,
+docstrings) chosen to trip naive regex patterns but contain no
+secret the agent should block. Composition and contribution rules
+live in
+[`agent/internal/dlp/testdata/corpus/README.md`](./agent/internal/dlp/testdata/corpus/README.md).
+
+### HTTP surface hardening
+
+Every HTTP listener the agent owns runs with a full timeout tuple
+(`ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`)
+plus a 16 KiB `MaxHeaderBytes` so a slowloris or a malicious
+header buffer cannot pin a listener thread. Control endpoints that
+take JSON bodies are wrapped in `http.MaxBytesReader(64 KiB)` and
+return `413 Request Entity Too Large` on overflow — the agent will
+not buffer megabytes of attacker-controlled JSON. The control API
+exception list (4 MiB for `/api/dlp/scan`, 1 MiB for
+`/api/profile/import`) is enumerated in
+[`agent/internal/api/handlers.go`](./agent/internal/api/handlers.go).
+
 ## Testing
 
 ```bash

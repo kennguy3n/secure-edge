@@ -664,11 +664,14 @@ func (s *Server) handleRulesUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	// Body cap must be in place before any early-return guard so a
+	// 503 path (no updater wired) still bounds the post-response
+	// drain. Same reasoning in handleProxyEnable / handleAgentUpdate.
+	capControlBody(w, r)
 	if s.RuleUpdater == nil {
 		writeError(w, http.StatusServiceUnavailable, "rule updater not configured")
 		return
 	}
-	capControlBody(w, r)
 	// Outbound HTTPS to fetch the signed rule manifest can exceed the
 	// server-wide 10 s WriteTimeout; the RuleUpdater client has its
 	// own timeout that bounds the operation.
@@ -715,11 +718,11 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	capControlBody(w, r)
 	if s.Proxy == nil {
 		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
 		return
 	}
-	capControlBody(w, r)
 	caPath, err := s.Proxy.Enable(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "enable proxy: "+err.Error())
@@ -1067,6 +1070,7 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	capControlBody(w, r)
 	if s.AgentUpdate == nil {
 		writeError(w, http.StatusServiceUnavailable, "agent updater not configured")
 		return
@@ -1075,7 +1079,6 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
 		return
 	}
-	capControlBody(w, r)
 	// Downloading the agent binary is a long outbound HTTPS operation
 	// that easily exceeds the server-wide 10 s WriteTimeout; the
 	// AgentUpdater client bounds the wall-clock budget.

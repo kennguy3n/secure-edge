@@ -190,8 +190,14 @@ changes between feature releases — breaking entries are flagged explicitly.
   taking a body. Each now calls the new `capControlBody` helper, which
   wraps `r.Body` in `http.MaxBytesReader(maxControlBytes)` so the drain
   returns `*http.MaxBytesError` once the 64 KiB cap is hit and the
-  server closes the connection instead of reusing it. Pinned by
-  `TestNoBodyControlEndpoints_BodyIsCapped` in `handlers_test.go`.
+  server closes the connection instead of reusing it. `capControlBody`
+  runs immediately after the method check — *before* any nil-backend
+  or profile-locked guard — so the cap is also in place on the
+  503 / 403 early-return paths a hostile peer can reach without any
+  agent-side configuration. Pinned by
+  `TestNoBodyControlEndpoints_BodyIsCapped` and
+  `TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn` in
+  `handlers_test.go`.
 
 ## [0.5.0] — 2026-05-13
 

@@ -2055,6 +2055,92 @@ func TestNoBodyControlEndpoints_BodyIsCapped(t *testing.T) {
 	}
 }
 
+// TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn covers the
+// half of the contract the happy-path table above does not: the
+// body cap must also be in place on the 503 (no backend wired) and
+// 403 (profile locked) early-return paths, because those are
+// precisely the paths a hostile peer can reach without any
+// configuration on the agent side — a probe POST to
+// /api/proxy/enable on a non-proxy install, or to /api/agent/update
+// on a managed install with a locked profile, still has to bound
+// the post-response drain or the helper's threat model is moot.
+//
+// Devin Review flagged this on PR #40 (file comment ID
+// 3249293282): capControlBody was placed AFTER the nil-backend
+// guard in handleRulesUpdate, handleProxyEnable, and
+// handleAgentUpdate, so on the 503/403 path r.Body was the raw
+// uncapped reader. The fix moved capControlBody to right after
+// the method check; this test pins that placement.
+func TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn(t *testing.T) {
+	oversize := bytes.Repeat([]byte{'x'}, maxControlBytes+1)
+
+	cases := []struct {
+		name       string
+		path       string
+		setup      func(*Server)
+		wantStatus int
+	}{
+		{
+			// handleRulesUpdate returns 503 when no RuleUpdater is
+			// wired (Phase 1 / Phase 2 deployments). Without the
+			// fix the cap would only be applied after the nil
+			// check, so this oversized body would drain unbounded.
+			name:       "rules update without updater (503 path)",
+			path:       "/api/rules/update",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			// handleProxyEnable returns 503 when no proxy
+			// controller is wired. Same reasoning as above.
+			name:       "proxy enable without controller (503 path)",
+			path:       "/api/proxy/enable",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			// handleAgentUpdate returns 503 when no AgentUpdater
+			// is wired. Same reasoning as above.
+			name:       "agent update without updater (503 path)",
+			path:       "/api/agent/update",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(oversize))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+
+			// Verify we actually hit the early-return path we
+			// designed the test around — otherwise the cap
+			// assertion below is a false positive.
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d (body=%q), want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
+			}
+
+			// Same in-place-wrap trick as the happy-path test:
+			// after the handler returns, req.Body should be the
+			// MaxBytesReader put there by capControlBody, and a
+			// Read past the cap surfaces *http.MaxBytesError.
+			buf := make([]byte, maxControlBytes*2)
+			_, readErr := req.Body.Read(buf)
+			var mbe *http.MaxBytesError
+			if !errors.As(readErr, &mbe) {
+				t.Errorf("req.Body.Read err = %v (type %T), want *http.MaxBytesError "+
+					"— the body cap was not applied on the %d early-return path",
+					readErr, readErr, c.wantStatus)
+			}
+		})
+	}
+}
+
 // deadlineRecorderWriter wraps an httptest.ResponseRecorder and
 // satisfies the SetWriteDeadline interface that
 // http.NewResponseController consults via reflection. The test below

@@ -1,208 +1,152 @@
 # Changelog
 
-All notable changes to ShieldNet Secure Edge are documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-once it reaches `1.0.0`. Until then the pre-release version (`0.x`)
-may introduce breaking changes between feature releases.
+All notable changes to ShieldNet Secure Edge are recorded in this file. The
+format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+the project will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+once it reaches `1.0.0`. Until then, the `0.x` series may introduce breaking
+changes between feature releases — breaking entries are flagged explicitly.
 
 ## [Unreleased]
 
 ### Added
 
-- Browser-extension ID pinning for the agent's control-plane
-  endpoints via the new `allowed_extension_ids` config key.
-- Per-install API capability token. The agent issues a
-  32-byte hex token at `api_token_path` and hands it to the
-  browser extension over Native Messaging; the Electron tray
-  reads it from the same path. Enforcement is staged
-  (`api_token_required` toggles between warn-only and reject).
-- HMAC-authenticated Native Messaging bridge keyed by the
-  per-install API token. The `bridge_mac_required` knob
-  mirrors `api_token_required` for staged rollout, and the
-  agent rejects rolled-back request ids or duplicate `hello`
-  frames on the same connection.
-- File-upload DLP scanning. The MAIN-world fetch / XHR hook
-  reads Blob, File, ArrayBuffer, and ArrayBufferView bodies
-  and walks FormData entries, and a new
-  `file-upload-interceptor` content script blocks risky
-  uploads from `<input type="file">` and file drops before
-  any content leaves the page.
-- Risky-file-extension blocklist. The upload interceptor
-  blocks a baked-in 34-entry executable / installer /
-  script / disk-image / Java-archive set before any read,
-  with a new `risky_file_extensions` config key and
-  `GET /api/config/risky-extensions` endpoint so operators
-  can override the default.
-- Clipboard-paste file scanning. The `paste-interceptor`
-  reads `clipboardData.files` and `items[].getAsFile()`,
-  applies the same risky-extension guard and DLP scan as
-  uploads, and suppresses the gesture synchronously on a
-  blocking verdict.
-- Signed enterprise configuration profiles. Profiles carry an
-  Ed25519 `signature` field, the disk / URL / inline-import
-  paths share one `profile.Verifier`, and a companion
-  `agent/cmd/sign-enterprise-profile` CLI mirrors the rule-
-  manifest signer.
-- Release-artefact hardening: every release publishes a
-  `SHA256SUMS` manifest, Sigstore keyless signatures
-  (`.sig` + `.pem`) under the workflow's GitHub OIDC identity,
-  CycloneDX 1.6 SBOMs for the Go agent / Electron tray /
-  browser extension, and a SLSA Build Level 3 provenance
-  attestation. `SECURITY.md` carries the verification recipe.
-- Three reference config presets at the repo root:
-  `config.personal.example.yaml`,
-  `config.team.example.yaml`, and
-  `config.managed.example.yaml`, plus an admin-guide section
-  recommending a personal → team → managed graduation path.
-- Managed-deployment (MDM) admin guide. New section in
-  `docs/admin-guide.md` covers per-organisation bundle
-  generation, Chrome Enterprise managed policies, and
-  per-platform walkthroughs for JAMF Pro, Microsoft Intune,
-  and VMware Workspace ONE.
-- Explicit screenshot / image DLP limitation called out in
-  `docs/admin-guide.md` and the `paste-interceptor` header.
-  The DLP scanner is text-only; binary payloads are decoded
-  as best-effort UTF-8 and OCR / image classification are
-  out of scope.
-- Adversarial test coverage for the MAIN ↔ ISO postMessage
-  relay and additional paste-interceptor posture rows
-  (oversize in team mode, agent-unavailable across
-  personal / team / managed, `items[]`-only screenshot paste).
-- Expanded the DLP pattern library by ~30 patterns across Terraform,
-  container registries, secret managers, OAuth2/OIDC, IaC vault
-  strings, and package-manager ecosystems.
-- Adaptive scanning for large payloads, pattern category grouping,
-  short-lived LRU scan cache, and concurrent regex evaluation for
-  payloads over 10 KiB.
-- Browser extension: drag-and-drop interception, dynamic content
-  script registration so Tier-2 host updates take effect without an
-  extension reload, an options page, and opt-in clipboard scanning.
-- Platform hardening: agent self-update via GitHub Releases
-  (SHA-256 + Ed25519 verification), graceful shutdown that waits for
-  in-flight scans, runtime metadata in `/api/status`, and a
-  configurable token-bucket rate limiter on `/api/dlp/scan`.
-- Electron tray UI: dark mode tuned for WCAG 2.1 AA contrast, a
-  read-only Rules page, a first-run setup wizard, and an in-memory
-  recent-blocks list.
-- Testing & quality: end-to-end DNS test, Go native fuzzing for the
-  DLP pipeline, a Playwright-based extension integration harness,
-  and a CI coverage gate that fails when the DLP package drops
-  below 80%.
-- Community files: `CONTRIBUTING.md`, this changelog, `SECURITY.md`,
-  GitHub issue/PR templates.
+- **Capability tokens and extension pinning.** Per-install API capability
+  token issued at `api_token_path` (32-byte hex, mode `0600`), with
+  `api_token_required` enforcing the `Authorization: Bearer` header on
+  control endpoints. `allowed_extension_ids` restricts the agent's
+  control-plane CORS allowlist to a fixed set of browser-extension IDs.
+- **HMAC-authenticated Native Messaging bridge.** The bridge is keyed by the
+  per-install API token; `bridge_mac_required` toggles enforcement, and the
+  agent rejects rolled-back request IDs or duplicate `hello` frames on the
+  same connection.
+- **File-upload and clipboard-file DLP.** The MAIN-world `fetch` / XHR hook
+  reads `Blob`, `File`, `ArrayBuffer`, and `ArrayBufferView` bodies and
+  walks `FormData`; a new `file-upload-interceptor` content script blocks
+  risky uploads from `<input type="file">` and file drops before any read,
+  and `paste-interceptor` applies the same guard to clipboard files.
+- **Risky-file-extension blocklist.** A baked-in 34-entry executable /
+  installer / script / disk-image / Java-archive set blocks before any
+  read; operators can override via `risky_file_extensions` and inspect
+  the effective list via `GET /api/config/risky-extensions`.
+- **Signed enterprise profiles.** Profiles carry an Ed25519 `signature`
+  field verified against `profile_public_key`; the disk, URL, and
+  inline-import paths share one `profile.Verifier`; and
+  `agent/cmd/sign-enterprise-profile` mirrors the rule-manifest signer.
+- **Release-artefact hardening.** Every release publishes a `SHA256SUMS`
+  manifest, Sigstore keyless signatures (`.sig` + `.pem`) under the
+  workflow's GitHub OIDC identity, CycloneDX 1.6 SBOMs for the agent /
+  tray / extension, and a SLSA Build Level 3 provenance attestation. The
+  verification recipe lives in [SECURITY.md](./SECURITY.md).
+- **Reference configuration presets.** Three repo-root config files —
+  `config.personal.example.yaml`, `config.team.example.yaml`,
+  `config.managed.example.yaml` — and an admin-guide section that walks
+  through a personal → team → managed graduation path.
+- **MDM deployment guide.** New section in
+  [docs/admin-guide.md](./docs/admin-guide.md) covers per-organisation
+  bundle generation, Chrome Enterprise managed policies, and per-platform
+  walkthroughs for JAMF Pro, Microsoft Intune, and VMware Workspace ONE.
+- **Hardening sweep.** Versioned `PRAGMA user_version` migrations,
+  transactional `Store.ApplyProfileTx` (validate-then-commit), atomic
+  `Counter.Flush` / `Reset` serialisation, fail-closed managed-mode boot
+  (`profile_path` or `profile_url` required), secure-defaults validator
+  for `enforcement_mode: team | managed`, store-level input validation
+  for category names and DLP weights, path-stripping `/api/status` (debug
+  paths gated on control-Origin only), and DNS-pinned `http.Transport`
+  for profile-URL fetches to close the DNS-rebinding TOCTOU window.
 
 ### Changed
 
-- **Breaking (managed mode):** `enforcement_mode: managed` now
-  requires `profile_path` or `profile_url` to be set in
-  `config.yaml`. Previously a managed install could boot with no
-  profile source declared, in which case `loadProfileOnStartup`
-  returned nil and the agent ran with only the store's seeded
-  defaults applied — a downgrade window between agent start and
-  the first push-via-API import. Operators who want the
-  push-via-API deployment model must now declare the initial
-  source explicitly (e.g. point `profile_path` at a placeholder
-  signed-empty profile shipped with the package); the
-  `POST /api/profile/import` runtime path is unchanged. Combined
-  with the existing `enforcement_mode: team` / `managed` secure
-  defaults gate landed in the hardening sweep
-  (`allowed_extension_ids`, `api_token_path`,
-  `api_token_required`, `bridge_mac_required`,
-  `profile_public_key`), operators upgrading an existing
-  team/managed deployment must reconcile their `config.yaml`
-  with the new validator before the agent will start.
-- `paste-interceptor.ts` now shares the `MAX_SCAN_BYTES`
-  constant with the other interceptors, and the constant is
-  pinned across the isolated and MAIN worlds by a parity
-  test.
-- `drag-interceptor.ts` cedes file drops to
-  `file-upload-interceptor.ts` so OS file managers that
-  attach a `text/plain` path alongside the `File` cannot
-  trick `drag-interceptor` into resuming a stale path string
-  while the file is being blocked.
+- **Breaking (managed mode):** `enforcement_mode: managed` now requires
+  `profile_path` **or** `profile_url` in `config.yaml`. Previously a
+  managed install could boot with no profile source declared and run
+  with only the store's seeded defaults — a downgrade window between
+  agent start and the first push-via-API import. Operators who want the
+  push-via-API model must now declare an initial source (e.g. point
+  `profile_path` at a placeholder signed-empty profile shipped with the
+  package). The `POST /api/profile/import` runtime path is unchanged.
+- **Breaking (team & managed):** the new secure-defaults validator
+  rejects configs that omit `allowed_extension_ids`, `api_token_path`,
+  or `api_token_required: true`; `managed` additionally requires
+  `bridge_mac_required: true` and a non-empty `profile_public_key`.
+  Whitespace-only values are treated as empty.
+- `paste-interceptor.ts` shares the `MAX_SCAN_BYTES` constant with the
+  other interceptors; a parity test pins the value across the isolated
+  and MAIN worlds.
+- `drag-interceptor.ts` cedes file drops to `file-upload-interceptor.ts`
+  so OS file managers that attach a `text/plain` path alongside the
+  `File` cannot trick `drag-interceptor` into resuming a stale path
+  string while the file is being blocked.
 
 ### Fixed
 
-- `store.SetPolicy` / `store.ApplyProfileTx` no longer reject
-  custom rule categories. The hardening sweep landed a
-  closed-set category allowlist that mirrored the seven shipped
-  defaults plus the `<verb>_admin` override pattern. Operators
-  who add a custom rule file under `rules/` (e.g. `gaming.txt`
-  → "Gaming") could load it into the policy engine via
-  `RuleSource` but every subsequent `PUT /api/policies/Gaming`
-  came back as `400 invalid category`, and enterprise profiles
-  containing the same custom name were rejected wholesale by
-  `ApplyProfileTx`. The store now exposes
-  `RegisterCategories([]string)`; the agent boot path registers
-  every category derived from `cfg.rule_paths` so the closed-set
-  protection still bounds the writable space without forcing
-  deployments to fork `store.knownCategories`.
-- Cross-compilation: `agent/internal/tamper/proxy_check.go`
-  now dispatches per platform via build-tagged
-  `proxy_{darwin,windows,other}.go` files instead of a
-  `switch runtime.GOOS` against per-platform stubs, so the
-  agent cross-builds cleanly for darwin and windows targets.
-- Electron-builder Linux `.deb` packaging now picks up
-  `homepage` + `author{name,email}` from `package.json`,
-  and the dotless `artifactName` in `electron-builder.yml`
-  survives GitHub's release-upload filename normalisation.
-- Windows MSI build now uses native WiX v4+
-  `<Files Include="…">` and is pinned to the WiX dotnet
-  tool v5.0.2.
-- The release `SHA256SUMS` pipeline uses NUL-separated piping
-  so artefacts whose names contain spaces hash correctly.
+- **Custom rule categories are accepted again.** The hardening sweep
+  landed a closed-set category allowlist; the store now exposes
+  `RegisterCategories([]string)` and the agent boot path registers every
+  category derived from `cfg.rule_paths`, so a custom rule file under
+  `rules/` (e.g. `gaming.txt` → `Gaming`) is once again addressable by
+  `PUT /api/policies/:category` and accepted inside enterprise profiles
+  without forcing operators to fork `store.knownCategories`.
+- `ErrInvalidCategory` and `ErrInvalidDLPConfig` now surface as HTTP 400
+  instead of 500 from `/api/policies` and `/api/dlp/config`.
+- Cross-compilation: `agent/internal/tamper/proxy_check.go` dispatches
+  per platform via build-tagged `proxy_{darwin,windows,other}.go`
+  files instead of a `switch runtime.GOOS` against per-platform stubs,
+  so the agent cross-builds cleanly for darwin and windows targets.
+- Electron-builder Linux `.deb` packaging picks up `homepage` +
+  `author{name,email}` from `package.json`; the dotless `artifactName`
+  in `electron-builder.yml` survives GitHub's release-upload filename
+  normalisation.
+- Windows MSI build uses native WiX v4+ `<Files Include="…">` and is
+  pinned to the WiX dotnet tool `v5.0.2`.
+- The release `SHA256SUMS` pipeline uses NUL-separated piping so
+  artefacts whose names contain spaces hash correctly.
 
 ## [0.5.0] — 2026-05-13
 
 ### Added
 
-- Enterprise profile distribution with policy lockdown, signed
-  profile manifests, and an /api/profile endpoint.
+- Enterprise profile distribution with policy lockdown, signed profile
+  manifests, and a `/api/profile` endpoint.
 - Tamper detection comparing the running DNS / proxy configuration
   against the agent's expected state and surfacing a hash-mismatch
   signal.
 - Optional aggregate heartbeat (`heartbeat_url`) that POSTs only
-  agent version + OS metadata + anonymous counters. No content,
+  `{agent_version, os_type, os_arch, aggregate_counters}`. No content,
   domains, or IPs are ever included.
 - Admin allow/block override store backed by SQLite with a CRUD API
   under `/api/rules/override`.
-- Expanded DLP pattern library (~95 new patterns) across Java,
-  Rust, frontend frameworks, desktop publishing, AI/ML APIs, iOS,
-  and others. See `docs/accessibility.md` and `BENCHMARKS.md` for
-  the audit trail.
+- ~95 additional DLP patterns across Java, Rust, frontend frameworks,
+  desktop publishing, AI/ML APIs, and iOS ecosystems.
 
 ### Changed
 
-- DLP pattern severity scoring is now data-driven via the
-  `score_weight` field, allowing low-confidence ecosystems to score
-  lower without removing them.
-- Status page surfaces tamper detection state and enterprise profile
+- DLP severity scoring is now data-driven via per-pattern
+  `score_weight`, so low-confidence ecosystems can score lower without
+  being removed.
+- The Status page surfaces tamper-detection state and enterprise-profile
   lockdown.
 
 ### Fixed
 
-- Aho-Corasick automaton switched to `MatchThreadSafe()` so the
+- Aho-Corasick automaton switched to `MatchThreadSafe()`, so the
   worker-pool path no longer drops hits under concurrent access.
 - Several accessibility regressions in the Electron tray: tablist
   arrow-key navigation, visible focus rings, and labelled form
-  controls. See `docs/accessibility.md`.
+  controls.
 
 ## [0.4.0] — 2026-05-12
 
 ### Added
 
-- Local MITM proxy with on-demand CA generation, system-trust
-  installer scripts for macOS, Linux, and Windows, and a pinning
-  bypass list for apps that break under MITM.
-- Per-host classification — Tier-1 hosts route DNS only, Tier-2
-  hosts route through the proxy with DLP enabled.
-- Electron Proxy page for enabling/disabling the proxy, installing
+- Local MITM proxy with on-demand CA generation, system-trust installer
+  scripts for macOS, Linux, and Windows, and a pinning bypass list for
+  apps that break under MITM.
+- Per-host classification — Tier-1 hosts route DNS only, Tier-2 hosts
+  route through the proxy with DLP enabled.
+- Electron Proxy page for enabling / disabling the proxy, installing
   the CA, and toggling system proxy configuration.
-- Safari extension build (`manifest.safari.json`) and Firefox
-  build (`manifest.firefox.json`) alongside the existing Chrome
-  Manifest V3.
+- Safari build (`manifest.safari.json`) and Firefox build
+  (`manifest.firefox.json`) alongside the existing Chrome Manifest V3.
 
 ## [0.3.0] — 2026-05-12
 
@@ -210,25 +154,24 @@ may introduce breaking changes between feature releases.
 
 - Rule auto-updater that polls a manifest URL and atomically swaps
   bundled rule files when a newer version is available.
-- Multi-platform installers: a Homebrew tap, a Debian `.deb`, a
-  Windows MSI, and a portable archive.
-- CI workflow (`.github/workflows/ci.yml`) that runs the Go test
-  suite, Electron typecheck, and extension typecheck on every push.
+- Multi-platform installers: a Homebrew tap, a Debian `.deb`, a Windows
+  MSI, and a portable archive.
+- CI workflow that runs the Go test suite plus Electron and extension
+  typechecks on every push.
 
 ## [0.2.0] — 2026-05-12
 
 ### Added
 
-- DLP pipeline: Aho-Corasick prefix scanner → regex validator →
-  hotword proximity check → entropy gate → exclusion filter →
-  threshold engine.
+- DLP pipeline: classifier → Aho-Corasick → regex → hotword proximity
+  → entropy gate → exclusion filter → threshold engine.
 - Browser extension (Chrome Manifest V3) that intercepts paste and
-  form-submit events on configured AI tool hosts and routes them
-  through `/api/dlp/scan`.
+  form-submit events on configured AI hosts and routes them through
+  `/api/dlp/scan`.
 - Bundled DLP rule files (`rules/dlp_patterns.json`,
   `rules/dlp_exclusions.json`) with ~70 starter patterns.
-- Native messaging bridge between the extension and the local
-  agent for hosts where the loopback HTTP API is unreachable.
+- Native Messaging bridge between the extension and the local agent
+  for hosts where the loopback HTTP API is unreachable.
 
 ## [0.1.0] — 2026-05-12
 
@@ -236,10 +179,7 @@ may introduce breaking changes between feature releases.
 
 - Initial public release.
 - Go agent: DNS resolver with policy engine, bundled rules, SQLite
-  store for stats and config, local HTTP API on
-  `127.0.0.1:8080`.
+  store for stats and config, local HTTP API on `127.0.0.1:8080`.
 - Electron tray app with Status and Settings pages.
-- Bundled domain blocklists for malware, phishing, tracking, and
-  ads.
-- Platform integration scripts for setting system DNS to the
-  agent.
+- Bundled domain blocklists.
+- Platform integration scripts for setting system DNS to the agent.

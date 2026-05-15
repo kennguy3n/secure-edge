@@ -10,8 +10,8 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
-- **DLP pattern coverage expanded from 376 to 720 rules (Workstream 1).**
-  Adds 344 new detectors across 17 themed batches: additional cloud
+- **DLP pattern coverage expanded from 376 to 718 rules (Workstream 1).**
+  Adds 342 new detectors across 17 themed batches: additional cloud
   providers (DigitalOcean / Linode / Vultr / Cloudflare / Hetzner /
   OVH / Scaleway / Backblaze / Wasabi), SaaS platform tokens
   (Salesforce / HubSpot / Zendesk / Intercom / Segment / Amplitude /

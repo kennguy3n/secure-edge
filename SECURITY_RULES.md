@@ -1,7 +1,7 @@
 # ShieldNet Secure Edge — Security Rules Reference
 
 A complete reference of every DLP pattern shipped in
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**720** patterns
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**718** patterns
 across **16** JSON categories). Sub-sections below group patterns by
 family for readability rather than by JSON category. For the schema
 and authoring workflow, see

@@ -1825,4 +1825,152 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Scaleway Secret Key"] = func(r *rand.Rand) string {
 		return "SCW_SECRET_KEY=" + randUUID(r)
 	}
+	// ---------------- Batch 13: Dev Tools / PaaS ----------------
+	valueGenerators["Vercel Personal Access Token"] = func(r *rand.Rand) string {
+		return "VERCEL_TOKEN=" + randAlnum(r, 24)
+	}
+	valueGenerators["Vercel Team Access Token"] = func(r *rand.Rand) string {
+		return "VERCEL_TEAM_TOKEN=team_" + randAlnum(r, 24)
+	}
+	valueGenerators["Vercel Deploy Webhook URL"] = func(r *rand.Rand) string {
+		return "https://api.vercel.com/v1/integrations/deploy/" + randAlnum(r, 24) + "/" + randAlnum(r, 16)
+	}
+	valueGenerators["Netlify OAuth Token"] = func(r *rand.Rand) string {
+		return "nfo_" + randAlnum(r, 40)
+	}
+	valueGenerators["Netlify Build Webhook URL"] = func(r *rand.Rand) string {
+		return "https://api.netlify.com/build_hooks/" + randHex(r, 24)
+	}
+	valueGenerators["Heroku OAuth Bearer Token"] = func(r *rand.Rand) string {
+		return "HRKU-" + randUUID(r)
+	}
+	valueGenerators["Heroku Pipelines Promotion Webhook"] = func(r *rand.Rand) string {
+		return "https://api.heroku.com/pipelines/" + randUUID(r) + "/promotion"
+	}
+	valueGenerators["Railway Project Token"] = func(r *rand.Rand) string {
+		return "RAILWAY_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["Railway Account API Token"] = func(r *rand.Rand) string {
+		return "RAILWAY_API_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["Render Service Deploy Key"] = func(r *rand.Rand) string {
+		return "RENDER_DEPLOY_KEY=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Render API Key"] = func(r *rand.Rand) string {
+		return "rnd_" + randAlnum(r, 40)
+	}
+	valueGenerators["Supabase Service Role Key (JWT)"] = func(r *rand.Rand) string {
+		return "SUPABASE_SERVICE_ROLE_KEY=eyJ" + randFromAlphabet(r, alnum+"_-", 50) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 120) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Supabase Anon Key (JWT)"] = func(r *rand.Rand) string {
+		return "SUPABASE_ANON_KEY=eyJ" + randFromAlphabet(r, alnum+"_-", 50) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 120) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Supabase Personal Access Token"] = func(r *rand.Rand) string {
+		return "sbp_" + randAlnum(r, 48)
+	}
+	valueGenerators["Firebase Cloud Messaging Server Key (Legacy)"] = func(r *rand.Rand) string {
+		return "AAAA" + randFromAlphabet(r, alnum+"_-", 7) + ":APA91b" + randFromAlphabet(r, alnum+"_-", 134)
+	}
+	valueGenerators["PlanetScale Database Password"] = func(r *rand.Rand) string {
+		return "pscale_pw_" + randFromAlphabet(r, alnum+"_.", 56)
+	}
+	valueGenerators["PlanetScale OAuth Token"] = func(r *rand.Rand) string {
+		return "pscale_oauth_" + randAlnum(r, 40)
+	}
+	valueGenerators["Neon API Key"] = func(r *rand.Rand) string {
+		return "NEON_API_KEY=nle_" + randAlnum(r, 48)
+	}
+	valueGenerators["Turso Database Token"] = func(r *rand.Rand) string {
+		return "TURSO_AUTH_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 60) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 100) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Clerk JWT Public Key"] = func(r *rand.Rand) string {
+		return "CLERK_JWT_KEY=-----BEGIN PUBLIC KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 200) + "\n-----END PUBLIC KEY-----"
+	}
+	valueGenerators["SuperTokens API Key"] = func(r *rand.Rand) string {
+		return "SUPERTOKENS_API_KEY=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Fly.io API Token"] = func(r *rand.Rand) string {
+		return "FlyV1 fm2_lJP" + randFromAlphabet(r, alnum+"_-", 220)
+	}
+	valueGenerators["Northflank API Token"] = func(r *rand.Rand) string {
+		return "NORTHFLANK_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["Cloudflare Workers Deploy Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_API_TOKEN_DEPLOY=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Replit Database URL"] = func(r *rand.Rand) string {
+		return "https://kv.replit.com/v0/" + randFromAlphabet(r, alnum+"_-", 80)
+	}
+	valueGenerators["Replit Auth Token"] = func(r *rand.Rand) string {
+		return "REPLIT_TOKEN=" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["Cloud 66 Stack Token"] = func(r *rand.Rand) string {
+		return "CX_STACK_TOKEN=" + randHex(r, 32)
+	}
+	valueGenerators["GitHub Codespaces SSH Token"] = func(r *rand.Rand) string {
+		return "GITHUB_CODESPACE_TOKEN=" + randAlnum(r, 64)
+	}
+	valueGenerators["CodeSandbox CLI Token"] = func(r *rand.Rand) string {
+		return "CSB_API_KEY=csb_" + randAlnum(r, 56)
+	}
+	valueGenerators["StackBlitz API Token"] = func(r *rand.Rand) string {
+		return "STACKBLITZ_TOKEN=sb_" + randAlnum(r, 40)
+	}
+	valueGenerators["Bitrise Personal Access Token"] = func(r *rand.Rand) string {
+		return "BITRISE_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Crowdin Personal Access Token"] = func(r *rand.Rand) string {
+		return "CROWDIN_TOKEN=" + randHex(r, 64)
+	}
+	valueGenerators["Lokalise API Token"] = func(r *rand.Rand) string {
+		return "LOKALISE_API_TOKEN=" + randHex(r, 56)
+	}
+	valueGenerators["Sanity CMS Token"] = func(r *rand.Rand) string {
+		return "SANITY_TOKEN=sk" + randAlnum(r, 60)
+	}
+	valueGenerators["Contentful Personal Access Token"] = func(r *rand.Rand) string {
+		return "CONTENTFUL_TOKEN=CFPAT-" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Strapi API Token"] = func(r *rand.Rand) string {
+		return "STRAPI_API_TOKEN=" + randHex(r, 80)
+	}
+	valueGenerators["Storyblok Management Token"] = func(r *rand.Rand) string {
+		return "STORYBLOK_MGMT_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["Builder.io Private Key"] = func(r *rand.Rand) string {
+		return "bpk-" + randHex(r, 40)
+	}
+	valueGenerators["Hygraph Permanent Auth Token"] = func(r *rand.Rand) string {
+		return "HYGRAPH_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 60) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 200) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["GitGuardian Personal Access Token"] = func(r *rand.Rand) string {
+		return "GITGUARDIAN_API_KEY=ggpat_" + randHex(r, 56)
+	}
+	valueGenerators["FOSSA API Key"] = func(r *rand.Rand) string {
+		return "FOSSA_API_KEY=" + randHex(r, 40)
+	}
+	valueGenerators["CircleCI Personal API Token"] = func(r *rand.Rand) string {
+		return "CCIPAT_" + randFromAlphabet(r, alnum+"_", 56)
+	}
+	valueGenerators["Bitbucket Pipelines OAuth Secret"] = func(r *rand.Rand) string {
+		return "BITBUCKET_PIPELINES_OAUTH_SECRET=" + randAlnum(r, 48)
+	}
+	valueGenerators["CloudBees Jenkins API Token"] = func(r *rand.Rand) string {
+		return "CLOUDBEES_API_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Gitea Personal Access Token"] = func(r *rand.Rand) string {
+		return "GITEA_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Forgejo API Token"] = func(r *rand.Rand) string {
+		return "FORGEJO_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Gerrit HTTP Password"] = func(r *rand.Rand) string {
+		return "GERRIT_HTTP_PASSWORD=" + randFromAlphabet(r, alnum+"+/=", 56)
+	}
+	valueGenerators["Phabricator Conduit API Token"] = func(r *rand.Rand) string {
+		return "api-" + randLowerAlnum(r, 28)
+	}
+	valueGenerators["Codecov Repo Upload Token"] = func(r *rand.Rand) string {
+		return "CODECOV_TOKEN=" + randUUID(r)
+	}
 }

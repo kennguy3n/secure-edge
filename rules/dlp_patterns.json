@@ -9515,6 +9515,836 @@
       "require_hotword": false,
       "entropy_min": 4.0,
       "category": "cloud"
+    },
+    {
+      "name": "Vercel Personal Access Token",
+      "regex": "(?i)VERCEL_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24}",
+      "prefix": "vercel_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vercel",
+        "deploy",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vercel Team Access Token",
+      "regex": "(?i)VERCEL_TEAM_TOKEN\\s*[:=]\\s*['\\\"]?team_[A-Za-z0-9]{24}",
+      "prefix": "vercel_team_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vercel",
+        "team",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vercel Deploy Webhook URL",
+      "regex": "https?://api\\.vercel\\.com/v\\d+/integrations/deploy/[A-Za-z0-9_\\-]{12,}/[A-Za-z0-9]{12,}",
+      "prefix": "api.vercel.com",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "vercel",
+        "webhook",
+        "deploy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Netlify OAuth Token",
+      "regex": "nfo_[A-Za-z0-9]{36,}",
+      "prefix": "nfo_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "netlify",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Netlify Build Webhook URL",
+      "regex": "https?://api\\.netlify\\.com/build_hooks/[a-f0-9]{20,}",
+      "prefix": "api.netlify.com",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "netlify",
+        "build hook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Heroku OAuth Bearer Token",
+      "regex": "HRKU-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "hrku-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "heroku",
+        "bearer",
+        "cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Heroku Pipelines Promotion Webhook",
+      "regex": "https?://api\\.heroku\\.com/pipelines/[a-f0-9-]{36}/promotion",
+      "prefix": "api.heroku.com",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "heroku",
+        "pipelines",
+        "promotion"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Railway Project Token",
+      "regex": "(?i)RAILWAY_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "railway_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "railway",
+        "project",
+        "deploy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Railway Account API Token",
+      "regex": "(?i)RAILWAY_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "railway_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "railway",
+        "api",
+        "account"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Render Service Deploy Key",
+      "regex": "(?i)RENDER_DEPLOY_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "render_deploy_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "render",
+        "deploy",
+        "webhook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Render API Key",
+      "regex": "rnd_[A-Za-z0-9]{30,}",
+      "prefix": "rnd_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "render",
+        "api",
+        "key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Supabase Service Role Key (JWT)",
+      "regex": "(?i)SUPABASE_SERVICE_ROLE_KEY\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{30,}\\.eyJ[A-Za-z0-9_\\-]{60,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "supabase_service_role_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "supabase",
+        "service role",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Supabase Anon Key (JWT)",
+      "regex": "(?i)SUPABASE_ANON_KEY\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{30,}\\.eyJ[A-Za-z0-9_\\-]{60,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "supabase_anon_key",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "supabase",
+        "anon",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Supabase Personal Access Token",
+      "regex": "sbp_[A-Za-z0-9]{40,}",
+      "prefix": "sbp_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "supabase",
+        "pat",
+        "cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Firebase Cloud Messaging Server Key (Legacy)",
+      "regex": "AAAA[A-Za-z0-9_\\-]{7}:APA91b[A-Za-z0-9_\\-]{134}",
+      "prefix": "aaaa",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fcm",
+        "firebase",
+        "push",
+        "server key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "PlanetScale Database Password",
+      "regex": "pscale_pw_[A-Za-z0-9_\\.]{40,}",
+      "prefix": "pscale_pw_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "planetscale",
+        "pscale",
+        "password"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "PlanetScale OAuth Token",
+      "regex": "pscale_oauth_[A-Za-z0-9]{20,}",
+      "prefix": "pscale_oauth_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "planetscale",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Neon API Key",
+      "regex": "(?i)NEON_API_KEY\\s*[:=]\\s*['\\\"]?nle_[A-Za-z0-9]{40,}",
+      "prefix": "neon_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "neon",
+        "postgres",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Turso Database Token",
+      "regex": "(?i)TURSO_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "turso_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "turso",
+        "libsql",
+        "sqld"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Clerk JWT Public Key",
+      "regex": "(?i)CLERK_JWT_KEY\\s*[:=]\\s*['\\\"]?-----BEGIN PUBLIC KEY-----[\\s\\S]{0,400}-----END PUBLIC KEY-----",
+      "prefix": "clerk_jwt_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "clerk",
+        "jwt",
+        "public key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "SuperTokens API Key",
+      "regex": "(?i)SUPERTOKENS_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "supertokens_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "supertokens",
+        "auth",
+        "saas"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Fly.io API Token",
+      "regex": "FlyV1\\s+fm2_lJP[A-Za-z0-9_\\-]{180,}",
+      "prefix": "flyv1 fm2_lj",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fly",
+        "fly.io",
+        "macaroon"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Northflank API Token",
+      "regex": "(?i)NORTHFLANK_API_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "northflank_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "northflank",
+        "deploy",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Workers Deploy Token",
+      "regex": "(?i)CLOUDFLARE_API_TOKEN_DEPLOY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "cloudflare_api_token_deploy",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "workers",
+        "deploy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Replit Database URL",
+      "regex": "https?://kv\\.replit\\.com/v\\d+/[A-Za-z0-9_\\-]{30,}",
+      "prefix": "kv.replit.com",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "replit",
+        "kv",
+        "database"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Replit Auth Token",
+      "regex": "(?i)REPLIT_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "replit_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "replit",
+        "auth",
+        "ide"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloud 66 Stack Token",
+      "regex": "(?i)CX_STACK_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{32,}",
+      "prefix": "cx_stack_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cloud66",
+        "cx",
+        "stack"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "GitHub Codespaces SSH Token",
+      "regex": "(?i)GITHUB_CODESPACE_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "github_codespace_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "codespaces",
+        "github",
+        "devcontainer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "CodeSandbox CLI Token",
+      "regex": "(?i)CSB_API_KEY\\s*[:=]\\s*['\\\"]?csb_[A-Za-z0-9]{40,}",
+      "prefix": "csb_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "codesandbox",
+        "csb",
+        "sandbox"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "StackBlitz API Token",
+      "regex": "(?i)STACKBLITZ_TOKEN\\s*[:=]\\s*['\\\"]?sb_[A-Za-z0-9]{32,}",
+      "prefix": "stackblitz_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "stackblitz",
+        "sb",
+        "online ide"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Bitrise Personal Access Token",
+      "regex": "(?i)BITRISE_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "bitrise_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitrise",
+        "mobile",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Crowdin Personal Access Token",
+      "regex": "(?i)CROWDIN_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{40,}",
+      "prefix": "crowdin_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "crowdin",
+        "localization",
+        "translation"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Lokalise API Token",
+      "regex": "(?i)LOKALISE_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{40,}",
+      "prefix": "lokalise_api_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "lokalise",
+        "localization"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Sanity CMS Token",
+      "regex": "(?i)SANITY_TOKEN\\s*[:=]\\s*['\\\"]?sk[A-Za-z0-9]{40,}",
+      "prefix": "sanity_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sanity",
+        "cms",
+        "headless"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Contentful Personal Access Token",
+      "regex": "(?i)CONTENTFUL_TOKEN\\s*[:=]\\s*['\\\"]?CFPAT-[A-Za-z0-9_\\-]{40,}",
+      "prefix": "contentful_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "contentful",
+        "cms",
+        "cfpat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Strapi API Token",
+      "regex": "(?i)STRAPI_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{60,}",
+      "prefix": "strapi_api_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "strapi",
+        "cms",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Storyblok Management Token",
+      "regex": "(?i)STORYBLOK_MGMT_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{36,}",
+      "prefix": "storyblok_mgmt_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "storyblok",
+        "management",
+        "cms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Builder.io Private Key",
+      "regex": "bpk-[a-f0-9]{30,}",
+      "prefix": "bpk-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "builder.io",
+        "cms",
+        "private key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Hygraph Permanent Auth Token",
+      "regex": "(?i)HYGRAPH_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.eyJ[A-Za-z0-9_\\-]{120,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "hygraph_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "hygraph",
+        "graphcms",
+        "cms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "GitGuardian Personal Access Token",
+      "regex": "(?i)GITGUARDIAN_API_KEY\\s*[:=]\\s*['\\\"]?gg[a-z]{1,10}_[a-f0-9_]{40,}",
+      "prefix": "gitguardian_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gitguardian",
+        "ggshield",
+        "scanner"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "FOSSA API Key",
+      "regex": "(?i)FOSSA_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32,}",
+      "prefix": "fossa_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "fossa",
+        "license scanner",
+        "sbom"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "CircleCI Personal API Token",
+      "regex": "CCIPAT_[A-Za-z0-9_]{40,}",
+      "prefix": "ccipat_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "circleci",
+        "pat",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Bitbucket Pipelines OAuth Secret",
+      "regex": "(?i)BITBUCKET_PIPELINES_OAUTH_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "bitbucket_pipelines_oauth_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitbucket",
+        "pipelines",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "CloudBees Jenkins API Token",
+      "regex": "(?i)CLOUDBEES_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{32,}",
+      "prefix": "cloudbees_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudbees",
+        "jenkins",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Gitea Personal Access Token",
+      "regex": "(?i)GITEA_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "gitea_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gitea",
+        "pat",
+        "self-hosted"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Forgejo API Token",
+      "regex": "(?i)FORGEJO_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "forgejo_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "forgejo",
+        "codeberg",
+        "fork"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Gerrit HTTP Password",
+      "regex": "(?i)GERRIT_HTTP_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{40,}",
+      "prefix": "gerrit_http_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gerrit",
+        "http password",
+        "review"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Phabricator Conduit API Token",
+      "regex": "api-[a-z2-7]{28}",
+      "prefix": "api-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "phabricator",
+        "conduit",
+        "arc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Codecov Repo Upload Token",
+      "regex": "(?i)CODECOV_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "codecov_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "codecov",
+        "upload",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

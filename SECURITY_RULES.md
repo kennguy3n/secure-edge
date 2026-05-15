@@ -302,7 +302,29 @@ Columns:
 
 - Patterns whose ambient shape is shared with benign text use
   `require_hotword: true` to keep the FP rate within budget.
-- Accuracy is enforced by
-  [`agent/internal/dlp/accuracy_test.go`](./agent/internal/dlp/accuracy_test.go)
-  with a 50-sample corpus (25 TP + 25 TN). Current budget: **FP < 10%**,
-  **FN < 5%**.
+- Accuracy is enforced at two levels:
+  - A fast 50-sample smoke check in
+    [`agent/internal/dlp/accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)
+    (25 TP + 25 TN, budget **FP < 10%**, **FN < 5%**) that runs on every
+    local `go test ./...` invocation and on every CI job.
+  - A large-scale evaluation in
+    [`agent/internal/dlp/accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)
+    that loads the full 5,000+-sample corpus from
+    [`agent/internal/dlp/testdata/corpus/`](./agent/internal/dlp/testdata/corpus/).
+    The large test is gated behind the `large` build tag (run with
+    `go test -tags=large ./internal/dlp/`), enforces tightened budgets
+    of **overall FP < 5%**, **overall FN < 3%**, and
+    **per-category FN < 10%**, and writes a structured JSON report to
+    `testdata/corpus/last_run_report.json` so CI can archive per-run
+    accuracy snapshots.
+  - A regression check in
+    [`agent/internal/dlp/accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go)
+    (also tagged `large`) compares each run against the committed
+    `testdata/corpus/baseline_report.json` and fails the build if any
+    category's recall drops by more than **2 percentage points** or the
+    overall FP rate rises by more than **1 percentage point**. Re-seed
+    the baseline after an intentional rule update with
+    `go test -tags=large -run TestDLPAccuracyRegression ./internal/dlp/ -args -update-baseline`.
+- See [`agent/internal/dlp/testdata/corpus/README.md`](./agent/internal/dlp/testdata/corpus/README.md)
+  for the corpus layout, JSONL record format, and contribution
+  guidelines (synthetic samples only — no real secrets).

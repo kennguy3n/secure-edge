@@ -1,0 +1,125 @@
+# Secure Edge — MANAGED preset (fail-closed, every signed surface required).
+#
+# This file is one of three reference configs that ship alongside the
+# packaged `config.yaml`. It is the hardened end-state for an MDM-
+# deployed fleet — every Phase 7 control surface enabled, every
+# signed artefact verified, and a fail-closed posture on agent-
+# unavailable gestures. Pair it with the per-platform MDM walkthrough
+# in §10 of docs/admin-guide.md.
+#
+# DO NOT deploy this preset until:
+#
+#   - You have a per-install API token plumbing path (the agent
+#     persists `crypto/rand` 32 bytes to `api_token_path` on first
+#     run; the Electron tray and browser extension read the same
+#     file). Test on a single endpoint first.
+#   - Every endpoint is running an extension build that produces
+#     Native Messaging HMACs (Phase 7 / C1). If you flip
+#     `bridge_mac_required: true` before the rollout is complete,
+#     the pre-C1 endpoints' scans will fall through to the HTTP
+#     fallback every time.
+#   - You have generated two Ed25519 keypairs on a dedicated signing
+#     host (one for enterprise profiles, one for the rule manifest;
+#     see §3.1 / §4 of docs/admin-guide.md) and have signed every
+#     artefact in the deployment bundle (§10.1) under them. An
+#     unsigned profile or manifest will be rejected outright once
+#     the matching public key below is configured.
+#   - You have validated `enforcement_mode: managed` on a single
+#     pilot endpoint and confirmed that the agent-unavailable
+#     fail-closed toast surfaces cleanly and that no user workflow
+#     trips it during normal use.
+#
+# The values below are templates — replace every `<placeholder>`
+# with the value from your signing host before pushing the preset.
+
+# DNS resolver
+upstream_dns: "8.8.8.8:53"
+dns_listen: "127.0.0.1:5353"
+
+# Local agent HTTP API.
+api_listen: "127.0.0.1:8080"
+
+# SQLite state. On a managed install this typically lives under the
+# packaged install directory; keep the default unless you have a
+# specific reason to relocate state (e.g. a read-only filesystem).
+db_path: "secure-edge.db"
+stats_flush_interval: 60s
+
+# Bundled rule files.
+rule_paths:
+  - rules/ai_chat_blocked.txt
+  - rules/ai_code_blocked.txt
+  - rules/ai_allowed.txt
+  - rules/ai_chat_dlp.txt
+  - rules/phishing.txt
+  - rules/social.txt
+  - rules/news.txt
+
+# DLP pipeline.
+dlp_patterns: rules/dlp_patterns.json
+dlp_exclusions: rules/dlp_exclusions.json
+
+# Phase 3 rule updater. Set `rule_update_url` to the signed-manifest
+# endpoint your MDM publishes; the agent verifies the manifest
+# signature against `rule_update_public_key` below before applying.
+rule_update_url: "https://mdm.example.com/secure-edge/rules/manifest.json"
+rule_update_interval: 6h
+rules_dir: rules
+
+# Phase 4 local MITM proxy. Enable for enforcement coverage on
+# non-browser traffic (desktop AI apps, IDE plugins). The CA is
+# provisioned per endpoint via the MDM's certificate payload — see
+# §8 of docs/admin-guide.md for the proxy vs. extension boundary.
+proxy_listen: "127.0.0.1:8443"
+proxy_enabled: true
+ca_cert_path: "/etc/secure-edge/ca.crt"
+ca_key_path: "/etc/secure-edge/ca.key"
+proxy_pinning_bypass: []
+
+# Phase 7 / C2 — fail-closed posture. An unreachable agent surfaces
+# a policy toast and blocks the gesture (paste / form / drop /
+# fetch). Users see why their action was rejected and the privacy
+# guarantee holds even on an offline endpoint.
+enforcement_mode: managed
+
+# Phase 7 / A1 — only honour state-changing API requests whose
+# chrome-extension:// origin appears in this list. Replace the
+# placeholder with the ID shown on chrome://extensions after a
+# managed-policy install of your build.
+allowed_extension_ids:
+  - "<your-chrome-extension-id>"
+
+# Phase 7 / A2 — per-install bearer token. Required in managed mode.
+api_token_path: /var/lib/secure-edge/api-token
+api_token_required: true
+
+# Phase 7 / C1 — Native Messaging bridge HMAC. Fully enforced on the
+# managed preset. Any frame with a missing or invalid MAC is
+# rejected with `bridge MAC required` / `bridge MAC mismatch`.
+bridge_mac_required: true
+
+# Phase 7 / D2 — Ed25519 public key for enterprise profiles. With
+# this key configured the agent rejects unsigned, malformed,
+# tampered, or wrong-key-signed profiles on every import surface
+# (`profile_path`, `profile_url`, `POST /api/profile/import`).
+profile_public_key: "<org-profile-ed25519-pubkey>"
+
+# Phase 7 / A3 — Ed25519 public key for the rule manifest. With this
+# key configured the agent verifies the manifest signature before
+# downloading any rule file referenced from it.
+rule_update_public_key: "<org-rules-ed25519-pubkey>"
+
+# Phase 7 / B2 — browser-side filename blocklist. The managed preset
+# enables the operator-recommended hardened set (Windows / macOS /
+# Linux executables + the canonical script payloads). Add or remove
+# entries based on your fleet's measured impact. Documented case-
+# insensitive; leading dots are stripped; blanks are dropped.
+risky_file_extensions:
+  - exe
+  - scr
+  - ps1
+  - msi
+  - bat
+  - cmd
+  - vbs
+  - sh

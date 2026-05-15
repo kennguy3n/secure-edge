@@ -60,6 +60,32 @@ log_level: info
 
 Full reference is in `agent/internal/config/config.go`.
 
+### 2.0 Reference presets (start here, then customise)
+
+Rather than editing the packaged `config.yaml` from scratch, operators
+are expected to start from one of three reference presets that ship at
+the repository root and copy it into the location §2 enumerates:
+
+| Preset | File | Posture |
+| --- | --- | --- |
+| Personal | `config.personal.example.yaml` | Fall-open, individual developer use. No per-install token; no Native Messaging HMAC pinning; no profile signature pinning. Mirrors the packaged `config.yaml` defaults. |
+| Team | `config.team.example.yaml` | Intermediate rollout. Per-install API token required; warn-toast on agent-unavailable; Native Messaging HMAC still lenient (warn-once log); unsigned profiles still accepted. |
+| Managed | `config.managed.example.yaml` | Fail-closed end-state for MDM-deployed fleets. Every Phase 7 control surface enabled, every signed artefact verified, fail-closed on agent-unavailable gestures. |
+
+Copy the appropriate file to the install location (e.g. `cp
+config.managed.example.yaml /etc/secure-edge/config.yaml`) and fill in
+the `<placeholder>` values from your signing host. The subsections
+below document each individual knob in detail — the presets only
+pre-select sensible groupings.
+
+Do not deploy the managed preset to your full fleet without first
+validating it on a single pilot endpoint (every signed surface
+requires matching plumbing — an unsigned profile or a pre-C1
+extension build on the wire will fail-closed under the managed
+posture). The recommended sequence is personal → team → managed.
+See §10.1 for the MDM deployment bundle and §3.1 / §4 / §2.1 for the
+staged rollout posture under each signing surface.
+
 ### 2.1 Native Messaging bridge HMAC (`bridge_mac_required`)
 
 Phase 7 added an HMAC-SHA256 message-authentication code to every
@@ -404,6 +430,73 @@ script runs. Combine them with the proxy for defence in depth:
 The agent does **not** distribute managed browser policies — that is the
 endpoint management system's job. Document the policy bundle you deploy
 alongside Secure Edge so future operators understand which layer enforces what.
+
+### 8.1 Image / screenshot DLP is not in scope
+
+The DLP scanner operates on **text content only**. The Aho-Corasick
+prefix scan, the regex pass, the entropy / hotword scoring, and the
+classifier head are all string-typed: the bytes a scanner receives
+are decoded as best-effort UTF-8 before any pattern fires. That
+decoder is the only way an image, screenshot, PDF, or other binary
+payload enters the pipeline, and it does **not** extract meaningful
+text from image pixels — a screenshot of an AWS access key is, to
+the scanner, an unrelated string of mojibake.
+
+This affects two surfaces specifically:
+
+- **Clipboard screenshot paste** (`extension/src/content/paste-interceptor.ts`,
+  Phase 7 / B3). The interceptor blocks the upload **gesture** by
+  calling `preventDefault` / `stopPropagation` before any await,
+  so a pasted screenshot never reaches the page's `paste`
+  listeners. The agent then runs its UTF-8 decode + DLP scan on
+  the file bytes; the resulting verdict is a coaching signal,
+  not a content-aware verdict. **The bytes never reach the AI
+  tool**, but Secure Edge cannot tell the operator whether the
+  screenshot contained sensitive content.
+- **Drag-and-drop / `<input type=file>` of image / PDF files**
+  (`file-upload-interceptor.ts`, Phase 7 / B1). Same shape — the
+  gesture is suppressed; the content scan is best-effort UTF-8.
+
+What the scanner **does** cover for binary payloads:
+
+- The risky-extension blocklist (§2.2). Filename-driven — a
+  matching extension blocks the gesture before any content read,
+  regardless of binary vs. text.
+- The proxy enforcement boundary above. The MITM proxy refuses
+  the body at the network layer; the content question is
+  irrelevant because the network refused to forward it at all.
+
+What the scanner does **not** support, and is not on the Phase 7
+roadmap:
+
+- OCR over screenshot pixels.
+- Image-classification heads (e.g. a CNN that flags screenshots
+  containing API-key-shaped layouts).
+- PDF text extraction (a PDF is treated as the same best-effort
+  UTF-8 decode as any other binary).
+
+For managed deployments that need screenshot DLP coverage, the
+recommended postures are:
+
+1. **Block the gesture outright on Tier-2 AI tools.** A managed
+   browser policy that disables clipboard image paste on the AI
+   tool's origin (Chrome Enterprise
+   [`DefaultClipboardSetting`](https://chromeenterprise.google/policies/#DefaultClipboardSetting)
+   set to `BlockClipboard` on the AI tool's origin, or the
+   equivalent in Edge / Firefox) makes screenshot paste
+   unreachable before any extension content script gets to run.
+2. **Layer in a complementary endpoint DLP product with OCR.**
+   Secure Edge's threat model is honest-user DLP coaching for
+   text payloads — a screenshot-OCR DLP product is a different
+   surface and the two compose cleanly (the extension blocks the
+   gesture for text-shape DLP; the endpoint product blocks the
+   gesture for image-shape DLP).
+
+The extension's B3 toast text intentionally does not claim that
+the screenshot was scanned — it only signals that the paste was
+suppressed. See the header comment in
+`extension/src/content/paste-interceptor.ts` for the same caveat
+in-source.
 
 ## 9. Troubleshooting
 

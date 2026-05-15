@@ -59,6 +59,29 @@
 //
 // Oversize routes through `policyForOversize` with the same
 // posture but a different toast.
+//
+// SCREENSHOT / IMAGE LIMITATION
+// -----------------------------
+// The FILE path covers the upload-gesture surface (paste of a
+// screenshot, copied image, copied PDF) and reliably suppresses
+// it before the page sees the event. It does NOT, however, give
+// a content-aware verdict on binary payloads. The downstream
+// `scanContent` agent decodes file bytes as best-effort UTF-8
+// before running the DLP pipeline — that decoder extracts no
+// meaningful text from image pixels, so a screenshot of an
+// API key looks (to the scanner) like an unrelated string of
+// mojibake.
+//
+// The privacy invariant the interceptor preserves on this path
+// is therefore: the screenshot bytes never reach the AI tool
+// (gesture is suppressed before the page's listeners fire). The
+// invariant it does NOT preserve is "the screenshot was scanned
+// for sensitive content". OCR + image classification are not
+// part of the threat model and are documented as out-of-scope
+// in docs/admin-guide.md §8.1. Managed deployments that need
+// screenshot DLP should layer a complementary endpoint DLP
+// product with OCR, or block clipboard image paste outright via
+// a managed browser policy.
 
 import {
     MAX_SCAN_BYTES,

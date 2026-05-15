@@ -257,6 +257,40 @@ may introduce breaking changes between feature releases.
   manifest, D2 signed profile, B2 risky-extension blocklist,
   browser policy) to where it lives in the bundle and how to
   verify it from the agent log or a single API probe.
+- **Config presets**: three reference configs at the repo root —
+  `config.personal.example.yaml` (fall-open, individual developer
+  use; mirrors the packaged `config.yaml` defaults),
+  `config.team.example.yaml` (per-install token + warn-toast on
+  agent-unavailable; Native Messaging HMAC and profile signing
+  still lenient for a staged rollout), and
+  `config.managed.example.yaml` (every Phase 7 control surface
+  enabled, every signed artefact verified, fail-closed posture
+  for an MDM-deployed fleet). New §2.0 in `docs/admin-guide.md`
+  cross-references all three and recommends a personal → team →
+  managed graduation path.
+- **Screenshot / image DLP limitation**: explicit
+  `docs/admin-guide.md §8.1` subsection documents that the DLP
+  scanner is text-only, that binary payloads (screenshots,
+  images, PDFs) are decoded as best-effort UTF-8, and that OCR /
+  image classification are out-of-scope for Phase 7. The B3
+  paste interceptor blocks the upload gesture; it does not give
+  a content-aware verdict on image pixels. Recommended postures
+  for managed deployments needing screenshot DLP: a Chrome
+  Enterprise `DefaultClipboardSetting: BlockClipboard` policy on
+  Tier-2 AI tool origins, or a complementary endpoint DLP
+  product with OCR. The same caveat is mirrored as a new
+  `SCREENSHOT / IMAGE LIMITATION` block in
+  `extension/src/content/paste-interceptor.ts`'s header comment.
+- **B3 test gap-fills**: five additional rows in
+  `paste-interceptor.test.ts` covering posture branches not
+  exercised by the original 22-test suite: text-only oversize in
+  team mode (silent-allow, matches personal), text-only
+  agent-unavailable in personal / team / managed (silent /
+  warn-toast / block-toast), and an `items[]`-only screenshot
+  paste integration that drives the full `onPaste` handler
+  through the `clipboardData.items[].getAsFile()` surface (the
+  previous coverage only unit-tested `collectClipboardFiles`
+  directly).
 
 ### Added — Phase 6: Hardening, Ecosystem Expansion & Community
 

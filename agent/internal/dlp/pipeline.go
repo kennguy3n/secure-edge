@@ -254,18 +254,22 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 		largeThreshold = LargeContentThreshold
 	}
 
-	// Step 1: classify content — currently used to short-circuit
-	// scans of obviously-empty input and to label the result for
-	// future per-class pattern subsets.
-	_ = ClassifyContent(content)
+	// Step 1: classify content. The verdict is fed into
+	// filterCandidates below so language-scoped patterns (e.g. Java
+	// password literals tagged content_types=["code"]) cannot fire on
+	// prose or structured JSON that happens to contain their prefix.
+	// Patterns with no content_types restriction continue to match
+	// every classification.
+	contentType := ClassifyContent(content)
 
 	// Step 2: Aho-Corasick prefix scan.
 	candidates := auto.Scan(content)
 
-	// Adaptive scanning + category filter: drop candidates whose
-	// patterns are disabled by category or de-prioritised for very
-	// large payloads.
-	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats)
+	// Adaptive scanning + category filter + content-type filter: drop
+	// candidates whose patterns are disabled by category, are
+	// de-prioritised for very large payloads, or are scoped to a
+	// classifier verdict that does not match contentType.
+	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats, contentType)
 
 	// Step 3: regex validation of candidates.
 	matches := ValidateCandidates(content, candidates)
@@ -416,21 +420,27 @@ func scanConcurrent(
 	return best
 }
 
-// filterCandidates implements adaptive scanning and category
-// filtering. For payloads larger than largeThreshold we drop candidates
-// whose Pattern severity is "low" or "medium" — large pastes pay the
-// per-candidate regex cost on critical/high patterns only.
+// filterCandidates implements adaptive scanning, category filtering,
+// and content-type filtering. For payloads larger than largeThreshold
+// we drop candidates whose Pattern severity is "low" or "medium" —
+// large pastes pay the per-candidate regex cost on critical/high
+// patterns only. A pattern with a non-empty ContentTypes list is
+// dropped when contentType is not in that list; patterns with an
+// empty ContentTypes list match every classification (backwards
+// compatible).
 func filterCandidates(
 	in []Candidate,
 	contentLen int,
 	largeThreshold int,
 	disabledCategories map[string]struct{},
+	contentType ContentType,
 ) []Candidate {
 	if len(in) == 0 {
 		return in
 	}
 	large := contentLen >= largeThreshold
-	if !large && len(disabledCategories) == 0 {
+	hasContentType := contentType != ""
+	if !large && len(disabledCategories) == 0 && !hasContentType {
 		return in
 	}
 	out := in[:0]
@@ -448,6 +458,9 @@ func filterCandidates(
 				continue
 			}
 		}
+		if hasContentType && len(pat.ContentTypes) > 0 && !contentTypeAllowed(pat.ContentTypes, contentType) {
+			continue
+		}
 		if large {
 			switch pat.Severity {
 			case SeverityCritical, SeverityHigh:
@@ -459,4 +472,16 @@ func filterCandidates(
 		out = append(out, c)
 	}
 	return out
+}
+
+// contentTypeAllowed reports whether ct appears in allowed. Tiny
+// helper kept separate from filterCandidates so the per-candidate
+// loop stays readable.
+func contentTypeAllowed(allowed []ContentType, ct ContentType) bool {
+	for _, a := range allowed {
+		if a == ct {
+			return true
+		}
+	}
+	return false
 }

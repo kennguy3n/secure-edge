@@ -11,7 +11,10 @@ For non-DLP rule changes (domains, categories) see
 
 The DLP pipeline runs seven steps per scan:
 
-1. **Classifier** — short-circuits obviously-empty input.
+1. **Classifier** — returns one of `code`, `structured`, `credentials`,
+   `natural`. The verdict is fed into the AC filter step (step 2) so
+   patterns whose `content_types` does not include the verdict are
+   dropped before regex validation.
 2. **Aho-Corasick** — single-pass O(n) scan for all pattern prefixes.
 3. **Regex revalidation** — runs the pattern's regex on a window around each
    AC hit; eliminates AC's false positives.
@@ -43,6 +46,7 @@ Every entry in `rules/dlp_patterns.json` is an object with these fields:
 | `require_hotword` | bool | When `true`, **no** block is issued unless at least one hotword matched. Use for patterns whose regex shape is shared with benign text (e.g. generic `password = "..."`). |
 | `entropy_min` | float | Below this Shannon entropy the score is **penalised** by `EntropyPenalty`. Set `0` to disable the entropy gate. |
 | `min_matches` | int | (optional) Require this many distinct matches in the same content before scoring; useful for low-signal regex like 16-digit credit card shapes. |
+| `content_types` | []string | (optional) Restrict this pattern to one or more classifier verdicts: `"code"`, `"structured"`, `"credentials"`, `"natural"`. Empty / omitted means "match every classification" (backwards compatible). When non-empty, candidates produced from content whose `ClassifyContent` verdict is not in this list are dropped at the Aho-Corasick filter step before the regex pass. Use this to scope language-specific shapes (`String x = "..."`, `let x = "..."`) so they cannot fire on prose that happens to share the prefix. |
 
 ### Example: a high-signal cloud key
 

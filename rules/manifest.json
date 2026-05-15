@@ -8,7 +8,7 @@
     {"name": "news.txt",             "sha256": "68b2d09c97985c49c305824b13d7da5d7923e35f0d2ef67466c1a700d057ad2e"},
     {"name": "phishing.txt",         "sha256": "b641c98e2b72b02e4fbc61d639b7f48c1daa253d742722d3dff0c9146d552c8f"},
     {"name": "social.txt",           "sha256": "08a7979116a8c61a2f0075e5be3303934de958f06038ec77da5ec73fbd28fd19"},
-    {"name": "dlp_patterns.json",    "sha256": "598c503fdb183aee25ec9fb41ba5a5bb577c2036b4ff16e733c281103bd8a153"},
+    {"name": "dlp_patterns.json",    "sha256": "1585068befc2919a51cbcc290c96b5e58ab66de7dd88bc5466adb15fa3d999ca"},
     {"name": "dlp_exclusions.json",  "sha256": "717303635678cec62e9b6037fa671a84ad3ac9ccc64b91d736fafd1e5fa2133d"}
   ]
 }

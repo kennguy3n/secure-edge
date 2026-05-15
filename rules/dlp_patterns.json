@@ -226,7 +226,10 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "cloud"
+      "category": "cloud",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "GCP OAuth Client Secret",
@@ -731,7 +734,10 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "code_secret"
+      "category": "code_secret",
+      "content_types": [
+        "code"
+      ]
     },
     {
       "name": "Internal URLs",
@@ -1811,7 +1817,11 @@
       "hotword_boost": 1,
       "require_hotword": true,
       "entropy_min": 3.0,
-      "category": "database_registry"
+      "category": "database_registry",
+      "content_types": [
+        "credentials",
+        "structured"
+      ]
     },
     {
       "name": "Docker Registry Auth",
@@ -1830,7 +1840,10 @@
       "hotword_boost": 1,
       "require_hotword": false,
       "entropy_min": 3.0,
-      "category": "database_registry"
+      "category": "database_registry",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "Helm Values Password",
@@ -2683,7 +2696,10 @@
       "hotword_boost": 2,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "database_registry"
+      "category": "database_registry",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "AWS Secrets Manager SecretString Paste",
@@ -2702,7 +2718,10 @@
       "hotword_boost": 2,
       "require_hotword": true,
       "entropy_min": 3.0,
-      "category": "cloud"
+      "category": "cloud",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "Azure Key Vault GetSecret Paste",
@@ -2720,7 +2739,10 @@
       "hotword_boost": 2,
       "require_hotword": false,
       "entropy_min": 0,
-      "category": "cloud"
+      "category": "cloud",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "GCP Secret Manager Payload Paste",
@@ -2739,7 +2761,10 @@
       "hotword_boost": 2,
       "require_hotword": true,
       "entropy_min": 3.5,
-      "category": "cloud"
+      "category": "cloud",
+      "content_types": [
+        "structured"
+      ]
     },
     {
       "name": "OAuth2 Refresh Token Assignment",

@@ -1,0 +1,377 @@
+// Tests for the Pattern.ContentTypes wiring that hooks the
+// ClassifyContent verdict into filterCandidates. The mechanism is
+// defense-in-depth: patterns with a non-empty ContentTypes list are
+// dropped at the AC filter step when ClassifyContent returns a verdict
+// not in the list. Patterns with an empty ContentTypes list continue
+// to match every classification (backwards compatible).
+//
+// These tests intentionally use a tiny inline pattern set rather than
+// the production rules/dlp_patterns.json so the assertions stay
+// independent of any specific real-world pattern's tagging.
+
+package dlp
+
+import (
+	"context"
+	"testing"
+)
+
+// contentTypePipeline builds a pipeline whose pattern set spans the
+// three interesting cases:
+//
+//   - a code-scoped pattern (ContentTypes=["code"]) — should fire on
+//     source code, must NOT fire on prose or env-style credentials.
+//   - a structured-scoped pattern (ContentTypes=["structured"]).
+//   - an untagged pattern (ContentTypes=nil) — must fire regardless of
+//     classification.
+//
+// Hotwords are widened and require_hotword is false so the assertions
+// here measure the classifier filter and nothing else.
+func contentTypePipeline(t testing.TB) *Pipeline {
+	t.Helper()
+	patternsJSON := []byte(`{
+"patterns": [
+  {
+    "name": "Code-Scoped Demo Token",
+    "regex": "CODEDEMO[A-Z0-9]{20}",
+    "prefix": "CODEDEMO",
+    "severity": "critical",
+    "score_weight": 1,
+    "hotwords": ["demo", "secret"],
+    "hotword_window": 400,
+    "hotword_boost": 2,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "category": "test_code_only",
+    "content_types": ["code"]
+  },
+  {
+    "name": "Structured-Scoped Demo Token",
+    "regex": "STRUCTDEMO[A-Z0-9]{20}",
+    "prefix": "STRUCTDEMO",
+    "severity": "critical",
+    "score_weight": 1,
+    "hotwords": ["demo", "secret"],
+    "hotword_window": 400,
+    "hotword_boost": 2,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "category": "test_structured_only",
+    "content_types": ["structured"]
+  },
+  {
+    "name": "Any-Type Demo Token",
+    "regex": "ANYDEMO[A-Z0-9]{20}",
+    "prefix": "ANYDEMO",
+    "severity": "critical",
+    "score_weight": 1,
+    "hotwords": ["demo", "secret"],
+    "hotword_window": 400,
+    "hotword_boost": 2,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "category": "test_any"
+  }
+]
+}`)
+
+	patterns, err := ParsePatterns(patternsJSON)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+
+	p := NewPipeline(DefaultScoreWeights(), NewThresholdEngine(DefaultThresholds()))
+	p.Rebuild(patterns, nil)
+	return p
+}
+
+// codeContext is a Java source-file snippet that the classifier should
+// report as CodeContent (≥2 import/class/package lines).
+const codeContext = `package com.example.demo;
+
+import java.util.List;
+import java.util.Map;
+
+public class DemoService {
+    private final String demoSecret = "CODEDEMOABCDEFGHIJKLMNOPQRST";
+    private final String anyMarker  = "ANYDEMOABCDEFGHIJKLMNOPQRST";
+    private final String structMark = "STRUCTDEMOABCDEFGHIJKLMNOPQRST";
+}`
+
+// structuredContext is a JSON blob that the classifier should report
+// as StructuredData (contains { and } and the "key": pattern).
+const structuredContext = `{
+  "demo": "secret",
+  "code_token": "CODEDEMOABCDEFGHIJKLMNOPQRST",
+  "struct_token": "STRUCTDEMOABCDEFGHIJKLMNOPQRST",
+  "any_token": "ANYDEMOABCDEFGHIJKLMNOPQRST"
+}`
+
+// naturalContext is plain English prose with no code or structured
+// markers — should classify as NaturalLanguage.
+const naturalContext = "Here is the demo secret string CODEDEMOABCDEFGHIJKLMNOPQRST " +
+	"alongside STRUCTDEMOABCDEFGHIJKLMNOPQRST and ANYDEMOABCDEFGHIJKLMNOPQRST " +
+	"embedded in this paragraph of ordinary English text that has many spaces " +
+	"and ordinary words and sentences ending in periods."
+
+func TestContentTypes_CodeScopedFiresOnCode(t *testing.T) {
+	if ct := ClassifyContent(codeContext); ct != CodeContent {
+		t.Fatalf("test fixture invariant: codeContext classified as %q, want %q", ct, CodeContent)
+	}
+	p := contentTypePipeline(t)
+
+	res := p.Scan(context.Background(), codeContext)
+	if !res.Blocked {
+		t.Fatalf("expected a block on code context, got %+v", res)
+	}
+	// Either code-scoped or any-type can win; both are valid TPs here.
+	switch res.PatternName {
+	case "Code-Scoped Demo Token", "Any-Type Demo Token":
+		// ok
+	default:
+		t.Fatalf("unexpected winning pattern %q", res.PatternName)
+	}
+}
+
+func TestContentTypes_CodeScopedDoesNotFireOnProse(t *testing.T) {
+	if ct := ClassifyContent(naturalContext); ct != NaturalLanguage {
+		t.Fatalf("test fixture invariant: naturalContext classified as %q, want %q", ct, NaturalLanguage)
+	}
+	p := contentTypePipeline(t)
+
+	// The code-scoped pattern shape is present in the prose, but the
+	// classifier filter must drop the candidate before regex/scoring.
+	// Disable the untagged "Any-Type Demo Token" so it cannot rescue
+	// the block — we want to observe that the code-scoped pattern by
+	// itself is suppressed.
+	original := p.Patterns()
+	filtered := make([]*Pattern, 0, len(original))
+	for _, pat := range original {
+		if pat.Name == "Any-Type Demo Token" || pat.Name == "Structured-Scoped Demo Token" {
+			continue
+		}
+		filtered = append(filtered, pat)
+	}
+	p.Rebuild(filtered, nil)
+
+	res := p.Scan(context.Background(), naturalContext)
+	if res.Blocked {
+		t.Fatalf("code-scoped pattern must not fire on prose, got %+v", res)
+	}
+}
+
+func TestContentTypes_StructuredScopedDoesNotFireOnCode(t *testing.T) {
+	if ct := ClassifyContent(codeContext); ct != CodeContent {
+		t.Fatalf("test fixture invariant: codeContext classified as %q, want %q", ct, CodeContent)
+	}
+	p := contentTypePipeline(t)
+
+	// Drop the code-scoped + any-type patterns so the only candidate
+	// reaching the AC is the structured-scoped one.
+	original := p.Patterns()
+	filtered := make([]*Pattern, 0, len(original))
+	for _, pat := range original {
+		if pat.Name == "Structured-Scoped Demo Token" {
+			filtered = append(filtered, pat)
+		}
+	}
+	p.Rebuild(filtered, nil)
+
+	res := p.Scan(context.Background(), codeContext)
+	if res.Blocked {
+		t.Fatalf("structured-scoped pattern must not fire on code, got %+v", res)
+	}
+}
+
+func TestContentTypes_AnyTypeFiresEverywhere(t *testing.T) {
+	p := contentTypePipeline(t)
+
+	// Keep only the untagged "Any-Type Demo Token" so the other two
+	// scoped patterns cannot mask the assertion.
+	original := p.Patterns()
+	filtered := make([]*Pattern, 0, len(original))
+	for _, pat := range original {
+		if pat.Name == "Any-Type Demo Token" {
+			filtered = append(filtered, pat)
+		}
+	}
+	p.Rebuild(filtered, nil)
+
+	cases := []struct {
+		label   string
+		content string
+		wantCT  ContentType
+	}{
+		{"code", codeContext, CodeContent},
+		{"structured", structuredContext, StructuredData},
+		{"natural", naturalContext, NaturalLanguage},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.label, func(t *testing.T) {
+			if ct := ClassifyContent(tc.content); ct != tc.wantCT {
+				t.Fatalf("fixture %q classified as %q, want %q", tc.label, ct, tc.wantCT)
+			}
+			res := p.Scan(context.Background(), tc.content)
+			if !res.Blocked {
+				t.Fatalf("untagged pattern must fire on %s, got %+v", tc.label, res)
+			}
+			if res.PatternName != "Any-Type Demo Token" {
+				t.Fatalf("unexpected pattern %q", res.PatternName)
+			}
+		})
+	}
+}
+
+func TestContentTypes_LoaderParsesField(t *testing.T) {
+	raw := []byte(`{"patterns": [
+  {
+    "name": "P1",
+    "regex": "ABCDEF[A-Z]{10}",
+    "prefix": "ABCDEF",
+    "severity": "critical",
+    "score_weight": 1,
+    "hotwords": [],
+    "hotword_window": 0,
+    "hotword_boost": 0,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "content_types": ["code", "structured"]
+  },
+  {
+    "name": "P2",
+    "regex": "GHIJKL[A-Z]{10}",
+    "prefix": "GHIJKL",
+    "severity": "critical",
+    "score_weight": 1,
+    "hotwords": [],
+    "hotword_window": 0,
+    "hotword_boost": 0,
+    "require_hotword": false,
+    "entropy_min": 0
+  }
+]}`)
+	pats, err := ParsePatterns(raw)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+	if len(pats) != 2 {
+		t.Fatalf("got %d patterns, want 2", len(pats))
+	}
+	if got := pats[0].ContentTypes; len(got) != 2 || got[0] != CodeContent || got[1] != StructuredData {
+		t.Fatalf("P1.ContentTypes = %v, want [code structured]", got)
+	}
+	if len(pats[1].ContentTypes) != 0 {
+		t.Fatalf("P2.ContentTypes = %v, want empty/nil", pats[1].ContentTypes)
+	}
+}
+
+func TestFilterCandidates_RespectsContentTypeAndPreservesCategoryFilter(t *testing.T) {
+	patternsJSON := []byte(`{"patterns": [
+  {
+    "name": "P-code",
+    "regex": "PCODE[A-Z0-9]{10}",
+    "prefix": "PCODE",
+    "severity": "high",
+    "score_weight": 1,
+    "hotwords": [],
+    "hotword_window": 0,
+    "hotword_boost": 0,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "category": "demo_code",
+    "content_types": ["code"]
+  },
+  {
+    "name": "P-any-low",
+    "regex": "PLOW[A-Z0-9]{10}",
+    "prefix": "PLOW",
+    "severity": "low",
+    "score_weight": 1,
+    "hotwords": [],
+    "hotword_window": 0,
+    "hotword_boost": 0,
+    "require_hotword": false,
+    "entropy_min": 0,
+    "category": "demo_low"
+  }
+]}`)
+	pats, err := ParsePatterns(patternsJSON)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+	auto := BuildAutomaton(pats)
+
+	// filterCandidates reuses the backing array (in[:0]) so each
+	// scenario calls auto.Scan again to get a fresh candidate slice.
+	// Feeds AC a content blob that hits both prefixes, then exercises
+	// the classifier filter, the large-content severity filter, and
+	// the disabledCategories set.
+	mix := "PCODEAAAAAAAAAA PLOWBBBBBBBBBB"
+
+	// Case 1: NaturalLanguage drops the code-scoped pattern; the
+	// untagged P-any-low survives.
+	out := filterCandidates(auto.Scan(mix), len(mix), 1<<30, nil, NaturalLanguage)
+	names := candidateNames(out)
+	if contains(names, "P-code") {
+		t.Fatalf("expected P-code dropped under NaturalLanguage, got %v", names)
+	}
+	if !contains(names, "P-any-low") {
+		t.Fatalf("expected P-any-low preserved under NaturalLanguage, got %v", names)
+	}
+
+	// Case 2: CodeContent keeps both.
+	out = filterCandidates(auto.Scan(mix), len(mix), 1<<30, nil, CodeContent)
+	names = candidateNames(out)
+	if !contains(names, "P-code") || !contains(names, "P-any-low") {
+		t.Fatalf("expected both candidates under CodeContent, got %v", names)
+	}
+
+	// Case 3: "Large" payload drops low-severity (P-any-low) even
+	// though the code-scoped is allowed.
+	out = filterCandidates(auto.Scan(mix), 1, 1, nil, CodeContent)
+	names = candidateNames(out)
+	if contains(names, "P-any-low") {
+		t.Fatalf("expected P-any-low dropped on large content, got %v", names)
+	}
+
+	// Case 4: disabledCategories drops by category regardless of
+	// classifier verdict.
+	disabled := map[string]struct{}{"demo_code": {}}
+	out = filterCandidates(auto.Scan(mix), len(mix), 1<<30, disabled, CodeContent)
+	names = candidateNames(out)
+	if contains(names, "P-code") {
+		t.Fatalf("expected P-code dropped via disabledCategories, got %v", names)
+	}
+
+	// Case 5: empty contentType (e.g. classifier disabled at the
+	// call site) must NOT drop ContentTypes-tagged patterns —
+	// backwards compatible behaviour for callers that bypass the
+	// classifier.
+	out = filterCandidates(auto.Scan(mix), len(mix), 1<<30, nil, ContentType(""))
+	names = candidateNames(out)
+	if !contains(names, "P-code") || !contains(names, "P-any-low") {
+		t.Fatalf("expected both candidates with empty contentType, got %v", names)
+	}
+}
+
+func candidateNames(cs []Candidate) []string {
+	out := make([]string, 0, len(cs))
+	for _, c := range cs {
+		if c.Pattern == nil {
+			continue
+		}
+		out = append(out, c.Pattern.Name)
+	}
+	return out
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}
+

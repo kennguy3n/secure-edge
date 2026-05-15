@@ -1082,4 +1082,104 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["BigCommerce API Token"] = func(r *rand.Rand) string {
 		return "BIGCOMMERCE_AUTH_TOKEN=" + randLowerAlnum(r, 40)
 	}
+	// ---------------- Batch 3: Crypto / Blockchain ----------------
+	valueGenerators["Infura Project ID"] = func(r *rand.Rand) string {
+		return "INFURA_PROJECT_ID=" + randHex(r, 32)
+	}
+	valueGenerators["Infura Project Secret"] = func(r *rand.Rand) string {
+		return "INFURA_PROJECT_SECRET=" + randHex(r, 32)
+	}
+	valueGenerators["Alchemy API Key"] = func(r *rand.Rand) string {
+		return "ALCHEMY_API_KEY=" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["Alchemy NFT API Key"] = func(r *rand.Rand) string {
+		return "ALCHEMY_NFT_API_KEY=" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["QuickNode Endpoint with Key"] = func(r *rand.Rand) string {
+		return "https://snowy-icy-glade.quiknode.pro/" + randLowerAlnum(r, 40) + "/"
+	}
+	valueGenerators["Chainstack RPC Endpoint"] = func(r *rand.Rand) string {
+		return "https://nd-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + ".p2pify.com/" + randHex(r, 32)
+	}
+	valueGenerators["Moralis Web3 API Key"] = func(r *rand.Rand) string {
+		return "MORALIS_API_KEY=" + randAlnum(r, 80)
+	}
+	valueGenerators["Etherscan API Key"] = func(r *rand.Rand) string {
+		return "ETHERSCAN_API_KEY=" + randUpperAlnum(r, 34)
+	}
+	valueGenerators["BscScan API Key"] = func(r *rand.Rand) string {
+		return "BSCSCAN_API_KEY=" + randUpperAlnum(r, 34)
+	}
+	valueGenerators["Polygonscan API Key"] = func(r *rand.Rand) string {
+		return "POLYGONSCAN_API_KEY=" + randUpperAlnum(r, 34)
+	}
+	valueGenerators["WalletConnect Project ID"] = func(r *rand.Rand) string {
+		return "WALLETCONNECT_PROJECT_ID=" + randHex(r, 32)
+	}
+	valueGenerators["Pinata JWT"] = func(r *rand.Rand) string {
+		return "PINATA_JWT=eyJ" + randFromAlphabet(r, alnum+"_-", 100) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 200) + "." + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Pinata API Key"] = func(r *rand.Rand) string {
+		return "PINATA_API_KEY=" + randHex(r, 20)
+	}
+	valueGenerators["Pinata API Secret"] = func(r *rand.Rand) string {
+		return "PINATA_API_SECRET=" + randHex(r, 64)
+	}
+	valueGenerators["web3.storage Token"] = func(r *rand.Rand) string {
+		return "WEB3_STORAGE_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 120)
+	}
+	valueGenerators["NFT.Storage Token"] = func(r *rand.Rand) string {
+		return "NFT_STORAGE_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 120)
+	}
+	valueGenerators["Tatum API Key"] = func(r *rand.Rand) string {
+		return "TATUM_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["BitGo Access Token"] = func(r *rand.Rand) string {
+		return "BITGO_ACCESS_TOKEN=v2x" + randHex(r, 60)
+	}
+	valueGenerators["Hedera Operator Private Key (DER hex)"] = func(r *rand.Rand) string {
+		return "302e020100300506032b657004220420" + randHex(r, 64)
+	}
+	valueGenerators["Ethereum Private Key (hex)"] = func(r *rand.Rand) string {
+		return "ETH_PRIVATE_KEY=0x" + randHex(r, 64)
+	}
+	valueGenerators["Ethereum Mnemonic Hint"] = func(r *rand.Rand) string {
+		return "MNEMONIC=" + bip39LikePhrase(r, 12)
+	}
+	valueGenerators["Bitcoin WIF Private Key"] = func(r *rand.Rand) string {
+		return "BTC_PRIVATE_KEY=" + pick(r, []string{"5", "K", "L"}) + randFromAlphabet(r, "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", 51)
+	}
+	valueGenerators["Solana Keypair JSON Array"] = func(r *rand.Rand) string {
+		return solanaKeypair(r)
+	}
+	valueGenerators["Solana Private Key Base58"] = func(r *rand.Rand) string {
+		return "SOLANA_PRIVATE_KEY=" + randFromAlphabet(r, "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", 88)
+	}
+	valueGenerators["Cardano Spending Key"] = func(r *rand.Rand) string {
+		return "CARDANO_SPENDING_KEY=ed25519_sk1" + randLowerAlnum(r, 56)
+	}
+	valueGenerators["Polkadot Account Seed"] = func(r *rand.Rand) string {
+		return "POLKADOT_SEED=0x" + randHex(r, 64)
+	}
+	valueGenerators["Cosmos Account Mnemonic"] = func(r *rand.Rand) string {
+		return "COSMOS_MNEMONIC=" + bip39LikePhrase(r, 12)
+	}
+	valueGenerators["OpenSea API Key"] = func(r *rand.Rand) string {
+		return "OPENSEA_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["CoinGecko Pro API Key"] = func(r *rand.Rand) string {
+		return "CG-" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["CoinMarketCap API Key"] = func(r *rand.Rand) string {
+		return "COINMARKETCAP_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["Binance API Key"] = func(r *rand.Rand) string {
+		return "BINANCE_API_KEY=" + randAlnum(r, 64)
+	}
+	valueGenerators["Binance API Secret"] = func(r *rand.Rand) string {
+		return "BINANCE_API_SECRET=" + randAlnum(r, 64)
+	}
+	valueGenerators["Coinbase Pro API Passphrase"] = func(r *rand.Rand) string {
+		return "COINBASE_PASSPHRASE=" + randAlnum(r, 16)
+	}
 }

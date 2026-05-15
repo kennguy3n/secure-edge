@@ -5358,6 +5358,571 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "Infura Project ID",
+      "regex": "(?i)INFURA_PROJECT_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "infura_project_id",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "infura",
+        "web3",
+        "ethereum"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Infura Project Secret",
+      "regex": "(?i)INFURA_PROJECT_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "infura_project_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "infura",
+        "web3",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Alchemy API Key",
+      "regex": "(?i)ALCHEMY_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "alchemy_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "alchemy",
+        "web3",
+        "rpc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Alchemy NFT API Key",
+      "regex": "(?i)ALCHEMY_NFT_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "alchemy_nft_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "alchemy",
+        "nft",
+        "web3"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "QuickNode Endpoint with Key",
+      "regex": "https?://[a-z0-9\\-]+\\.quiknode\\.pro/[a-z0-9]{32,}/",
+      "prefix": ".quiknode.pro/",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "quicknode",
+        "rpc",
+        "ethereum"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Chainstack RPC Endpoint",
+      "regex": "https?://[a-z0-9]+\\.p2pify\\.com/[a-f0-9]{32,}",
+      "prefix": ".p2pify.com/",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "chainstack",
+        "rpc",
+        "p2pify"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Moralis Web3 API Key",
+      "regex": "(?i)MORALIS_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{60,}",
+      "prefix": "moralis_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "moralis",
+        "web3",
+        "nft"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Etherscan API Key",
+      "regex": "(?i)ETHERSCAN_API_KEY\\s*[:=]\\s*['\\\"]?[A-Z0-9]{34}",
+      "prefix": "etherscan_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "etherscan",
+        "blockchain",
+        "explorer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "BscScan API Key",
+      "regex": "(?i)BSCSCAN_API_KEY\\s*[:=]\\s*['\\\"]?[A-Z0-9]{34}",
+      "prefix": "bscscan_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bscscan",
+        "bsc",
+        "explorer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Polygonscan API Key",
+      "regex": "(?i)POLYGONSCAN_API_KEY\\s*[:=]\\s*['\\\"]?[A-Z0-9]{34}",
+      "prefix": "polygonscan_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "polygonscan",
+        "polygon",
+        "explorer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "WalletConnect Project ID",
+      "regex": "(?i)WALLETCONNECT_PROJECT_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "walletconnect_project_id",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "walletconnect",
+        "wc",
+        "project"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Pinata JWT",
+      "regex": "(?i)PINATA_JWT\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{60,}\\.[A-Za-z0-9_\\-]{60,}\\.[A-Za-z0-9_\\-]{30,}",
+      "prefix": "pinata_jwt",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pinata",
+        "ipfs",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Pinata API Key",
+      "regex": "(?i)PINATA_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{20}",
+      "prefix": "pinata_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pinata",
+        "ipfs"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Pinata API Secret",
+      "regex": "(?i)PINATA_API_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{64}",
+      "prefix": "pinata_api_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pinata",
+        "ipfs",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "web3.storage Token",
+      "regex": "(?i)WEB3_STORAGE_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{80,}",
+      "prefix": "web3_storage_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "web3.storage",
+        "ipfs",
+        "filecoin"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "NFT.Storage Token",
+      "regex": "(?i)NFT_STORAGE_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{80,}",
+      "prefix": "nft_storage_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "nft.storage",
+        "ipfs",
+        "nft"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Tatum API Key",
+      "regex": "(?i)TATUM_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "tatum_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "tatum",
+        "blockchain",
+        "web3"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "BitGo Access Token",
+      "regex": "(?i)BITGO_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?v2x[a-f0-9]{40,}",
+      "prefix": "bitgo_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitgo",
+        "wallet",
+        "custody"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Hedera Operator Private Key (DER hex)",
+      "regex": "302e020100300506032b657004220420[a-f0-9]{64}",
+      "prefix": "302e020100300506032b657004220420",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "hedera",
+        "hashgraph",
+        "operator"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Ethereum Private Key (hex)",
+      "regex": "(?i)(?:ETH_PRIVATE_KEY|ETHEREUM_PRIVATE_KEY|PRIVATE_KEY)\\s*[:=]\\s*['\\\"]?0x[a-f0-9]{64}",
+      "prefix": "0x",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ethereum",
+        "eth",
+        "private key",
+        "wallet"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Ethereum Mnemonic Hint",
+      "regex": "(?i)(?:MNEMONIC|SEED_PHRASE|RECOVERY_PHRASE)\\s*[:=]\\s*['\\\"]?(?:[a-z]{3,8}\\s+){11,23}[a-z]{3,8}",
+      "prefix": "mnemonic",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mnemonic",
+        "seed",
+        "bip39",
+        "recovery"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Bitcoin WIF Private Key",
+      "regex": "(?i)BTC_PRIVATE_KEY\\s*[:=]\\s*['\\\"]?[5KL][1-9A-HJ-NP-Za-km-z]{50,51}",
+      "prefix": "btc_private_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bitcoin",
+        "btc",
+        "wif",
+        "private"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Solana Keypair JSON Array",
+      "regex": "\\[\\s*(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)(?:\\s*,\\s*(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)){63}\\s*\\]",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "solana",
+        "sol",
+        "keypair",
+        "secretkey"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Solana Private Key Base58",
+      "regex": "(?i)SOLANA_PRIVATE_KEY\\s*[:=]\\s*['\\\"]?[1-9A-HJ-NP-Za-km-z]{87,88}",
+      "prefix": "solana_private_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "solana",
+        "sol",
+        "base58",
+        "wallet"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cardano Spending Key",
+      "regex": "(?i)CARDANO_SPENDING_KEY\\s*[:=]\\s*['\\\"]?ed25519_sk1[a-z0-9]{50,60}",
+      "prefix": "ed25519_sk1",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cardano",
+        "ada",
+        "wallet"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Polkadot Account Seed",
+      "regex": "(?i)POLKADOT_SEED\\s*[:=]\\s*['\\\"]?0x[a-f0-9]{64}",
+      "prefix": "polkadot_seed",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "polkadot",
+        "dot",
+        "seed"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cosmos Account Mnemonic",
+      "regex": "(?i)COSMOS_MNEMONIC\\s*[:=]\\s*['\\\"]?(?:[a-z]{3,8}\\s+){11,23}[a-z]{3,8}",
+      "prefix": "cosmos_mnemonic",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cosmos",
+        "atom",
+        "mnemonic"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "OpenSea API Key",
+      "regex": "(?i)OPENSEA_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "opensea_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "opensea",
+        "nft",
+        "marketplace"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "CoinGecko Pro API Key",
+      "regex": "CG-[A-Za-z0-9_\\-]{30,}",
+      "prefix": "cg-",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "coingecko",
+        "cg-pro",
+        "price"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "CoinMarketCap API Key",
+      "regex": "(?i)COINMARKETCAP_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "coinmarketcap_api_key",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "coinmarketcap",
+        "cmc",
+        "price"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Binance API Key",
+      "regex": "(?i)BINANCE_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{64}",
+      "prefix": "binance_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "binance",
+        "exchange",
+        "spot"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Binance API Secret",
+      "regex": "(?i)BINANCE_API_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{64}",
+      "prefix": "binance_api_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "binance",
+        "exchange",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Coinbase Pro API Passphrase",
+      "regex": "(?i)COINBASE_PASSPHRASE\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%]{6,}",
+      "prefix": "coinbase_passphrase",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "coinbase",
+        "pro",
+        "passphrase"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
     }
   ]
 }

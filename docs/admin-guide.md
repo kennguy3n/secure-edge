@@ -445,16 +445,7 @@ and force-install semantics carry over.
             "runtime_blocked_hosts": [],
             "runtime_allowed_hosts": ["*://*/*"]
         }
-    },
-    "ManagedConfigurationPerOrigin": [
-        {
-            "origin": "chrome-extension://<extension-id>/",
-            "configuration": {
-                "agent_base": "http://127.0.0.1:8080",
-                "enforcement_mode_hint": "managed"
-            }
-        }
-    ]
+    }
 }
 ```
 
@@ -466,9 +457,10 @@ and force-install semantics carry over.
   intercepts AI-tool surfaces by URL match. If your fleet only uses a
   known subset (e.g. just `chatgpt.com` and `claude.ai`), narrow this
   list to reduce the extension's exposure.
-- `ManagedConfigurationPerOrigin` is **optional** — the extension reads
-  the enforcement mode from the agent over loopback; the policy entry
-  only matters for early-bootstrap before the agent first responds.
+- The extension does not read `chrome.storage.managed`; the agent
+  endpoint and enforcement mode are resolved over loopback at runtime
+  from the agent itself (see §1 and §7). No additional managed-policy
+  keys are needed.
 
 ### 10.3 Per-platform recipes
 

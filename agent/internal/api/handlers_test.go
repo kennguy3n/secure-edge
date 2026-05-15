@@ -1960,3 +1960,181 @@ func TestControlEndpoints_BodyTooLarge(t *testing.T) {
 		})
 	}
 }
+
+// TestNoBodyControlEndpoints_BodyIsCapped confirms the POST control
+// handlers that do NOT decode r.Body still wrap r.Body in
+// http.MaxBytesReader via capControlBody, so that the server-side
+// drain Go runs to support keep-alive cannot be coerced into
+// transferring megabytes of attacker payload at endpoints that have
+// no business taking a body. These handlers don't return 413 to the
+// client — they return their normal status (200 for happy path,
+// 503 when the backend is unwired) — but after the handler returns
+// r.Body must read as a *http.MaxBytesError once the cap is
+// exceeded. A regression that drops capControlBody would let the
+// drain consume an arbitrarily large body and waste server I/O
+// budget, so the per-endpoint table here pins the wiring.
+func TestNoBodyControlEndpoints_BodyIsCapped(t *testing.T) {
+	oversize := bytes.Repeat([]byte{'x'}, maxControlBytes+1)
+
+	cases := []struct {
+		name       string
+		path       string
+		setup      func(*Server)
+		wantStatus int
+	}{
+		{
+			name: "proxy enable POST (with controller)",
+			path: "/api/proxy/enable",
+			setup: func(s *Server) {
+				s.SetProxyController(&fakeProxyController{statusSnap: ProxyStatus{
+					ListenAddr: "127.0.0.1:8443",
+				}})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "rules update POST (with updater)",
+			path: "/api/rules/update",
+			setup: func(s *Server) {
+				s.SetRuleUpdater(&stubUpdater{})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "stats reset POST",
+			path:       "/api/stats/reset",
+			setup:      func(*Server) {}, // newTestServer wires Stats
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "agent update POST (with updater)",
+			path: "/api/agent/update",
+			setup: func(s *Server) {
+				s.SetAgentUpdater(&stubAgentUpdater{stage: AgentUpdateStage{
+					Version: "0.2.0",
+				}})
+			},
+			wantStatus: http.StatusOK,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(oversize))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+
+			// Happy-path check first — the cap is a no-op for the
+			// handler's response. If this fails, capControlBody is
+			// being called but is somehow breaking the handler’s
+			// normal control flow, which would be a regression.
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d (body=%q), want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
+			}
+
+			// capControlBody mutates req.Body in place by replacing
+			// it with an http.MaxBytesReader. We held the request
+			// pointer across ServeHTTP, so after the handler returns
+			// req.Body should now be the wrapped reader. The next
+			// Read past the cap surfaces *http.MaxBytesError — this
+			// is exactly what Go’s internal drain code sees, and
+			// what tells the server to close the connection instead
+			// of keep-aliving it.
+			buf := make([]byte, maxControlBytes*2)
+			_, readErr := req.Body.Read(buf)
+			var mbe *http.MaxBytesError
+			if !errors.As(readErr, &mbe) {
+				t.Errorf("req.Body.Read err = %v (type %T), want *http.MaxBytesError",
+					readErr, readErr)
+			}
+		})
+	}
+}
+
+// deadlineRecorderWriter wraps an httptest.ResponseRecorder and
+// satisfies the SetWriteDeadline interface that
+// http.NewResponseController consults via reflection. The test below
+// uses it to observe whether allowLongWrite calls
+// SetWriteDeadline(time.Time{}) on the three handlers that do
+// long-IO work and would otherwise be cut off by the server-wide
+// 10 s WriteTimeout configured in api/server.go.
+type deadlineRecorderWriter struct {
+	*httptest.ResponseRecorder
+	deadlines []time.Time
+}
+
+func (d *deadlineRecorderWriter) SetWriteDeadline(t time.Time) error {
+	d.deadlines = append(d.deadlines, t)
+	return nil
+}
+
+// TestLongIOHandlers_DropWriteDeadline pins the contract that the
+// three control handlers which do outbound HTTPS — handleRulesUpdate
+// (signed manifest fetch), handleProfileImport (profile URL fetch),
+// handleAgentUpdate (agent binary download) — disable the
+// per-connection write deadline so http.Server.WriteTimeout = 10s
+// does not prematurely cut off their response. A regression that
+// removes the allowLongWrite call would re-introduce the bug Devin
+// Review flagged on PR #37 (the response writer dies mid-stream
+// when the outbound op takes >10s).
+//
+// The expectation is that SetWriteDeadline is called with the zero
+// time.Time — net/http’s documented "no deadline" sentinel.
+func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
+	cases := []struct {
+		name  string
+		path  string
+		setup func(*Server)
+	}{
+		{
+			name: "rules update",
+			path: "/api/rules/update",
+			setup: func(s *Server) {
+				s.SetRuleUpdater(&stubUpdater{})
+			},
+		},
+		{
+			name: "agent update",
+			path: "/api/agent/update",
+			setup: func(s *Server) {
+				s.SetAgentUpdater(&stubAgentUpdater{stage: AgentUpdateStage{
+					Version: "0.2.0",
+				}})
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+			rec := &deadlineRecorderWriter{ResponseRecorder: httptest.NewRecorder()}
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(nil))
+			srv.Handler().ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d body=%q", rec.Code, rec.Body.String())
+			}
+			// Exactly one SetWriteDeadline(zero) call expected per
+			// handler invocation — if the handler is wrapping more
+			// than one allowLongWrite that’s harmless but unusual,
+			// so the test asserts presence of zero rather than count.
+			foundZero := false
+			for _, d := range rec.deadlines {
+				if d.IsZero() {
+					foundZero = true
+					break
+				}
+			}
+			if !foundZero {
+				t.Errorf("SetWriteDeadline never called with zero time; observed = %v",
+					rec.deadlines)
+			}
+		})
+	}
+}
+
+

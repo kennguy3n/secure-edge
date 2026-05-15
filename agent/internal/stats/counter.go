@@ -7,6 +7,7 @@ package stats
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -37,12 +38,41 @@ type Store interface {
 type storeStats = Snapshot
 
 // Counter is the in-memory counter set.
+//
+// Increments use atomics so the hot DNS / DLP paths never block on a
+// shared lock. flushMu serialises Flush / Reset against each other so
+// the swap-then-AddStats sequence in Flush cannot interleave with a
+// concurrent Reset that zeroes the persisted row: without the lock a
+// Reset that lands between Flush's atomic.SwapInt64 calls and its
+// store.AddStats call would persist the swapped-out delta on top of a
+// freshly-zeroed row and the operator would see counters "reappear"
+// post-reset. flushMu is intentionally NOT held over the increment
+// fast path — increments remain lock-free.
+//
+// Direct-to-store increments (paths that bypass this counter and bump
+// store.AggregateStats themselves) are NOT serialised here. The known
+// audit list at the time of writing:
+//
+//   - internal/api/handlers.go bumpDLPStats: the per-scan handler and
+//     the Native Messaging frame handler increment dlp_scans_total
+//     and dlp_blocks_total directly on store.Store after every scan.
+//     Documented in the bumpDLPStats comment; the store-level write
+//     is itself atomic so the bypass cannot corrupt counter values.
+//
+// Every DNS / tamper / DLP increment outside that one helper routes
+// through *Counter.Increment* and therefore takes the in-memory fast
+// path. New direct-to-store call sites must update bumpDLPStats's
+// doc comment and this audit list so the contract stays explicit.
 type Counter struct {
 	dnsQueries int64
 	dnsBlocks  int64
 	dlpScans   int64
 	dlpBlocks  int64
 	tamperHits int64
+
+	// flushMu serialises Flush and Reset. Increments do not take
+	// this lock — they stay on the atomic-only fast path.
+	flushMu sync.Mutex
 
 	store Store
 }
@@ -94,8 +124,13 @@ func (c *Counter) GetStats(ctx context.Context) (Snapshot, error) {
 }
 
 // Flush atomically extracts the in-memory deltas, adds them to the
-// persisted totals, and zeroes the in-memory counters.
+// persisted totals, and zeroes the in-memory counters. Serialised
+// against Reset via flushMu so a Reset cannot land between the
+// in-memory swap and the store.AddStats call — see the Counter
+// type comment for the regression that race would re-introduce.
 func (c *Counter) Flush(ctx context.Context) error {
+	c.flushMu.Lock()
+	defer c.flushMu.Unlock()
 	delta := Snapshot{
 		DNSQueriesTotal:       atomic.SwapInt64(&c.dnsQueries, 0),
 		DNSBlocksTotal:        atomic.SwapInt64(&c.dnsBlocks, 0),
@@ -120,7 +155,11 @@ func (c *Counter) Flush(ctx context.Context) error {
 }
 
 // Reset zeroes both the in-memory and the persisted counters.
+// Serialised against Flush via flushMu so the swap-then-AddStats path
+// cannot interleave with a Reset that zeroes the persisted row.
 func (c *Counter) Reset(ctx context.Context) error {
+	c.flushMu.Lock()
+	defer c.flushMu.Unlock()
 	atomic.StoreInt64(&c.dnsQueries, 0)
 	atomic.StoreInt64(&c.dnsBlocks, 0)
 	atomic.StoreInt64(&c.dlpScans, 0)

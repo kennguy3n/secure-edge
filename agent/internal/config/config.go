@@ -306,7 +306,71 @@ func Load(path string) (Config, error) {
 	if err := merged.validate(); err != nil {
 		return Config{}, err
 	}
+	if err := merged.ValidateEnforcementRequirements(); err != nil {
+		return Config{}, err
+	}
 	return merged, nil
+}
+
+// ValidateEnforcementRequirements enforces the secure-default contract
+// for non-personal enforcement modes. team / managed deployments
+// require an opinionated baseline (pinned extension origins, an API
+// token, and — in managed mode — a profile public key and the
+// Native-Messaging MAC requirement) so the agent cannot silently boot
+// in a degraded posture that the operator did not opt into.
+//
+// Called from Load() after validate(); a successful return implies
+// the config is safe to wire into the rest of the agent. Each rule
+// fires with a stable, human-readable message so the systemd /
+// launchd / Windows-service unit logs are self-documenting when the
+// operator misconfigures a managed install.
+func (c Config) ValidateEnforcementRequirements() error {
+	mode := c.EnforcementMode
+	if mode != "team" && mode != "managed" {
+		return nil
+	}
+	// Every string secure-default below is checked after
+	// strings.TrimSpace so a whitespace-only value cannot slip past
+	// the validator. The downstream consumers of these fields
+	// (profile.NewVerifierFromHex, the API-token loader, the
+	// Native-Messaging extension-ID matcher) all trim before use, so
+	// without trimming here a managed install could pass validation
+	// with profile_public_key: "  " and then boot on the lenient
+	// warn-once verifier — the exact failure mode the secure-default
+	// gate exists to prevent.
+	if !hasNonBlankEntry(c.AllowedExtensionIDs) {
+		return errors.New("managed/team mode requires allowed_extension_ids to be configured")
+	}
+	if strings.TrimSpace(c.APITokenPath) == "" {
+		return errors.New("managed/team mode requires api_token_path")
+	}
+	if !c.APITokenRequired {
+		return errors.New("managed/team mode requires api_token_required: true")
+	}
+	if mode == "managed" {
+		if !c.BridgeMACRequired {
+			return errors.New("managed mode requires bridge_mac_required: true")
+		}
+		if strings.TrimSpace(c.ProfilePublicKey) == "" {
+			return errors.New("managed mode requires profile_public_key")
+		}
+	}
+	return nil
+}
+
+// hasNonBlankEntry reports whether the slice contains at least one
+// element that is non-empty after strings.TrimSpace. Used by the
+// secure-default gate so allowed_extension_ids: ["   "] doesn't
+// satisfy the "non-empty" check — the Native-Messaging extension-ID
+// matcher trims before comparing, so a blank entry would behave
+// like no entry at runtime.
+func hasNonBlankEntry(ss []string) bool {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // phase6IntOverlay re-decodes the four DLP int fields whose

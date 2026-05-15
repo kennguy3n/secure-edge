@@ -406,6 +406,10 @@ type fakePolicyStore struct {
 	policies  map[string]string
 	dlp       DLPConfigSnapshot
 	setPolicy func(category, action string) error
+	// applyProfileTx, when non-nil, overrides the default in-memory
+	// implementation of ApplyProfileTx so tests can inject failures
+	// at the transaction boundary.
+	applyProfileTx func(categories []CategoryPolicy, dlp *DLPConfigSnapshot) error
 }
 
 func newFakePolicyStore() *fakePolicyStore {
@@ -428,6 +432,30 @@ func (f *fakePolicyStore) GetDLPConfig(_ context.Context) (DLPConfigSnapshot, er
 
 func (f *fakePolicyStore) SetDLPConfig(_ context.Context, cfg DLPConfigSnapshot) error {
 	f.dlp = cfg
+	return nil
+}
+
+// ApplyProfileTx mirrors the all-or-nothing semantics of
+// store.Store.ApplyProfileTx: the per-category setPolicy hook (used by
+// existing tests to inject failures) runs first against every input;
+// if any of them errors out, no policies or DLP config are persisted.
+func (f *fakePolicyStore) ApplyProfileTx(_ context.Context, categories []CategoryPolicy, dlp *DLPConfigSnapshot) error {
+	if f.applyProfileTx != nil {
+		return f.applyProfileTx(categories, dlp)
+	}
+	if f.setPolicy != nil {
+		for _, p := range categories {
+			if err := f.setPolicy(p.Category, p.Action); err != nil {
+				return err
+			}
+		}
+	}
+	for _, p := range categories {
+		f.policies[p.Category] = p.Action
+	}
+	if dlp != nil {
+		f.dlp = *dlp
+	}
 	return nil
 }
 
@@ -561,3 +589,115 @@ func TestApplyDLPSink(t *testing.T) {
 		}
 	})
 }
+
+// TestLoadFromURL_PinnedDialRejectsRebind exercises the dial-time
+// resolution Task 8 introduced. We bypass the pre-flight hostCheck
+// (which already covered the request-build-time path) and let the
+// caller-supplied client use the loader's default pinned transport.
+// The transport's DialContext re-resolves the host and rejects the
+// dial closed when the address comes back as 127.0.0.1, even though
+// hostCheck saw a benign public address.
+//
+// Without the pinned transport this test would fall through to the
+// default Transport, which performs its own (unchecked) DNS lookup
+// at dial time and would happily connect — exactly the DNS-rebinding
+// flaw Task 8 closes.
+func TestLoadFromURL_PinnedDialRejectsRebind(t *testing.T) {
+	// hostCheck must let the initial host through so we hit the
+	// dial path. Without this stub the request-build-time guard
+	// would reject the resolution before the pinned transport ever
+	// runs and we'd be re-testing the same code path as
+	// TestLoadFromURL_RejectsHostnameResolvingToPrivate.
+	origCheck := hostCheck
+	hostCheck = func(_ context.Context, _ string) error { return nil }
+	t.Cleanup(func() { hostCheck = origCheck })
+
+	// Resolver returns 127.0.0.1 — i.e. simulated DNS rebind.
+	origResolver := profileResolver
+	profileResolver = func(_ context.Context, host string) ([]string, error) {
+		if host == "rebind.example.com" {
+			return []string{"127.0.0.1"}, nil
+		}
+		return nil, errors.New("unexpected host")
+	}
+	t.Cleanup(func() { profileResolver = origResolver })
+
+	_, err := LoadFromURL(context.Background(), nil, "https://rebind.example.com/profile.json", nil)
+	if err == nil {
+		t.Fatal("expected dial-time rejection for hostname pinning to 127.0.0.1")
+	}
+	if !strings.Contains(err.Error(), "private/loopback") {
+		t.Fatalf("error %q must mention private/loopback", err)
+	}
+}
+
+// TestApply_AtomicWithFailingApplyProfileTx is the Task 2 regression
+// test at the profile boundary: when the all-or-nothing
+// ApplyProfileTx call fails, Apply must NOT proceed to fire the
+// DLPSink or call Reloader.Reload. Those two side effects mutate
+// the live agent — running them after a failed persist would leave
+// the in-memory pipeline ahead of the SQLite row.
+func TestApply_AtomicWithFailingApplyProfileTx(t *testing.T) {
+	ps := newFakePolicyStore()
+	ps.applyProfileTx = func(_ []CategoryPolicy, _ *DLPConfigSnapshot) error {
+		return errors.New("simulated tx failure")
+	}
+	rel := &fakeReloader{}
+	var sinkCalls int
+	p := &Profile{
+		Name:    "acme",
+		Managed: true,
+		Categories: map[string]string{
+			"AI Chat Blocked": "deny",
+		},
+		DLPThresholds: &DLPThresholds{ThresholdCritical: 12},
+	}
+	err := p.Apply(context.Background(), ApplyOptions{
+		PolicyStore: ps,
+		Reloader:    rel,
+		DLPSink:     func(DLPConfigSnapshot) { sinkCalls++ },
+	})
+	if err == nil {
+		t.Fatal("expected error from failing ApplyProfileTx")
+	}
+	if rel.called {
+		t.Errorf("reloader fired despite failed persist")
+	}
+	if sinkCalls != 0 {
+		t.Errorf("DLPSink fired despite failed persist; calls=%d", sinkCalls)
+	}
+}
+
+// TestApply_ReloadFailureSurfacesAsPersistedNotLive pins the
+// "profile persisted but not live" contract Task 2 introduced. If
+// the SQLite commit succeeded but the in-memory engine refuses to
+// reload, Apply must surface that with ErrProfilePersistedNotLive
+// so callers can tell the operator a restart is the remediation
+// (rather than a re-import that would land another commit).
+func TestApply_ReloadFailureSurfacesAsPersistedNotLive(t *testing.T) {
+	ps := newFakePolicyStore()
+	rel := &fakeReloaderErr{err: errors.New("reload boom")}
+	p := &Profile{
+		Name:    "acme",
+		Managed: true,
+		Categories: map[string]string{
+			"AI Chat Blocked": "deny",
+		},
+	}
+	err := p.Apply(context.Background(), ApplyOptions{
+		PolicyStore: ps,
+		Reloader:    rel,
+	})
+	if err == nil {
+		t.Fatal("expected error from reloader")
+	}
+	if !errors.Is(err, ErrProfilePersistedNotLive) {
+		t.Errorf("error %q does not wrap ErrProfilePersistedNotLive", err)
+	}
+}
+
+// fakeReloaderErr is a Reloader stub that returns the configured
+// error. Used by the persisted-not-live test above.
+type fakeReloaderErr struct{ err error }
+
+func (r *fakeReloaderErr) Reload(_ context.Context) error { return r.err }

@@ -291,7 +291,26 @@ type Server struct {
 	// startup.
 	riskyFileExtensions    []string
 	riskyFileExtensionsSet bool
+
+	// degraded is set when the agent booted but a non-fatal
+	// security-relevant subsystem failed to initialise — currently
+	// only "team mode tried to load a profile and the load failed".
+	// /api/status surfaces this as a top-level "degraded": true so
+	// the extension / tray can warn the operator that policy is
+	// running on whatever was previously persisted rather than the
+	// expected baseline. Mutated only via SetDegraded.
+	degraded bool
 }
+
+// SetDegraded toggles the degraded flag reported through /api/status.
+// Called by the agent boot path when team-mode profile load fails so
+// the front-ends can render a "running degraded" warning without
+// having to introspect logs. Idempotent.
+func (s *Server) SetDegraded(d bool) { s.degraded = d }
+
+// Degraded reports the current degraded flag. Exposed for handler
+// tests and for the /api/status response builder.
+func (s *Server) Degraded() bool { return s.degraded }
 
 // NewServer returns an API server with its start time set to now.
 // The scan rate limiter is initialised with a permissive default that

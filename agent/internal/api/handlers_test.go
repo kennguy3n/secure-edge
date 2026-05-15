@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -831,6 +832,10 @@ func (f *fakePolicyStore) SetDLPConfig(_ context.Context, _ profile.DLPConfigSna
 	atomic.AddInt64(&f.calls, 1)
 	return nil
 }
+func (f *fakePolicyStore) ApplyProfileTx(_ context.Context, _ []profile.CategoryPolicy, _ *profile.DLPConfigSnapshot) error {
+	atomic.AddInt64(&f.calls, 1)
+	return nil
+}
 
 func TestProfileGetReturnsHolderContents(t *testing.T) {
 	srv, _, _ := newTestServer(t)
@@ -1625,5 +1630,270 @@ func TestRiskyExtensions_AIPageOriginAllowed(t *testing.T) {
 	}
 	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://chatgpt.com" {
 		t.Errorf("Access-Control-Allow-Origin = %q, want chatgpt.com", got)
+	}
+}
+
+// TestStatus_StripsRuleFilePaths is the Task 6 regression: the
+// default /api/status payload must not echo full filesystem paths
+// in its rule-file metadata. Leaking install layouts to any
+// caller (the extension page included) gives free reconnaissance
+// information for negligible operational gain. The basename is
+// preserved so the existing operator-facing JSON still tells you
+// which file is which.
+func TestStatus_StripsRuleFilePaths(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d body=%s", w.Code, w.Body.String())
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	p := got.Rules[0].Path
+	if strings.ContainsAny(p, `/\`) {
+		t.Errorf("Path %q contains separator; expected basename", p)
+	}
+	if p != "block.txt" {
+		t.Errorf("Path = %q, want %q", p, "block.txt")
+	}
+}
+
+// TestStatus_DebugFlagFromLocalhostExposesFullPath proves the
+// debug-only escape hatch still works: ?debug=true from a loopback
+// caller re-enables the absolute path so operators tailing the
+// status JSON locally can still see the on-disk location.
+func TestStatus_DebugFlagFromLocalhostExposesFullPath(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	if got.Rules[0].Path != full {
+		t.Errorf("Path = %q, want %q (debug should expose full path)", got.Rules[0].Path, full)
+	}
+}
+
+// TestStatus_DegradedFlag covers Task 4's wire surface: SetDegraded
+// flips the top-level status response to expose a "degraded": true
+// hint so the extension / tray can warn the operator that the
+// agent booted without its expected baseline.
+func TestStatus_DegradedFlag(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	r := newLocalRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Degraded {
+		t.Errorf("degraded=true before SetDegraded")
+	}
+
+	srv.SetDegraded(true)
+	r = newLocalRequest(http.MethodGet, "/api/status", nil)
+	w = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	var got2 StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got2); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !got2.Degraded {
+		t.Errorf("degraded=false after SetDegraded(true)")
+	}
+}
+
+// TestUpdatePolicy_UnknownCategoryReturns400 covers the API-shape
+// half of the Task 7 hardening: store.SetPolicy now returns
+// ErrInvalidCategory for an out-of-set category name, and the
+// handler must map that to 400, not 500. A 500 would mislead
+// callers into believing the agent malfunctioned rather than that
+// their request was rejected.
+func TestUpdatePolicy_UnknownCategoryReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	body := bytes.NewBufferString(`{"action":"allow"}`)
+	r := newLocalRequest(http.MethodPut, "/api/policies/Made%20Up%20Category", body)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "invalid category") {
+		t.Errorf("body %q should mention invalid category", w.Body.String())
+	}
+}
+
+// TestUpdatePolicy_InvalidActionReturns400 is the regression baseline:
+// the existing ErrInvalidAction → 400 mapping must still fire. Without
+// this test a future refactor of the err-mapping ladder could drop the
+// pre-existing branch and only the new category branch would be
+// covered by the suite.
+func TestUpdatePolicy_InvalidActionReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	body := bytes.NewBufferString(`{"action":"definitely-not-an-action"}`)
+	r := newLocalRequest(http.MethodPut, "/api/policies/AI%20Chat%20Blocked", body)
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", w.Code, w.Body.String())
+	}
+}
+
+// TestDLPConfig_InvalidThresholdReturns400 covers the API-shape
+// half of the Task 7 DLP validator: store.SetDLPConfig now returns
+// ErrInvalidDLPConfig-wrapped errors for non-positive thresholds and
+// out-of-bounds weights, and the handler must surface that as 400
+// with the underlying message so callers know which field is wrong.
+func TestDLPConfig_InvalidThresholdReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	srv.SetDLP(&fakeDLP{thr: thr})
+
+	bad := store.DLPConfig{
+		ThresholdCritical: 0, // invalid
+		ThresholdHigh:     1,
+		ThresholdMedium:   2,
+		ThresholdLow:      3,
+	}
+	body, _ := json.Marshal(bad)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "threshold_critical") {
+		t.Errorf("body %q should name the offending field", rec.Body.String())
+	}
+}
+
+// TestDLPConfig_OutOfBoundsWeightReturns400 covers the weight half
+// of the Task 7 DLP validator at the API surface.
+func TestDLPConfig_OutOfBoundsWeightReturns400(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	thr := dlp.NewThresholdEngine(dlp.DefaultThresholds())
+	srv.SetDLP(&fakeDLP{thr: thr})
+
+	bad := store.DLPConfig{
+		ThresholdCritical: 10,
+		ThresholdHigh:     8,
+		ThresholdMedium:   5,
+		ThresholdLow:      2,
+		HotwordBoost:      200, // outside [-100,100]
+	}
+	body, _ := json.Marshal(bad)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("code = %d body=%s, want 400", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "hotword_boost") {
+		t.Errorf("body %q should name the offending field", rec.Body.String())
+	}
+}
+
+// TestStatus_DebugFlagRejectedFromAIPageOrigin closes the Devin
+// Review bypass: the agent's listener binds to 127.0.0.1, so every
+// caller's RemoteAddr is loopback — including content scripts on
+// AI-page origins that CORS already lets reach /api/status. Gating
+// ?debug=true on RemoteAddr was therefore dead code against the
+// stated threat model. The new gate is Origin-based: an AI-page
+// Origin (here https://chatgpt.com) must still receive the
+// path-stripped response even when the caller asked for debug.
+func TestStatus_DebugFlagRejectedFromAIPageOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	r.Header.Set("Origin", "https://chatgpt.com")
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 {
+		t.Fatalf("rules len = %d, want 1", len(got.Rules))
+	}
+	if got.Rules[0].Path == full {
+		t.Errorf("AI-page Origin received full path %q; debug should be denied", full)
+	}
+	if got.Rules[0].Path != filepath.Base(full) {
+		t.Errorf("Path = %q, want basename %q",
+			got.Rules[0].Path, filepath.Base(full))
+	}
+}
+
+// TestStatus_DebugFlagAllowedFromControlOrigin pins the positive
+// half of the new gate: a control Origin (the Electron renderer's
+// file:// → "null") gets the absolute path back so the tray's
+// diagnostics view keeps working. Without this, the operator-facing
+// admin surface would lose its access to the on-disk path.
+func TestStatus_DebugFlagAllowedFromControlOrigin(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	dir := t.TempDir()
+	full := filepath.Join(dir, "block.txt")
+	if err := os.WriteFile(full, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("seed rule file: %v", err)
+	}
+	srv.SetRuleFiles([]string{full})
+
+	r := newLocalRequest(http.MethodGet, "/api/status?debug=true", nil)
+	// "null" is the Origin Chromium sends for file:// — the
+	// packaged Electron renderer in production.
+	r.Header.Set("Origin", "null")
+	r.RemoteAddr = "127.0.0.1:55555"
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d", w.Code)
+	}
+	var got StatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.Rules) != 1 || got.Rules[0].Path != full {
+		t.Errorf("control-origin debug request did not surface full path: %+v", got.Rules)
 	}
 }

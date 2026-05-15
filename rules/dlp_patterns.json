@@ -6276,6 +6276,330 @@
       "require_hotword": true,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "Mailchimp OAuth Access Token",
+      "regex": "(?i)MAILCHIMP_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9]{40,}",
+      "prefix": "mailchimp_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mailchimp",
+        "oauth",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Mailchimp Transactional API Key",
+      "regex": "md-[A-Za-z0-9_\\-]{22}",
+      "prefix": "md-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mailchimp",
+        "mandrill",
+        "transactional"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Mailgun API Key",
+      "regex": "key-[a-f0-9]{32}",
+      "prefix": "key-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mailgun",
+        "email",
+        "smtp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Mailgun Private API Key",
+      "regex": "(?i)MAILGUN_PRIVATE_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}-[a-f0-9]{8}-[a-f0-9]{8}",
+      "prefix": "mailgun_private_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mailgun",
+        "private",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Mailgun Webhook Signing Key",
+      "regex": "(?i)MAILGUN_WEBHOOK_SIGNING_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "mailgun_webhook_signing_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mailgun",
+        "webhook",
+        "signing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Postmark Server API Token",
+      "regex": "(?i)POSTMARK_SERVER_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "postmark_server_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "postmark",
+        "server",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Postmark Account API Token",
+      "regex": "(?i)POSTMARK_ACCOUNT_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "postmark_account_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "postmark",
+        "account",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "SparkPost API Key",
+      "regex": "(?i)SPARKPOST_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "sparkpost_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sparkpost",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "SparkPost EU API Key",
+      "regex": "(?i)SPARKPOST_EU_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "sparkpost_eu_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sparkpost",
+        "eu",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Amazon SES SMTP Username",
+      "regex": "AKIA[0-9A-Z]{16}",
+      "prefix": "akia",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ses",
+        "smtp",
+        "email",
+        "aws"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Amazon SES SMTP Password",
+      "regex": "(?i)AWS_SES_SMTP_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{44,}",
+      "prefix": "aws_ses_smtp_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ses",
+        "smtp",
+        "password",
+        "aws"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Mandrill API Key",
+      "regex": "(?i)MANDRILL_API_KEY\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9_\\-]{22}",
+      "prefix": "mandrill_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mandrill",
+        "mailchimp",
+        "transactional"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "ConvertKit API Secret",
+      "regex": "(?i)CONVERTKIT_API_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32,}",
+      "prefix": "convertkit_api_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "convertkit",
+        "email",
+        "newsletter"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Brevo API Key",
+      "regex": "xkeysib-[a-f0-9]{64,}",
+      "prefix": "xkeysib-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "brevo",
+        "sendinblue",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "MailerLite API Token",
+      "regex": "(?i)MAILERLITE_API_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9.]{60,}",
+      "prefix": "mailerlite_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mailerlite",
+        "email",
+        "newsletter"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "ActiveCampaign API Key",
+      "regex": "(?i)ACTIVECAMPAIGN_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{60,}",
+      "prefix": "activecampaign_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "activecampaign",
+        "email",
+        "crm"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "GetResponse API Key",
+      "regex": "(?i)GETRESPONSE_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "getresponse_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "getresponse",
+        "email",
+        "newsletter"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Sendinblue API Key (legacy)",
+      "regex": "xkeymail-[a-f0-9]{40,}",
+      "prefix": "xkeymail-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sendinblue",
+        "legacy",
+        "email"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "SendGrid Subuser Token",
+      "regex": "(?i)SENDGRID_SUBUSER_TOKEN\\s*[:=]\\s*['\\\"]?SG\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{30,}",
+      "prefix": "sendgrid_subuser_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sendgrid",
+        "subuser",
+        "twilio"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
     }
   ]
 }

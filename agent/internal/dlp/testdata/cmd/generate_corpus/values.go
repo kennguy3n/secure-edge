@@ -1246,4 +1246,62 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Verizon EdgeCast Token"] = func(r *rand.Rand) string {
 		return "EDGECAST_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
 	}
+	// ---------------- Batch 5: Email / Marketing ----------------
+	valueGenerators["Mailchimp OAuth Access Token"] = func(r *rand.Rand) string {
+		return "MAILCHIMP_ACCESS_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["Mailchimp Transactional API Key"] = func(r *rand.Rand) string {
+		return "md-" + randFromAlphabet(r, alnum+"_-", 22)
+	}
+	valueGenerators["Mailgun API Key"] = func(r *rand.Rand) string {
+		return "key-" + randHex(r, 32)
+	}
+	valueGenerators["Mailgun Private API Key"] = func(r *rand.Rand) string {
+		return "MAILGUN_PRIVATE_API_KEY=" + randHex(r, 32) + "-" + randHex(r, 8) + "-" + randHex(r, 8)
+	}
+	valueGenerators["Mailgun Webhook Signing Key"] = func(r *rand.Rand) string {
+		return "MAILGUN_WEBHOOK_SIGNING_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Postmark Server API Token"] = func(r *rand.Rand) string {
+		return "POSTMARK_SERVER_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["Postmark Account API Token"] = func(r *rand.Rand) string {
+		return "POSTMARK_ACCOUNT_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["SparkPost API Key"] = func(r *rand.Rand) string {
+		return "SPARKPOST_API_KEY=" + randHex(r, 40)
+	}
+	valueGenerators["SparkPost EU API Key"] = func(r *rand.Rand) string {
+		return "SPARKPOST_EU_API_KEY=" + randHex(r, 40)
+	}
+	valueGenerators["Amazon SES SMTP Username"] = func(r *rand.Rand) string {
+		return "AKIA" + randUpperAlnum(r, 16)
+	}
+	valueGenerators["Amazon SES SMTP Password"] = func(r *rand.Rand) string {
+		return "AWS_SES_SMTP_PASSWORD=" + randFromAlphabet(r, alnum+"+/=", 48)
+	}
+	valueGenerators["Mandrill API Key"] = func(r *rand.Rand) string {
+		return "MANDRILL_API_KEY=" + randFromAlphabet(r, alnum+"_-", 22)
+	}
+	valueGenerators["ConvertKit API Secret"] = func(r *rand.Rand) string {
+		return "CONVERTKIT_API_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Brevo API Key"] = func(r *rand.Rand) string {
+		return "xkeysib-" + randHex(r, 64) + "-" + randAlnum(r, 16)
+	}
+	valueGenerators["MailerLite API Token"] = func(r *rand.Rand) string {
+		return "MAILERLITE_API_TOKEN=" + randFromAlphabet(r, alnum+".", 80)
+	}
+	valueGenerators["ActiveCampaign API Key"] = func(r *rand.Rand) string {
+		return "ACTIVECAMPAIGN_API_KEY=" + randHex(r, 64)
+	}
+	valueGenerators["GetResponse API Key"] = func(r *rand.Rand) string {
+		return "GETRESPONSE_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Sendinblue API Key (legacy)"] = func(r *rand.Rand) string {
+		return "xkeymail-" + randHex(r, 56) + "-" + randAlnum(r, 16)
+	}
+	valueGenerators["SendGrid Subuser Token"] = func(r *rand.Rand) string {
+		return "SENDGRID_SUBUSER_TOKEN=SG." + randFromAlphabet(r, alnum+"_-", 22) + "." + randFromAlphabet(r, alnum+"_-", 43)
+	}
 }

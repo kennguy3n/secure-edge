@@ -471,6 +471,27 @@ var patternCategory = map[string]string{
 	"Vercel Edge Config Token":          "dns_cdn",
 	"Sucuri WAF API Key":                "dns_cdn",
 	"Verizon EdgeCast Token":            "dns_cdn",
+
+	// Batch 5: Email / Marketing
+	"Mailchimp OAuth Access Token":    "email_marketing",
+	"Mailchimp Transactional API Key": "email_marketing",
+	"Mailgun API Key":                 "email_marketing",
+	"Mailgun Private API Key":         "email_marketing",
+	"Mailgun Webhook Signing Key":     "email_marketing",
+	"Postmark Server API Token":       "email_marketing",
+	"Postmark Account API Token":      "email_marketing",
+	"SparkPost API Key":               "email_marketing",
+	"SparkPost EU API Key":            "email_marketing",
+	"Amazon SES SMTP Username":        "email_marketing",
+	"Amazon SES SMTP Password":        "email_marketing",
+	"Mandrill API Key":                "email_marketing",
+	"ConvertKit API Secret":           "email_marketing",
+	"Brevo API Key":                   "email_marketing",
+	"MailerLite API Token":            "email_marketing",
+	"ActiveCampaign API Key":          "email_marketing",
+	"GetResponse API Key":             "email_marketing",
+	"Sendinblue API Key (legacy)":     "email_marketing",
+	"SendGrid Subuser Token":          "email_marketing",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

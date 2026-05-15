@@ -1099,7 +1099,7 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		return "https://snowy-icy-glade.quiknode.pro/" + randLowerAlnum(r, 40) + "/"
 	}
 	valueGenerators["Chainstack RPC Endpoint"] = func(r *rand.Rand) string {
-		return "https://nd-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + ".p2pify.com/" + randHex(r, 32)
+		return "https://nd" + randFromAlphabet(r, digits, 9) + ".p2pify.com/" + randHex(r, 32)
 	}
 	valueGenerators["Moralis Web3 API Key"] = func(r *rand.Rand) string {
 		return "MORALIS_API_KEY=" + randAlnum(r, 80)
@@ -1630,13 +1630,13 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	}
 	// ---------------- Batch 11: Additional Secret Formats ----------------
 	valueGenerators["TOTP Shared Secret (otpauth URI)"] = func(r *rand.Rand) string {
-		return "otpauth://totp/Example:user@example.com?secret=" + randBase32Lower(r, 32) + "&issuer=Example"
+		return "otpauth://totp/Acme:alice@corp.internal?secret=" + randBase32Lower(r, 32) + "&issuer=Acme"
 	}
 	valueGenerators["TOTP Plain Base32 Seed"] = func(r *rand.Rand) string {
 		return "TOTP_SECRET=" + randBase32Lower(r, 32)
 	}
 	valueGenerators["HMAC-Based OTP Counter Seed"] = func(r *rand.Rand) string {
-		return "otpauth://hotp/Example:user@example.com?secret=" + randBase32Lower(r, 32) + "&counter=0"
+		return "otpauth://hotp/Acme:alice@corp.internal?secret=" + randBase32Lower(r, 32) + "&counter=0"
 	}
 	valueGenerators["SAML Assertion Signature"] = func(r *rand.Rand) string {
 		return "<ds:SignatureValue>" + randFromAlphabet(r, alnum+"+/=", 88) + "</ds:SignatureValue>"
@@ -1968,7 +1968,7 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		return "GERRIT_HTTP_PASSWORD=" + randFromAlphabet(r, alnum+"+/=", 56)
 	}
 	valueGenerators["Phabricator Conduit API Token"] = func(r *rand.Rand) string {
-		return "api-" + randLowerAlnum(r, 28)
+		return "api-" + randBase32Lower(r, 28)
 	}
 	valueGenerators["Codecov Repo Upload Token"] = func(r *rand.Rand) string {
 		return "CODECOV_TOKEN=" + randUUID(r)
@@ -2069,5 +2069,159 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	}
 	valueGenerators["Matrix Homeserver Access Token"] = func(r *rand.Rand) string {
 		return "MATRIX_ACCESS_TOKEN=syt_" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	// ---------------- Batch 15: Additional Code/Config Secrets ----------------
+	valueGenerators[".pypirc Username Token Block"] = func(r *rand.Rand) string {
+		return "[pypi]\nusername = __token__\npassword = pypi-" + randFromAlphabet(r, alnum+"+/=_-", 80)
+	}
+	valueGenerators["Python pip extra-index-url Credentials"] = func(r *rand.Rand) string {
+		return "extra-index-url = https://" + randLowerAlnum(r, 10) + ":" + randAlnum(r, 16) + "@" + randLowerAlnum(r, 8) + ".corp.internal/simple"
+	}
+	valueGenerators["Python config.ini DB Password"] = func(r *rand.Rand) string {
+		return "[database]\nhost = localhost\nuser = admin\npassword = " + randAlnum(r, 24)
+	}
+	valueGenerators["Python conda authentication token"] = func(r *rand.Rand) string {
+		return "https://conda.anaconda.cloud/?token=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Ruby credentials.yml Master Key"] = func(r *rand.Rand) string {
+		return "RAILS_MASTER_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Ruby secrets.yml secret_key_base"] = func(r *rand.Rand) string {
+		return "secret_key_base: " + randHex(r, 128)
+	}
+	valueGenerators["Ruby .gem/credentials API Key"] = func(r *rand.Rand) string {
+		return ":rubygems_api_key: " + randHex(r, 48)
+	}
+	valueGenerators["Ruby Devise pepper"] = func(r *rand.Rand) string {
+		return "Devise.pepper = \"" + randHex(r, 128) + "\""
+	}
+	valueGenerators["PHP Laravel .env APP_KEY"] = func(r *rand.Rand) string {
+		return "APP_KEY=base64:" + randFromAlphabet(r, alnum+"+/=", 44)
+	}
+	valueGenerators["PHP Symfony APP_SECRET"] = func(r *rand.Rand) string {
+		return "APP_SECRET=" + randHex(r, 40)
+	}
+	valueGenerators["PHP CodeIgniter Encryption Key"] = func(r *rand.Rand) string {
+		return "$config[\"encryption_key\"] = \"" + randAlnum(r, 32) + "\";"
+	}
+	valueGenerators["PHP WordPress wp-config Authentication Salt"] = func(r *rand.Rand) string {
+		return "define(\"AUTH_KEY\", \"" + randAlnum(r, 64) + "\");"
+	}
+	valueGenerators[".NET appsettings.json Connection String"] = func(r *rand.Rand) string {
+		return "\"DefaultConnection\": \"Server=tcp:" + randLowerAlnum(r, 8) + ".database.windows.net,1433;Database=mydb;User ID=admin;Password=" + randAlnum(r, 16) + ";Encrypt=True\""
+	}
+	valueGenerators[".NET appsettings.json JWT Secret"] = func(r *rand.Rand) string {
+		return "\"Jwt\": { \"Issuer\": \"example\", \"Key\": \"" + randFromAlphabet(r, alnum+"_-", 48) + "\" }"
+	}
+	valueGenerators[".NET User Secrets ID"] = func(r *rand.Rand) string {
+		return "<UserSecretsId>" + randUUID(r) + "</UserSecretsId>"
+	}
+	valueGenerators[".NET Service Connection String"] = func(r *rand.Rand) string {
+		return "StorageConnectionString=DefaultEndpointsProtocol=https;AccountName=" + randLowerAlnum(r, 12) + ";AccountKey=" + randFromAlphabet(r, alnum+"+/=", 64)
+	}
+	valueGenerators["Java application.properties JDBC Password"] = func(r *rand.Rand) string {
+		return "spring.datasource.password=" + randAlnum(r, 20)
+	}
+	valueGenerators["Java keystore.jks Password Hint"] = func(r *rand.Rand) string {
+		return "keystore.password=" + randAlnum(r, 16)
+	}
+	valueGenerators["Maven settings.xml Server Password"] = func(r *rand.Rand) string {
+		return "<server><id>nexus</id><username>deployer</username><password>" + randAlnum(r, 20) + "</password></server>"
+	}
+	valueGenerators["Gradle gradle.properties Auth"] = func(r *rand.Rand) string {
+		return "gpr.token=" + randAlnum(r, 32)
+	}
+	valueGenerators["Go config.go Hard-coded Password"] = func(r *rand.Rand) string {
+		return "Password: \"" + randAlnum(r, 24) + "\""
+	}
+	valueGenerators["Go .envrc with secrets"] = func(r *rand.Rand) string {
+		return "export GITHUB_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Go viper.SetEnvPrefix Secret"] = func(r *rand.Rand) string {
+		return "viper.SetString(\"db.password\", \"" + randAlnum(r, 20) + "\")"
+	}
+	valueGenerators["Node config.js Hard-coded Secret"] = func(r *rand.Rand) string {
+		return "apiSecret: \"" + randFromAlphabet(r, alnum+"_-", 32) + "\""
+	}
+	valueGenerators["Node process.env literal token"] = func(r *rand.Rand) string {
+		return "GITHUB_TOKEN=\"" + randFromAlphabet(r, alnum+"_-", 36) + "\""
+	}
+	valueGenerators["Node .npmrc Email + Auth"] = func(r *rand.Rand) string {
+		return "//registry.example.com/:always-auth=true\n//registry.example.com/:_password=" + randFromAlphabet(r, alnum+"+/=", 24)
+	}
+	valueGenerators["Terraform tfstate AWS Credentials"] = func(r *rand.Rand) string {
+		return "\"AccessKeyId\": \"AKIA" + randUpperAlnum(r, 16) + "\",\n\"SecretAccessKey\": \"" + randFromAlphabet(r, alnum+"+/", 40) + "\""
+	}
+	valueGenerators["Terraform variable.tf default secret"] = func(r *rand.Rand) string {
+		return "variable \"db_password\" { default = \"" + randAlnum(r, 24) + "\" }"
+	}
+	valueGenerators["Ansible Vault Header"] = func(r *rand.Rand) string {
+		return "$ANSIBLE_VAULT;1.1;AES256"
+	}
+	valueGenerators["Ansible Vault Password File Reference"] = func(r *rand.Rand) string {
+		return "ansible_vault_password_file = ~/.ansible/.vault_pass"
+	}
+	valueGenerators["Ansible Inventory ansible_password"] = func(r *rand.Rand) string {
+		return "ansible_password=" + randAlnum(r, 24)
+	}
+	valueGenerators["Chef Encrypted Data Bag Secret"] = func(r *rand.Rand) string {
+		return "encrypted_data_bag_secret \"/etc/chef/encrypted_data_bag_secret\""
+	}
+	valueGenerators["Chef Client Validation Key"] = func(r *rand.Rand) string {
+		return "-----BEGIN RSA PRIVATE KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END RSA PRIVATE KEY-----"
+	}
+	valueGenerators["Puppet Hiera eyaml Token"] = func(r *rand.Rand) string {
+		return "ENC[PKCS7," + randFromAlphabet(r, alnum+"+/=", 300) + "]"
+	}
+	valueGenerators["Docker Build ARG Secret"] = func(r *rand.Rand) string {
+		return "ARG GITHUB_TOKEN=" + randFromAlphabet(r, alnum+"_-", 36)
+	}
+	valueGenerators["docker-compose.yml Password ENV"] = func(r *rand.Rand) string {
+		return "MYSQL_ROOT_PASSWORD: " + randAlnum(r, 20)
+	}
+	valueGenerators["Kubernetes Pod env literal secret"] = func(r *rand.Rand) string {
+		return "- name: API_KEY\n  value: " + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["Kubernetes externalSecrets reference"] = func(r *rand.Rand) string {
+		return "secretRef:\n  name: app-secrets\n  key: API_TOKEN"
+	}
+	valueGenerators["iOS Info.plist Hard-coded Key"] = func(r *rand.Rand) string {
+		return "<key>APIKey</key><string>" + randFromAlphabet(r, alnum+"_-", 40) + "</string>"
+	}
+	valueGenerators["Android local.properties Key"] = func(r *rand.Rand) string {
+		return "apiKey=AIza" + randFromAlphabet(r, alnum+"_-", 35)
+	}
+	valueGenerators["Shell script export TOKEN/PASSWORD"] = func(r *rand.Rand) string {
+		return "export GITLAB_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Shell script curl Basic Auth"] = func(r *rand.Rand) string {
+		return "curl -u admin:" + randAlnum(r, 20) + " https://api.corp.internal/v1/orders"
+	}
+	valueGenerators["Shell script PSQL connection URI"] = func(r *rand.Rand) string {
+		return "psql \"postgresql://admin:" + randAlnum(r, 16) + "@db.example.com/prod\""
+	}
+	valueGenerators["Vault sealed-secret Annotation"] = func(r *rand.Rand) string {
+		return "sealedsecrets.bitnami.com/managed: \"true\"\n  sealedsecrets.bitnami.com/cluster-wide: \"" + randFromAlphabet(r, alnum+"+/=", 80) + "\""
+	}
+	valueGenerators["Helm Chart Values Inline Token"] = func(r *rand.Rand) string {
+		return "secrets:\n  token: " + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Github Actions Workflow Inline Secret"] = func(r *rand.Rand) string {
+		return "env:\n  API_TOKEN: " + randFromAlphabet(r, alnum+"_-", 36)
+	}
+	valueGenerators["Doppler Service Token"] = func(r *rand.Rand) string {
+		return "dp.st." + randLowerAlnum(r, 10) + "." + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["1Password Service Account Token"] = func(r *rand.Rand) string {
+		return "ops_" + randFromAlphabet(r, alnum+"_", 56)
+	}
+	valueGenerators["Akeyless Access ID"] = func(r *rand.Rand) string {
+		return "p-" + randLowerAlnum(r, 12) + "." + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Conjur API Key"] = func(r *rand.Rand) string {
+		return "CONJUR_API_KEY=" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["AWS Secrets Manager ARN"] = func(r *rand.Rand) string {
+		return "arn:aws:secretsmanager:us-east-1:" + randFromAlphabet(r, digits, 12) + ":secret:prod/api/key-" + randAlnum(r, 6)
 	}
 }

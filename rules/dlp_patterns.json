@@ -2980,6 +2980,925 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "package_manager"
+    },
+    {
+      "name": "Linode Personal Access Token",
+      "regex": "(?i)(?:LINODE_TOKEN|LINODE_CLI_TOKEN|LINODE_PAT)\\s*[:=]\\s*['\\\"]?[a-f0-9]{64}",
+      "prefix": "linode_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linode",
+        "linode-cli",
+        "akamai",
+        "compute"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Linode OAuth Token",
+      "regex": "(?i)LINODE_OAUTH_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{64}",
+      "prefix": "linode_oauth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linode",
+        "oauth",
+        "linode-cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Linode Object Storage Access Key",
+      "regex": "(?i)(?:LINODE_OBJ_ACCESS_KEY|LINODE_S3_ACCESS_KEY)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{20}",
+      "prefix": "linode_obj",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "linode",
+        "object",
+        "storage",
+        "s3"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Linode Object Storage Secret Key",
+      "regex": "(?i)(?:LINODE_OBJ_SECRET_KEY|LINODE_S3_SECRET_KEY)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9/+]{40}",
+      "prefix": "linode_obj",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "linode",
+        "object",
+        "storage",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vultr API Key",
+      "regex": "(?i)(?:VULTR_API_KEY|VULTR_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{36}",
+      "prefix": "vultr",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vultr",
+        "vultr-cli",
+        "compute"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Vultr Object Storage Access Key",
+      "regex": "(?i)(?:VULTR_OBJ_ACCESS_KEY|VULTR_S3_ACCESS_KEY)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{20}",
+      "prefix": "vultr_obj",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "vultr",
+        "object",
+        "storage"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vultr Object Storage Secret Key",
+      "regex": "(?i)(?:VULTR_OBJ_SECRET_KEY|VULTR_S3_SECRET_KEY)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9/+]{40}",
+      "prefix": "vultr_obj",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vultr",
+        "object",
+        "storage",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Hetzner Cloud API Token",
+      "regex": "(?i)(?:HCLOUD_TOKEN|HETZNER_TOKEN|HETZNER_API_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{64}",
+      "prefix": "hcloud_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "hetzner",
+        "hcloud",
+        "cloud-cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Hetzner DNS API Token",
+      "regex": "(?i)(?:HETZNER_DNS_API_TOKEN|HETZNER_DNS_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32}",
+      "prefix": "hetzner_dns",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hetzner",
+        "dns",
+        "ns1.hetzner"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Hetzner Robot Webservice Password",
+      "regex": "(?i)(?:HETZNER_ROBOT_PASSWORD|ROBOT_WS_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%^&*]{12,}",
+      "prefix": "hetzner_robot",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hetzner",
+        "robot",
+        "webservice"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Hetzner Storage Box Password",
+      "regex": "(?i)HETZNER_STORAGEBOX_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%^&*]{8,}",
+      "prefix": "hetzner_storagebox",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hetzner",
+        "storagebox",
+        "ftp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "OVH Application Key",
+      "regex": "(?i)OVH_APPLICATION_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "ovh_application_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ovh",
+        "ovhcloud",
+        "application"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "OVH Application Secret",
+      "regex": "(?i)OVH_APPLICATION_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "ovh_application_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ovh",
+        "ovhcloud",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "OVH Consumer Key",
+      "regex": "(?i)OVH_CONSUMER_KEY\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9]{32}",
+      "prefix": "ovh_consumer_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ovh",
+        "ovhcloud",
+        "consumer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "OVHcloud Token Bundle",
+      "regex": "(?i)(?:OVH_TOKEN|OVHCLOUD_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "ovh",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ovh",
+        "ovhcloud",
+        "token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Scaleway IAM API Key",
+      "regex": "(?i)(?:SCW_SECRET_KEY|SCW_API_KEY)\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "scw_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "scaleway",
+        "scw",
+        "online.net"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 1,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Scaleway Access Key",
+      "regex": "(?i)SCW_ACCESS_KEY\\s*[:=]\\s*['\\\"]?SCW[A-Z0-9]{17}",
+      "prefix": "scw_access_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "scaleway",
+        "scw",
+        "access"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Scaleway Project ID",
+      "regex": "(?i)SCW_DEFAULT_PROJECT_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "scw_default_project_id",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "scaleway",
+        "scw",
+        "project"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Scaleway Organization ID",
+      "regex": "(?i)SCW_DEFAULT_ORGANIZATION_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "scw_default_organization_id",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "scaleway",
+        "scw",
+        "organization"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Backblaze B2 Application Key ID",
+      "regex": "(?i)(?:B2_APPLICATION_KEY_ID|B2_KEY_ID)\\s*[:=]\\s*['\\\"]?K[0-9]{3}[a-zA-Z0-9]{20,25}",
+      "prefix": "b2_application_key_id",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "backblaze",
+        "b2",
+        "application"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Backblaze B2 Application Key",
+      "regex": "(?i)B2_APPLICATION_KEY\\s*[:=]\\s*['\\\"]?K[0-9]{3}[a-zA-Z0-9+/=]{27,40}",
+      "prefix": "b2_application_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "backblaze",
+        "b2",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Backblaze B2 Master Account Token",
+      "regex": "(?i)B2_MASTER_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "b2_master_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "backblaze",
+        "b2",
+        "master"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Wasabi Access Key ID",
+      "regex": "(?i)WASABI_ACCESS_KEY(?:_ID)?\\s*[:=]\\s*['\\\"]?[A-Z0-9]{20}",
+      "prefix": "wasabi_access_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "wasabi",
+        "s3",
+        "object",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Wasabi Secret Access Key",
+      "regex": "(?i)WASABI_SECRET_ACCESS_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9/+]{40}",
+      "prefix": "wasabi_secret_access_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "wasabi",
+        "secret",
+        "object"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Wasabi Account ID",
+      "regex": "(?i)WASABI_ACCOUNT_ID\\s*[:=]\\s*['\\\"]?[0-9]{12,16}",
+      "prefix": "wasabi_account_id",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "wasabi",
+        "account",
+        "tenant"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "DigitalOcean Spaces Access Key",
+      "regex": "(?i)(?:DO_SPACES_KEY|DIGITALOCEAN_SPACES_ACCESS_KEY)\\s*[:=]\\s*['\\\"]?[A-Z0-9]{20}",
+      "prefix": "do_spaces",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "digitalocean",
+        "spaces",
+        "s3",
+        "object"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "DigitalOcean Spaces Secret Key",
+      "regex": "(?i)(?:DO_SPACES_SECRET|DIGITALOCEAN_SPACES_SECRET_KEY)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9/+]{40,43}",
+      "prefix": "do_spaces",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "digitalocean",
+        "spaces",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "DigitalOcean Container Registry Token",
+      "regex": "(?i)DOCR_TOKEN\\s*[:=]\\s*['\\\"]?dop_v1_[a-f0-9]{64}",
+      "prefix": "docr_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "digitalocean",
+        "registry",
+        "container"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Global API Key",
+      "regex": "(?i)CLOUDFLARE_GLOBAL_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{37}",
+      "prefix": "cloudflare_global_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "global",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare R2 Access Key ID",
+      "regex": "(?i)(?:R2_ACCESS_KEY_ID|CLOUDFLARE_R2_ACCESS_KEY)\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "r2_access_key_id",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "r2",
+        "s3",
+        "object"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare R2 Secret Access Key",
+      "regex": "(?i)(?:R2_SECRET_ACCESS_KEY|CLOUDFLARE_R2_SECRET_KEY)\\s*[:=]\\s*['\\\"]?[a-f0-9]{64}",
+      "prefix": "r2_secret_access_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "r2",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Origin CA Key",
+      "regex": "v1\\.0-[A-Za-z0-9_\\-]{171,}",
+      "prefix": "v1.0-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "origin",
+        "ca",
+        "certificate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Workers KV Namespace Token",
+      "regex": "(?i)CLOUDFLARE_KV_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "cloudflare_kv_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "workers",
+        "kv",
+        "namespace"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Stream API Token",
+      "regex": "(?i)CLOUDFLARE_STREAM_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "cloudflare_stream_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "stream",
+        "video"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Tunnel Token",
+      "regex": "(?i)CF_TUNNEL_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9+/=]{200,}",
+      "prefix": "cf_tunnel_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "tunnel",
+        "cloudflared",
+        "zerotrust"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Akamai EdgeRC Client Token",
+      "regex": "(?i)(?:AKAMAI_CLIENT_TOKEN|akamai_edgerc_client_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9\\-]{30,}",
+      "prefix": "akamai_client_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "akamai",
+        "edgerc",
+        "edgegrid"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Akamai EdgeRC Client Secret",
+      "regex": "(?i)(?:AKAMAI_CLIENT_SECRET|akamai_edgerc_client_secret)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{40,}",
+      "prefix": "akamai_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "akamai",
+        "edgerc",
+        "edgegrid",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Akamai EdgeRC Access Token",
+      "regex": "(?i)(?:AKAMAI_ACCESS_TOKEN|akamai_edgerc_access_token)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9\\-]{30,}",
+      "prefix": "akamai_access_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "akamai",
+        "edgerc",
+        "edgegrid",
+        "access"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Fastly API Token",
+      "regex": "(?i)(?:FASTLY_API_TOKEN|FASTLY_TOKEN|FASTLY_KEY)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32}",
+      "prefix": "fastly",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fastly",
+        "cdn",
+        "compute@edge"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Fastly Service ID",
+      "regex": "(?i)FASTLY_SERVICE_ID\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{22}",
+      "prefix": "fastly_service_id",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "fastly",
+        "service",
+        "cdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "IBM Cloud IAM API Key",
+      "regex": "(?i)(?:IBMCLOUD_API_KEY|IBM_CLOUD_API_KEY|BLUEMIX_API_KEY)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "ibmcloud_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ibm",
+        "bluemix",
+        "ibmcloud",
+        "watson"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "IBM Cloud IAM Access Token",
+      "regex": "(?i)IBMCLOUD_IAM_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9+/=._\\-]{120,}",
+      "prefix": "ibmcloud_iam_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ibm",
+        "ibmcloud",
+        "iam",
+        "bearer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Oracle OCI API Key Fingerprint",
+      "regex": "(?i)OCI_FINGERPRINT\\s*[:=]\\s*['\\\"]?(?:[0-9a-f]{2}:){15}[0-9a-f]{2}",
+      "prefix": "oci_fingerprint",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "oracle",
+        "oci",
+        "fingerprint",
+        "tenancy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Oracle OCI User OCID",
+      "regex": "ocid1\\.user\\.oc1\\.\\.[a-z0-9]{20,80}",
+      "prefix": "ocid1.user.oc1..",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "oracle",
+        "oci",
+        "user",
+        "ocid"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Oracle OCI Tenancy OCID",
+      "regex": "ocid1\\.tenancy\\.oc1\\.\\.[a-z0-9]{20,80}",
+      "prefix": "ocid1.tenancy.oc1..",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "oracle",
+        "oci",
+        "tenancy",
+        "ocid"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "UpCloud API Credentials",
+      "regex": "(?i)UPCLOUD_(?:USERNAME|PASSWORD|API_USER|API_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%\\-_]{8,}",
+      "prefix": "upcloud_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "upcloud",
+        "api",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Equinix Metal API Token",
+      "regex": "(?i)(?:METAL_AUTH_TOKEN|EQUINIX_METAL_TOKEN|PACKET_API_TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24,}",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "equinix",
+        "metal",
+        "packet",
+        "bare-metal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Rackspace API Key",
+      "regex": "(?i)RACKSPACE_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "rackspace_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rackspace",
+        "cloud",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Civo API Key",
+      "regex": "(?i)CIVO_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "civo_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "civo",
+        "cloud",
+        "kubernetes"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "OpenStack Application Credential Secret",
+      "regex": "(?i)OS_APPLICATION_CREDENTIAL_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
+      "prefix": "os_application_credential_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "openstack",
+        "keystone",
+        "application"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Kamatera API Key",
+      "regex": "(?i)KAMATERA_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32,}",
+      "prefix": "kamatera_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kamatera",
+        "cloud",
+        "compute"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Kamatera API Secret",
+      "regex": "(?i)KAMATERA_API_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{32,}",
+      "prefix": "kamatera_api_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kamatera",
+        "cloud",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Exoscale API Key",
+      "regex": "(?i)EXOSCALE_(?:API_)?KEY\\s*[:=]\\s*['\\\"]?EXO[A-Za-z0-9]{16,}",
+      "prefix": "exo",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "exoscale",
+        "cloud",
+        "cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

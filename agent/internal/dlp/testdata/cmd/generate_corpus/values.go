@@ -660,4 +660,164 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Chef Encrypted Data Bag"] = func(r *rand.Rand) string {
 		return fmt.Sprintf(`"cipher": "aes-256-cbc", "encrypted_data": "%s"`, randBase64(r, 80))
 	}
+	// ---------------- Batch 1: Additional Cloud Providers ----------------
+	valueGenerators["Linode Personal Access Token"] = func(r *rand.Rand) string {
+		return "LINODE_TOKEN=" + randHex(r, 64)
+	}
+	valueGenerators["Linode OAuth Token"] = func(r *rand.Rand) string {
+		return "LINODE_OAUTH_TOKEN=" + randHex(r, 64)
+	}
+	valueGenerators["Linode Object Storage Access Key"] = func(r *rand.Rand) string {
+		return "LINODE_OBJ_ACCESS_KEY=" + randUpperAlnum(r, 20)
+	}
+	valueGenerators["Linode Object Storage Secret Key"] = func(r *rand.Rand) string {
+		return "LINODE_OBJ_SECRET_KEY=" + randFromAlphabet(r, alnum+"+/", 40)
+	}
+	valueGenerators["Vultr API Key"] = func(r *rand.Rand) string {
+		return "VULTR_API_KEY=" + randUpperAlnum(r, 36)
+	}
+	valueGenerators["Vultr Object Storage Access Key"] = func(r *rand.Rand) string {
+		return "VULTR_OBJ_ACCESS_KEY=" + randUpperAlnum(r, 20)
+	}
+	valueGenerators["Vultr Object Storage Secret Key"] = func(r *rand.Rand) string {
+		return "VULTR_OBJ_SECRET_KEY=" + randFromAlphabet(r, alnum+"+/", 40)
+	}
+	valueGenerators["Hetzner Cloud API Token"] = func(r *rand.Rand) string {
+		return "HCLOUD_TOKEN=" + randAlnum(r, 64)
+	}
+	valueGenerators["Hetzner DNS API Token"] = func(r *rand.Rand) string {
+		return "HETZNER_DNS_API_TOKEN=" + randAlnum(r, 32)
+	}
+	valueGenerators["Hetzner Robot Webservice Password"] = func(r *rand.Rand) string {
+		return "HETZNER_ROBOT_PASSWORD=" + randAlnum(r, 20)
+	}
+	valueGenerators["Hetzner Storage Box Password"] = func(r *rand.Rand) string {
+		return "HETZNER_STORAGEBOX_PASSWORD=" + randAlnum(r, 16)
+	}
+	valueGenerators["OVH Application Key"] = func(r *rand.Rand) string {
+		return "OVH_APPLICATION_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["OVH Application Secret"] = func(r *rand.Rand) string {
+		return "OVH_APPLICATION_SECRET=" + randHex(r, 32)
+	}
+	valueGenerators["OVH Consumer Key"] = func(r *rand.Rand) string {
+		return "OVH_CONSUMER_KEY=" + randAlnum(r, 32)
+	}
+	valueGenerators["OVHcloud Token Bundle"] = func(r *rand.Rand) string {
+		return "OVHCLOUD_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["Scaleway IAM API Key"] = func(r *rand.Rand) string {
+		return "SCW_SECRET_KEY=" + randUUID(r)
+	}
+	valueGenerators["Scaleway Access Key"] = func(r *rand.Rand) string {
+		return "SCW_ACCESS_KEY=SCW" + randUpperAlnum(r, 17)
+	}
+	valueGenerators["Scaleway Project ID"] = func(r *rand.Rand) string {
+		return "SCW_DEFAULT_PROJECT_ID=" + randUUID(r)
+	}
+	valueGenerators["Scaleway Organization ID"] = func(r *rand.Rand) string {
+		return "SCW_DEFAULT_ORGANIZATION_ID=" + randUUID(r)
+	}
+	valueGenerators["Backblaze B2 Application Key ID"] = func(r *rand.Rand) string {
+		return "B2_APPLICATION_KEY_ID=K" + randFromAlphabet(r, digits, 3) + randAlnum(r, 22)
+	}
+	valueGenerators["Backblaze B2 Application Key"] = func(r *rand.Rand) string {
+		return "B2_APPLICATION_KEY=K" + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, alnum+"+/=", 28)
+	}
+	valueGenerators["Backblaze B2 Master Account Token"] = func(r *rand.Rand) string {
+		return "B2_MASTER_KEY=" + randAlnum(r, 48)
+	}
+	valueGenerators["Wasabi Access Key ID"] = func(r *rand.Rand) string {
+		return "WASABI_ACCESS_KEY=" + randUpperAlnum(r, 20)
+	}
+	valueGenerators["Wasabi Secret Access Key"] = func(r *rand.Rand) string {
+		return "WASABI_SECRET_ACCESS_KEY=" + randFromAlphabet(r, alnum+"+/", 40)
+	}
+	valueGenerators["Wasabi Account ID"] = func(r *rand.Rand) string {
+		return "WASABI_ACCOUNT_ID=" + randFromAlphabet(r, digits, 14)
+	}
+	valueGenerators["DigitalOcean Spaces Access Key"] = func(r *rand.Rand) string {
+		return "DO_SPACES_KEY=" + randUpperAlnum(r, 20)
+	}
+	valueGenerators["DigitalOcean Spaces Secret Key"] = func(r *rand.Rand) string {
+		return "DO_SPACES_SECRET=" + randFromAlphabet(r, alnum+"+/", 43)
+	}
+	valueGenerators["DigitalOcean Container Registry Token"] = func(r *rand.Rand) string {
+		return "DOCR_TOKEN=dop_v1_" + randHex(r, 64)
+	}
+	valueGenerators["Cloudflare Global API Key"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_GLOBAL_API_KEY=" + randHex(r, 37)
+	}
+	valueGenerators["Cloudflare R2 Access Key ID"] = func(r *rand.Rand) string {
+		return "R2_ACCESS_KEY_ID=" + randHex(r, 32)
+	}
+	valueGenerators["Cloudflare R2 Secret Access Key"] = func(r *rand.Rand) string {
+		return "R2_SECRET_ACCESS_KEY=" + randHex(r, 64)
+	}
+	valueGenerators["Cloudflare Origin CA Key"] = func(r *rand.Rand) string {
+		return "v1.0-" + randFromAlphabet(r, alnum+"_-", 180)
+	}
+	valueGenerators["Cloudflare Workers KV Namespace Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_KV_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Cloudflare Stream API Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_STREAM_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Cloudflare Tunnel Token"] = func(r *rand.Rand) string {
+		return "CF_TUNNEL_TOKEN=eyJ" + randFromAlphabet(r, alnum+"+/=", 240)
+	}
+	valueGenerators["Akamai EdgeRC Client Token"] = func(r *rand.Rand) string {
+		return "AKAMAI_CLIENT_TOKEN=akab-" + randAlnum(r, 32)
+	}
+	valueGenerators["Akamai EdgeRC Client Secret"] = func(r *rand.Rand) string {
+		return "AKAMAI_CLIENT_SECRET=" + randFromAlphabet(r, alnum+"+/=", 44)
+	}
+	valueGenerators["Akamai EdgeRC Access Token"] = func(r *rand.Rand) string {
+		return "AKAMAI_ACCESS_TOKEN=akab-" + randAlnum(r, 32)
+	}
+	valueGenerators["Fastly API Token"] = func(r *rand.Rand) string {
+		return "FASTLY_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["Fastly Service ID"] = func(r *rand.Rand) string {
+		return "FASTLY_SERVICE_ID=" + randAlnum(r, 22)
+	}
+	valueGenerators["IBM Cloud IAM API Key"] = func(r *rand.Rand) string {
+		return "IBMCLOUD_API_KEY=" + randFromAlphabet(r, alnum+"_-", 44)
+	}
+	valueGenerators["IBM Cloud IAM Access Token"] = func(r *rand.Rand) string {
+		return "IBMCLOUD_IAM_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 200) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 80) + "." + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Oracle OCI API Key Fingerprint"] = func(r *rand.Rand) string {
+		return "OCI_FINGERPRINT=" + colonHexPairs(r, 16)
+	}
+	valueGenerators["Oracle OCI User OCID"] = func(r *rand.Rand) string {
+		return "ocid1.user.oc1.." + randLowerAlnum(r, 60)
+	}
+	valueGenerators["Oracle OCI Tenancy OCID"] = func(r *rand.Rand) string {
+		return "ocid1.tenancy.oc1.." + randLowerAlnum(r, 60)
+	}
+	valueGenerators["UpCloud API Credentials"] = func(r *rand.Rand) string {
+		return "UPCLOUD_PASSWORD=" + randAlnum(r, 20)
+	}
+	valueGenerators["Equinix Metal API Token"] = func(r *rand.Rand) string {
+		return "METAL_AUTH_TOKEN=" + randAlnum(r, 32)
+	}
+	valueGenerators["Rackspace API Key"] = func(r *rand.Rand) string {
+		return "RACKSPACE_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Civo API Key"] = func(r *rand.Rand) string {
+		return "CIVO_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["OpenStack Application Credential Secret"] = func(r *rand.Rand) string {
+		return "OS_APPLICATION_CREDENTIAL_SECRET=" + randFromAlphabet(r, alnum+"_-", 43)
+	}
+	valueGenerators["Kamatera API Key"] = func(r *rand.Rand) string {
+		return "KAMATERA_API_KEY=" + randAlnum(r, 40)
+	}
+	valueGenerators["Kamatera API Secret"] = func(r *rand.Rand) string {
+		return "KAMATERA_API_SECRET=" + randAlnum(r, 48)
+	}
+	valueGenerators["Exoscale API Key"] = func(r *rand.Rand) string {
+		return "EXOSCALE_KEY=EXO" + randAlnum(r, 24)
+	}
 }

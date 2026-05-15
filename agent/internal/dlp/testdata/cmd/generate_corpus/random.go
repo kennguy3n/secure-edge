@@ -115,3 +115,17 @@ func joinLines(lines ...string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// colonHexPairs returns n hex byte pairs joined by ':',
+// matching the (?:[0-9a-f]{2}:){n-1}[0-9a-f]{2} shape used in
+// API key fingerprints (e.g. Oracle Cloud OCI).
+func colonHexPairs(r *rand.Rand, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	pairs := make([]string, n)
+	for i := range pairs {
+		pairs[i] = randHex(r, 2)
+	}
+	return strings.Join(pairs, ":")
+}

@@ -12122,23 +12122,6 @@
       "category": "financial"
     },
     {
-      "name": "Plaid Production Secret",
-      "regex": "(?i)PLAID_SECRET\\s*[:=]\\s*['\\\"]?[a-f0-9]{30}",
-      "prefix": "plaid_secret",
-      "severity": "critical",
-      "score_weight": 1,
-      "hotwords": [
-        "plaid",
-        "secret",
-        "production"
-      ],
-      "hotword_window": 250,
-      "hotword_boost": 2,
-      "require_hotword": false,
-      "entropy_min": 3.5,
-      "category": "financial"
-    },
-    {
       "name": "Plaid Public Token",
       "regex": "(?i)public-(?:sandbox|production|development)-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
       "prefix": "public-",

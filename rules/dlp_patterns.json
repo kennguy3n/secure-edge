@@ -14037,6 +14037,96 @@
       "require_hotword": false,
       "entropy_min": 0.0,
       "category": "phi"
+    },
+    {
+      "name": "California Driver's License",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "california driver",
+        "california dl",
+        "dmv california",
+        "california drivers license"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California State ID Card",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "california state id",
+        "california identification card",
+        "ca state id card",
+        "dmv id card california"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Medi-Cal Beneficiary ID",
+      "regex": "\\b\\d{8}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "medi-cal",
+        "medi cal",
+        "california medicaid",
+        "dhcs medi-cal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Vehicle License Plate",
+      "regex": "\\b[1-9][A-Z]{3}\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "california license plate",
+        "california plate number",
+        "ca plate",
+        "dmv plate california"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Sales Tax Permit Number",
+      "regex": "\\b\\d{3}-\\d{6}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "california sales tax",
+        "cdtfa permit",
+        "california seller's permit",
+        "ca sales tax permit"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
     }
   ]
 }

@@ -967,6 +967,13 @@ var patternCategory = map[string]string{
 	"HL7 v2 OBX Result Segment":       "phi",
 	"HL7 v2 ORC Order Segment":        "phi",
 	"DICOM Patient Name Tag":          "phi",
+
+	// W4 Batch 7: CCPA — California consumer data identifiers.
+	"California Driver's License":        "pii_ccpa",
+	"California State ID Card":           "pii_ccpa",
+	"California Medi-Cal Beneficiary ID": "pii_ccpa",
+	"California Vehicle License Plate":   "pii_ccpa",
+	"California Sales Tax Permit Number": "pii_ccpa",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

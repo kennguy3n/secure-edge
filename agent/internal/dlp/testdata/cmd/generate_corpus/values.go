@@ -2704,4 +2704,22 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		given := pick(r, []string{"John", "Maria", "Hiroshi", "Klaus", "Giulia", "Erik"})
 		return "DICOM imaging study patient (PACS): (0010,0010) PN [" + family + "^" + given + "]"
 	}
+
+	// W4 Batch 7: CCPA — California-specific consumer data identifiers.
+	valueGenerators["California Driver's License"] = func(r *rand.Rand) string {
+		return "California driver license (DMV California issued): " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["California State ID Card"] = func(r *rand.Rand) string {
+		return "California state id card (DMV ID card California — non-driver): " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["California Medi-Cal Beneficiary ID"] = func(r *rand.Rand) string {
+		return "Medi-Cal beneficiary (California Medicaid — DHCS Medi-Cal): " + randFromAlphabet(r, digits, 8) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["California Vehicle License Plate"] = func(r *rand.Rand) string {
+		first := pick(r, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9"})
+		return "California license plate (DMV plate California vehicle): " + first + randFromAlphabet(r, upper, 3) + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["California Sales Tax Permit Number"] = func(r *rand.Rand) string {
+		return "California sales tax permit (CDTFA California seller's permit number): " + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 6)
+	}
 }

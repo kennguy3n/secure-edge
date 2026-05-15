@@ -77,7 +77,7 @@ test("MAX_SCAN_BYTES is identical between scan-client (isolated world) and main-
     );
     // Pin the absolute value too so a coordinated edit that bumps both
     // sites still gets a second look in code review. 1 MiB matches the
-    // documented contract in PROPOSAL.md.
+    // documented DLP contract.
     assert.equal(MAX_SCAN_BYTES, 1 * 1024 * 1024, "MAX_SCAN_BYTES must remain 1 MiB; coordinate any bump with the documented DLP contract");
 });
 

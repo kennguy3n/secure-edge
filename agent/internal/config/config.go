@@ -354,6 +354,20 @@ func (c Config) ValidateEnforcementRequirements() error {
 		if strings.TrimSpace(c.ProfilePublicKey) == "" {
 			return errors.New("managed mode requires profile_public_key")
 		}
+		// Managed mode must declare a profile source at boot so the
+		// agent never runs without a baseline. A managed install with
+		// neither profile_path nor profile_url set would otherwise
+		// take loadProfileOnStartup's default: return nil branch and
+		// silently boot with only the store's seedDefaults applied
+		// — a downgrade window between agent startup and the first
+		// successful POST /api/profile/import. Operators who want
+		// the "push-via-API" deployment model can still hit
+		// /api/profile/import at runtime; they just have to declare
+		// the initial source explicitly here so an unconfigured
+		// install fails-closed instead of fails-open.
+		if strings.TrimSpace(c.ProfilePath) == "" && strings.TrimSpace(c.ProfileURL) == "" {
+			return errors.New("managed mode requires profile_path or profile_url to declare a profile source")
+		}
 	}
 	return nil
 }

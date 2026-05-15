@@ -355,8 +355,12 @@ func TestLoad_EnforcementMode_AcceptsKnown(t *testing.T) {
 api_token_path: /tmp/api-token
 api_token_required: true
 `
+	// managed mode additionally requires a profile source
+	// (profile_path or profile_url) so an unconfigured managed
+	// install never boots without a baseline.
 	const managedPreamble = teamPreamble + `bridge_mac_required: true
 profile_public_key: "abc123"
+profile_path: /tmp/profile.yaml
 `
 	cases := []struct {
 		in       string
@@ -672,8 +676,14 @@ func TestValidateEnforcementRequirements_ManagedAddsMACAndPubKey(t *testing.T) {
 		t.Fatal("expected error for missing profile_public_key")
 	}
 
-	// Full set: every secure-default rule satisfied.
+	// Profile key set but no profile source declared (P2 follow-up).
 	c.ProfilePublicKey = "abc123"
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing profile_path/profile_url")
+	}
+
+	// Full set: every secure-default rule satisfied.
+	c.ProfilePath = "/tmp/profile.yaml"
 	if err := c.ValidateEnforcementRequirements(); err != nil {
 		t.Errorf("happy path rejected: %v", err)
 	}
@@ -747,5 +757,75 @@ func TestValidateEnforcementRequirements_RejectsAllBlankAllowedExtensionIDs(t *t
 	}
 	if !strings.Contains(err.Error(), "allowed_extension_ids") {
 		t.Errorf("error %q should mention allowed_extension_ids", err.Error())
+	}
+}
+
+// TestValidateEnforcementRequirements_ManagedRequiresProfileSource
+// pins the follow-up fix for the post-merge review finding: a
+// managed install must declare a profile source (profile_path or
+// profile_url) at boot. Without this, loadProfileOnStartup's
+// "neither set → return nil" branch silently lets managed mode boot
+// with only the store's seedDefaults applied, opening a downgrade
+// window between agent startup and the first push-via-API import.
+func TestValidateEnforcementRequirements_ManagedRequiresProfileSource(t *testing.T) {
+	base := Config{
+		EnforcementMode:     "managed",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+		APITokenRequired:    true,
+		BridgeMACRequired:   true,
+		ProfilePublicKey:    "abc123",
+	}
+
+	// Neither profile_path nor profile_url → reject.
+	if err := base.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected rejection when neither profile_path nor profile_url is set")
+	} else if !strings.Contains(err.Error(), "profile_path") || !strings.Contains(err.Error(), "profile_url") {
+		t.Errorf("error %q should mention both profile_path and profile_url", err.Error())
+	}
+
+	// profile_path satisfies the requirement.
+	c := base
+	c.ProfilePath = "/etc/secure-edge/profile.yaml"
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("profile_path-set config rejected: %v", err)
+	}
+
+	// profile_url alone also satisfies it (the alternative
+	// deployment model — server-distributed profile).
+	c = base
+	c.ProfileURL = "https://profiles.example.com/managed.yaml"
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("profile_url-set config rejected: %v", err)
+	}
+
+	// Whitespace-only values must not slip past the check —
+	// mirrors the trim-bypass pattern fixed elsewhere in the
+	// validator. Without trim a managed install could pass
+	// validation with profile_path: "  " and then boot with no
+	// effective source.
+	c = base
+	c.ProfilePath = "  "
+	c.ProfileURL = "\t"
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Error("whitespace-only profile_path/profile_url should be rejected")
+	}
+}
+
+// TestValidateEnforcementRequirements_TeamDoesNotRequireProfileSource
+// is the scope guard: the managed-only requirement must not bleed
+// into team mode. Team installs intentionally have a softer posture
+// (boot degraded if the profile fails to load) and shouldn't be
+// forced to declare a profile source.
+func TestValidateEnforcementRequirements_TeamDoesNotRequireProfileSource(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+		APITokenRequired:    true,
+		// no profile_path / profile_url
+	}
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("team mode without profile source should pass, got: %v", err)
 	}
 }

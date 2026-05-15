@@ -220,12 +220,23 @@ func run(configPath string) error {
 	// as the category file path; the category name is derived from the
 	// basename for human-friendly display.
 	var sources []rules.RuleSource
+	var ruleCategories []string
 	for _, p := range cfg.RulePaths {
+		cat := categoryFromPath(p)
 		sources = append(sources, rules.RuleSource{
-			Category: categoryFromPath(p),
+			Category: cat,
 			Path:     p,
 		})
+		ruleCategories = append(ruleCategories, cat)
 	}
+	// Register every category derived from cfg.RulePaths with the
+	// Store so SetPolicy / ApplyProfileTx accept policy writes against
+	// operator-defined custom rule files (e.g. "Gaming" from a
+	// `gaming.txt` entry under rules/). Without this the store's
+	// closed-set check would 400 every write — including writes from
+	// an enterprise profile that names the same custom category — and
+	// the policy engine would silently default-deny.
+	s.RegisterCategories(ruleCategories)
 	engine, err := policy.New(s, sources)
 	if err != nil {
 		return fmt.Errorf("build policy engine: %w", err)

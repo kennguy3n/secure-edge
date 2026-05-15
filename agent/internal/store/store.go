@@ -71,8 +71,13 @@ var knownCategories = map[string]bool{
 // trailing `_admin` substring.
 var adminCategoryPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*_admin$`)
 
-// isKnownCategory reports whether cat is acceptable as a SetPolicy
-// target — either a hard-coded fixed category or an admin-override.
+// isKnownCategory reports whether cat is one of the hard-coded
+// closed-set categories or an admin-override. Operator-registered
+// custom categories are NOT consulted here — callers that have a
+// *Store handle should use Store.isAcceptableCategory, which also
+// consults RegisterCategories. This standalone form is retained for
+// the documented compile-time invariants and for the (rare) test
+// paths that exercise validation without a Store.
 func isKnownCategory(cat string) bool {
 	if knownCategories[cat] {
 		return true
@@ -100,6 +105,66 @@ type Store struct {
 	db *sql.DB
 
 	mu sync.Mutex
+
+	// customCategoriesMu guards customCategories. A separate mutex from
+	// `mu` so RegisterCategories at boot does not contend with the hot
+	// stats / policy write path. Reads (SetPolicy / ApplyProfileTx)
+	// take an RLock to stay cheap; writes (RegisterCategories) take
+	// the write lock and are expected to be rare (boot + the occasional
+	// runtime reload).
+	customCategoriesMu sync.RWMutex
+	customCategories   map[string]bool
+}
+
+// RegisterCategories extends the closed-set category allowlist with
+// operator-derived names (e.g. category strings produced by
+// cmd/agent's categoryFromPath from cfg.RulePaths). Names are stored
+// after strings.TrimSpace; blank entries are ignored. The call is
+// idempotent — subsequent registrations union into the same set
+// rather than replacing it, so a runtime reload that re-derives the
+// list does not transiently empty the allowlist while a SetPolicy
+// write is in flight.
+//
+// This exists so deployments that ship custom rule files (a
+// `gaming.txt` → "Gaming" category, an enterprise profile that
+// references a non-stock category, etc.) can SetPolicy / ApplyProfileTx
+// against those categories without us either (a) dropping the
+// closed-set protection or (b) requiring every deployment to fork the
+// store.knownCategories source.
+func (s *Store) RegisterCategories(names []string) {
+	if s == nil || len(names) == 0 {
+		return
+	}
+	s.customCategoriesMu.Lock()
+	defer s.customCategoriesMu.Unlock()
+	if s.customCategories == nil {
+		s.customCategories = make(map[string]bool, len(names))
+	}
+	for _, n := range names {
+		trimmed := strings.TrimSpace(n)
+		if trimmed == "" {
+			continue
+		}
+		s.customCategories[trimmed] = true
+	}
+}
+
+// isAcceptableCategory is the *Store-bound form of isKnownCategory:
+// it consults the closed-set + admin-pattern check from
+// isKnownCategory and then falls through to the operator-registered
+// custom-categories set. Callers go through this instead of
+// validatePolicyInputs when they have an *s handle (i.e. always, from
+// SetPolicy and ApplyProfileTx).
+func (s *Store) isAcceptableCategory(cat string) bool {
+	if isKnownCategory(cat) {
+		return true
+	}
+	if s == nil {
+		return false
+	}
+	s.customCategoriesMu.RLock()
+	defer s.customCategoriesMu.RUnlock()
+	return s.customCategories[cat]
 }
 
 // Open connects to the SQLite database at path (creating it if needed)
@@ -440,11 +505,22 @@ func validateDLPConfig(c DLPConfig) error {
 // transaction (so the partial-write regression test in store_test.go
 // can drive the failure mode without depending on SQLite's own
 // rollback semantics).
-func validatePolicyInputs(category, action string) error {
+//
+// When s is non-nil the operator-registered custom-categories set
+// (Store.RegisterCategories) is consulted too. The s==nil form
+// retains the original closed-set-only semantics for the (rare) call
+// sites that don't have a handle.
+func validatePolicyInputs(s *Store, category, action string) error {
 	switch action {
 	case ActionAllow, ActionAllowWithDLP, ActionDeny:
 	default:
 		return ErrInvalidAction
+	}
+	if s != nil {
+		if !s.isAcceptableCategory(category) {
+			return fmt.Errorf("%w: %q", ErrInvalidCategory, category)
+		}
+		return nil
 	}
 	if !isKnownCategory(category) {
 		return fmt.Errorf("%w: %q", ErrInvalidCategory, category)
@@ -456,7 +532,7 @@ func validatePolicyInputs(category, action string) error {
 // action (ErrInvalidAction) and the category name (ErrInvalidCategory)
 // before touching the DB so an out-of-set category never lands on disk.
 func (s *Store) SetPolicy(ctx context.Context, category, action string) error {
-	if err := validatePolicyInputs(category, action); err != nil {
+	if err := validatePolicyInputs(s, category, action); err != nil {
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `
@@ -587,7 +663,7 @@ func (s *Store) SetDLPConfig(ctx context.Context, c DLPConfig) error {
 // a no-op and returns without opening a transaction.
 func (s *Store) ApplyProfileTx(ctx context.Context, categories []CategoryPolicy, dlpConfig *DLPConfig) error {
 	for _, p := range categories {
-		if err := validatePolicyInputs(p.Category, p.Action); err != nil {
+		if err := validatePolicyInputs(s, p.Category, p.Action); err != nil {
 			return fmt.Errorf("apply_profile_tx: %w", err)
 		}
 	}

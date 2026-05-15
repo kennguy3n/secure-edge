@@ -409,3 +409,117 @@ func TestApplyProfileTx_HappyPath(t *testing.T) {
 		t.Errorf("dlp_config not persisted: got %+v", cur)
 	}
 }
+
+// TestRegisterCategories_AcceptsCustomNames pins the follow-up fix
+// for the post-merge review finding: operators ship custom rule
+// files via cfg.RulePaths (categoryFromPath turns a `gaming.txt`
+// entry into the category "Gaming"), and the store must accept
+// SetPolicy writes against those custom categories. Without
+// RegisterCategories the closed-set check rejects them as
+// ErrInvalidCategory and the operator-visible /api/policies surface
+// returns 400 on every write.
+func TestRegisterCategories_AcceptsCustomNames(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	// Baseline: an unregistered custom category is rejected.
+	if err := s.SetPolicy(ctx, "Gaming", ActionDeny); err == nil {
+		t.Fatal("expected ErrInvalidCategory for unregistered custom category")
+	}
+
+	// Register and retry.
+	s.RegisterCategories([]string{"Gaming"})
+	if err := s.SetPolicy(ctx, "Gaming", ActionDeny); err != nil {
+		t.Fatalf("registered custom category should be accepted, got %v", err)
+	}
+
+	// The closed-set known names still flow through.
+	if err := s.SetPolicy(ctx, "AI Chat Blocked", ActionDeny); err != nil {
+		t.Fatalf("known closed-set category rejected: %v", err)
+	}
+
+	// An admin-pattern category still works without registration.
+	if err := s.SetPolicy(ctx, "allow_admin", ActionAllow); err != nil {
+		t.Fatalf("admin-pattern category rejected: %v", err)
+	}
+}
+
+// TestRegisterCategories_TrimsAndIgnoresBlanks is the input-hygiene
+// half of RegisterCategories. The boot-time helper that derives
+// names from cfg.RulePaths could pass through whitespace if the
+// path contained a trailing space (or a future caller passes raw
+// YAML values), and a blank entry would otherwise widen the
+// acceptable-category set to include the empty string.
+func TestRegisterCategories_TrimsAndIgnoresBlanks(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	s.RegisterCategories([]string{"  ", "", "\t", "  Gaming  ", "Reading"})
+
+	// The empty string and pure whitespace must NOT have been added.
+	if err := s.SetPolicy(ctx, "", ActionDeny); err == nil {
+		t.Error("empty-string category should be rejected")
+	}
+	if err := s.SetPolicy(ctx, "   ", ActionDeny); err == nil {
+		t.Error("whitespace-only category should be rejected")
+	}
+
+	// The trimmed forms succeed.
+	if err := s.SetPolicy(ctx, "Gaming", ActionDeny); err != nil {
+		t.Errorf("trimmed Gaming rejected: %v", err)
+	}
+	if err := s.SetPolicy(ctx, "Reading", ActionAllow); err != nil {
+		t.Errorf("Reading rejected: %v", err)
+	}
+}
+
+// TestRegisterCategories_AppliesToApplyProfileTx confirms the
+// ApplyProfileTx code path also consults the registered set —
+// otherwise an enterprise profile that names a custom category
+// would still be rejected wholesale during import.
+func TestRegisterCategories_AppliesToApplyProfileTx(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	s.RegisterCategories([]string{"Gaming"})
+
+	cats := []CategoryPolicy{
+		{Category: "AI Chat Blocked", Action: ActionDeny},
+		{Category: "Gaming", Action: ActionDeny},
+	}
+	if err := s.ApplyProfileTx(ctx, cats, nil); err != nil {
+		t.Fatalf("ApplyProfileTx with registered custom: %v", err)
+	}
+
+	// And the negative case still fires for unregistered names.
+	bad := []CategoryPolicy{{Category: "Cooking", Action: ActionDeny}}
+	if err := s.ApplyProfileTx(ctx, bad, nil); err == nil {
+		t.Fatal("expected ApplyProfileTx to reject unregistered Cooking")
+	}
+}
+
+// TestRegisterCategories_NilSafeAndIdempotent covers the two
+// degenerate inputs (nil receiver, repeated registrations) so a
+// caller can re-derive the list on every reload without worrying
+// about emptying or wiping the existing set.
+func TestRegisterCategories_NilSafeAndIdempotent(t *testing.T) {
+	var nilStore *Store
+	nilStore.RegisterCategories([]string{"Gaming"}) // must not panic
+
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	s.RegisterCategories([]string{"Gaming"})
+	s.RegisterCategories(nil)
+	s.RegisterCategories([]string{}) // explicit empty
+	s.RegisterCategories([]string{"Reading"})
+
+	// First registration survived the subsequent no-ops.
+	if err := s.SetPolicy(ctx, "Gaming", ActionDeny); err != nil {
+		t.Errorf("Gaming survived idempotent calls: %v", err)
+	}
+	// Second registration unioned in.
+	if err := s.SetPolicy(ctx, "Reading", ActionAllow); err != nil {
+		t.Errorf("Reading added on second call: %v", err)
+	}
+}

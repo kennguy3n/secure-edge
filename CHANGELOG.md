@@ -95,6 +95,24 @@ may introduce breaking changes between feature releases.
 
 ### Changed
 
+- **Breaking (managed mode):** `enforcement_mode: managed` now
+  requires `profile_path` or `profile_url` to be set in
+  `config.yaml`. Previously a managed install could boot with no
+  profile source declared, in which case `loadProfileOnStartup`
+  returned nil and the agent ran with only the store's seeded
+  defaults applied — a downgrade window between agent start and
+  the first push-via-API import. Operators who want the
+  push-via-API deployment model must now declare the initial
+  source explicitly (e.g. point `profile_path` at a placeholder
+  signed-empty profile shipped with the package); the
+  `POST /api/profile/import` runtime path is unchanged. Combined
+  with the existing `enforcement_mode: team` / `managed` secure
+  defaults gate landed in the hardening sweep
+  (`allowed_extension_ids`, `api_token_path`,
+  `api_token_required`, `bridge_mac_required`,
+  `profile_public_key`), operators upgrading an existing
+  team/managed deployment must reconcile their `config.yaml`
+  with the new validator before the agent will start.
 - `paste-interceptor.ts` now shares the `MAX_SCAN_BYTES`
   constant with the other interceptors, and the constant is
   pinned across the isolated and MAIN worlds by a parity
@@ -107,6 +125,20 @@ may introduce breaking changes between feature releases.
 
 ### Fixed
 
+- `store.SetPolicy` / `store.ApplyProfileTx` no longer reject
+  custom rule categories. The hardening sweep landed a
+  closed-set category allowlist that mirrored the seven shipped
+  defaults plus the `<verb>_admin` override pattern. Operators
+  who add a custom rule file under `rules/` (e.g. `gaming.txt`
+  → "Gaming") could load it into the policy engine via
+  `RuleSource` but every subsequent `PUT /api/policies/Gaming`
+  came back as `400 invalid category`, and enterprise profiles
+  containing the same custom name were rejected wholesale by
+  `ApplyProfileTx`. The store now exposes
+  `RegisterCategories([]string)`; the agent boot path registers
+  every category derived from `cfg.rule_paths` so the closed-set
+  protection still bounds the writable space without forcing
+  deployments to fork `store.knownCategories`.
 - Cross-compilation: `agent/internal/tamper/proxy_check.go`
   now dispatches per platform via build-tagged
   `proxy_{darwin,windows,other}.go` files instead of a

@@ -13120,6 +13120,284 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_uk"
+    },
+    {
+      "name": "UAE Emirates ID",
+      "regex": "\\b784-\\d{4}-\\d{7}-\\d\\b",
+      "prefix": "784-",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "emirates id",
+        "hawiya",
+        "uae emirates",
+        "hoiya",
+        "federal authority for identity"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi National ID",
+      "regex": "\\b[12]\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "saudi national id",
+        "iqama",
+        "\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064a\u0629",
+        "national identity card saudi",
+        "ahwal madaniyah"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar QID",
+      "regex": "\\b[23]\\d{10}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "qatar id",
+        "qid",
+        "qatari id",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a",
+        "ministry of interior qatar"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Bahrain CPR Number",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bahrain cpr",
+        "bahrain personal number",
+        "information and egovernment authority",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a \u0627\u0644\u0628\u062d\u0631\u064a\u0646\u064a"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Kuwait Civil ID",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kuwait civil id",
+        "public authority for civil information",
+        "\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0645\u062f\u0646\u064a\u0629",
+        "civil id kuwait",
+        "paci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Oman Civil Number",
+      "regex": "\\b\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oman civil number",
+        "royal oman police",
+        "sultanate of oman id",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0645\u062f\u0646\u064a \u0627\u0644\u0639\u0645\u0627\u0646\u064a"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "UAE Tax Registration Number",
+      "regex": "\\b\\d{15}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "tax registration number",
+        "trn uae",
+        "federal tax authority",
+        "uae vat",
+        "fta"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi VAT Number",
+      "regex": "\\b3\\d{13}3\\b",
+      "prefix": "3",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "saudi vat",
+        "zatca",
+        "general authority of zakat and tax",
+        "kingdom of saudi arabia vat",
+        "ksa vat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi IBAN",
+      "regex": "\\bSA\\d{2}\\d{2}[A-Z0-9]{18}\\b",
+      "prefix": "sa",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "saudi",
+        "sama",
+        "sarie",
+        "bank account saudi"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "UAE IBAN",
+      "regex": "\\bAE\\d{2}\\d{3}\\d{16}\\b",
+      "prefix": "ae",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "uae",
+        "united arab emirates",
+        "central bank of the uae",
+        "cbuae"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Kuwait IBAN",
+      "regex": "\\bKW\\d{2}[A-Z]{4}\\d{22}\\b",
+      "prefix": "kw",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "kuwait",
+        "central bank of kuwait",
+        "cbk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Bahrain IBAN",
+      "regex": "\\bBH\\d{2}[A-Z]{4}[A-Z0-9]{14}\\b",
+      "prefix": "bh",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "bahrain",
+        "central bank of bahrain",
+        "cbb"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar IBAN",
+      "regex": "\\bQA\\d{2}[A-Z]{4}[A-Z0-9]{21}\\b",
+      "prefix": "qa",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "qatar",
+        "qatar central bank",
+        "qcb"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Oman IBAN",
+      "regex": "\\bOM\\d{2}\\d{3}[A-Z0-9]{16}\\b",
+      "prefix": "om",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "oman",
+        "central bank of oman",
+        "cbo oman"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar TIN",
+      "regex": "\\b\\d{10}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "qatar tax number",
+        "qatar tin",
+        "general tax authority qatar",
+        "\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0642\u0637\u0631"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
     }
   ]
 }

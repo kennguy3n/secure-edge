@@ -2500,4 +2500,53 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["UK UTR"] = func(r *rand.Rand) string {
 		return "HMRC UTR (Unique Taxpayer Reference): " + randFromAlphabet(r, digits, 10)
 	}
+
+	// W4 Batch 4: GCC / Middle East.
+	valueGenerators["UAE Emirates ID"] = func(r *rand.Rand) string {
+		yr := fmt.Sprintf("%04d", 1950+r.Intn(75))
+		return "Emirates ID: 784-" + yr + "-" + randFromAlphabet(r, digits, 7) + "-" + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["Saudi National ID"] = func(r *rand.Rand) string {
+		// Saudi national IDs start with 1 (citizen) or 2 (resident / iqama).
+		return "Saudi National ID (Iqama): " + pick(r, []string{"1", "2"}) + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Qatar QID"] = func(r *rand.Rand) string {
+		return "Qatar ID (QID — Ministry of Interior Qatar): " + pick(r, []string{"2", "3"}) + randFromAlphabet(r, digits, 10)
+	}
+	valueGenerators["Bahrain CPR Number"] = func(r *rand.Rand) string {
+		return "Bahrain CPR (Information and eGovernment Authority): " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Kuwait Civil ID"] = func(r *rand.Rand) string {
+		return "Kuwait Civil ID (PACI — Public Authority for Civil Information): " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["Oman Civil Number"] = func(r *rand.Rand) string {
+		return "Oman Civil Number (Royal Oman Police): " + randFromAlphabet(r, digits, 8)
+	}
+	valueGenerators["UAE Tax Registration Number"] = func(r *rand.Rand) string {
+		return "UAE Tax Registration Number (Federal Tax Authority — FTA): " + randFromAlphabet(r, digits, 15)
+	}
+	valueGenerators["Saudi VAT Number"] = func(r *rand.Rand) string {
+		return "Saudi VAT (ZATCA, Kingdom of Saudi Arabia VAT): 3" + randFromAlphabet(r, digits, 13) + "3"
+	}
+	valueGenerators["Saudi IBAN"] = func(r *rand.Rand) string {
+		return "Saudi IBAN (SAMA): SA" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upAlnum, 18)
+	}
+	valueGenerators["UAE IBAN"] = func(r *rand.Rand) string {
+		return "UAE IBAN (Central Bank of the UAE — CBUAE): AE" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, digits, 16)
+	}
+	valueGenerators["Kuwait IBAN"] = func(r *rand.Rand) string {
+		return "Kuwait IBAN (Central Bank of Kuwait — CBK): KW" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, digits, 22)
+	}
+	valueGenerators["Bahrain IBAN"] = func(r *rand.Rand) string {
+		return "Bahrain IBAN (Central Bank of Bahrain — CBB): BH" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upAlnum, 14)
+	}
+	valueGenerators["Qatar IBAN"] = func(r *rand.Rand) string {
+		return "Qatar IBAN (Qatar Central Bank — QCB): QA" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upAlnum, 21)
+	}
+	valueGenerators["Oman IBAN"] = func(r *rand.Rand) string {
+		return "Oman IBAN (Central Bank of Oman): OM" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, upAlnum, 16)
+	}
+	valueGenerators["Qatar TIN"] = func(r *rand.Rand) string {
+		return "Qatar Tax Number (General Tax Authority Qatar): " + randFromAlphabet(r, digits, 10)
+	}
 }

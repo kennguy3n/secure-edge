@@ -909,6 +909,23 @@ var patternCategory = map[string]string{
 	"UK Passport Number":           "pii_uk",
 	"UK Driving Licence Number":    "pii_uk",
 	"UK UTR":                       "pii_uk",
+
+	// W4 Batch 4: GCC / Middle East.
+	"UAE Emirates ID":             "pii_gcc",
+	"Saudi National ID":           "pii_gcc",
+	"Qatar QID":                   "pii_gcc",
+	"Bahrain CPR Number":          "pii_gcc",
+	"Kuwait Civil ID":             "pii_gcc",
+	"Oman Civil Number":           "pii_gcc",
+	"UAE Tax Registration Number": "pii_gcc",
+	"Saudi VAT Number":            "pii_gcc",
+	"Saudi IBAN":                  "pii_gcc",
+	"UAE IBAN":                    "pii_gcc",
+	"Kuwait IBAN":                 "pii_gcc",
+	"Bahrain IBAN":                "pii_gcc",
+	"Qatar IBAN":                  "pii_gcc",
+	"Oman IBAN":                   "pii_gcc",
+	"Qatar TIN":                   "pii_gcc",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

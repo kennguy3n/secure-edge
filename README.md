@@ -253,7 +253,7 @@ human-readable error (see
 
 ### DLP accuracy methodology
 
-718 patterns across 16 categories (the full breakdown is in the
+812 patterns across 22 categories (the full breakdown is in the
 [DLP coverage](#dlp-coverage) section below). Accuracy is enforced
 by three CI-gated layers, each pinned in `agent/internal/dlp/`:
 
@@ -310,25 +310,31 @@ live in `*_bench_test.go` files; see [BENCHMARKS.md](./BENCHMARKS.md).
 
 ## DLP coverage
 
-718 patterns across 16 categories (counted from `rules/dlp_patterns.json`):
+812 patterns across 22 categories (counted from `rules/dlp_patterns.json`):
 
 | Category             | Patterns | Examples                                                                                                                                  |
 |----------------------|---------:|-------------------------------------------------------------------------------------------------------------------------------------------|
 | `cloud`              | 462      | AWS, GCP, Azure, IBM, Alibaba, Oracle, DigitalOcean / Linode / Vultr / Hetzner / OVH / Scaleway / regional clouds, monitoring & VPN PATs  |
 | `code_secret`        | 60       | GitHub / GitLab / Bitbucket PATs, .pypirc tokens, Rails master.key, Laravel APP\_KEY, Terraform / Ansible / Chef / Puppet / Docker / K8s   |
 | `credential`         | 37       | shell `export` literals, JDBC URLs, env-file passwords, Salt / Helm / sealed-secret literals                                              |
+| `phi`                | 35       | FHIR / SMART-on-FHIR tokens, Epic / Cerner credentials, HL7 v2 PID/OBX/ORC, DICOM tags, NPI, DEA, MBI, MRN, ICD-10 / ICD-9 / CPT / HCPCS / LOINC / SNOMED / DSM-5, NDC, CLIA |
 | `database_registry`  | 34       | Postgres / MongoDB URIs, Docker / npm tokens, registry credentials                                                                        |
+| `pii_eu`             | 30       | GDPR — IBAN, DE Personalausweis / Steueridentifikationsnummer, FR INSEE/NIR / SIREN / SIRET, IT Codice Fiscale, ES DNI/NIE, NL BSN, BE Rijksregister, PL PESEL, PT NIF, SE Personnummer, FI HETU, GR AFM, HU TAJ, EU VAT |
 | `financial`          | 20       | Stripe (whsec\_, rk\_), Plaid, Dwolla, Adyen, Wise, GoCardless, PayPal, Square, Coinbase, Razorpay                                          |
-| `phi`                | 20       | FHIR / SMART-on-FHIR tokens, Epic / Cerner credentials, HL7 v2 PID, DICOM tags, NPI, DEA, MBI, MRN, ICD-10 lists                          |
+| `pii_sea`            | 20       | Singapore NRIC/FIN, Malaysia MyKad, Thai NID, Philippines SSS/TIN/UMID, Indonesia NIK/NPWP, Vietnam CCCD/MST, Japan My Number / Passport, Korea RRN / Biz Reg, Taiwan NID, China Resident ID / Passport, India Aadhaar / PAN, Hong Kong HKID |
 | `mobile_desktop`     | 17       | Apple App Store Connect, Google Play, code-signing, iOS Info.plist, Android local.properties                                              |
+| `pii_gcc`            | 15       | UAE Emirates ID / TRN / IBAN, Saudi National ID (Iqama) / IBAN, Qatar QID, Bahrain CPR, Kuwait Civil ID, Oman Civil Number, GCC VAT IDs   |
 | `ai_ml`              | 13       | OpenAI, Anthropic, Google AI, Replicate, HuggingFace                                                                                      |
 | `package_manager`    | 12       | npm, PyPI, Maven, NuGet, RubyGems                                                                                                         |
-| `auth`               | 8        | Auth0, Okta, Stripe Connect, Twilio Authy                                                                                                 |
 | `ci_cd`              | 8        | CircleCI, TeamCity, Bitrise, Buildkite                                                                                                    |
 | `messaging`          | 8        | Slack, Twilio, SendGrid, Discord, Mailgun, Zoom JWT, Microsoft Teams, Vonage, MessageBird                                                 |
+| `auth`               | 8        | OIDC ID tokens, OAuth refresh tokens, JWT secrets, SAML assertions, Auth0, Okta, Stripe Connect, Twilio Authy                             |
 | `infra_secret`       | 7        | Terraform, Vault, Pulumi                                                                                                                  |
+| `pii_uk`             | 5        | UK NINO, NHS Number, UK Passport, UK Driver's Licence, UK UTR                                                                             |
+| `pii_ccpa`           | 5        | California Driver's Licence / State ID / Medi-Cal Beneficiary ID / Vehicle Plate / CDTFA Sales Tax Permit                                 |
 | `payments`           | 5        | Stripe, Square, PayPal, Braintree                                                                                                         |
 | `pii`                | 4        | US SSN, credit cards, emails, phones                                                                                                      |
+| `pii_switzerland`    | 4        | Swiss AHV / AVS, Swiss IBAN, Swiss UID (CHE-…), Swiss Passport                                                                            |
 | `iac`                | 3        | Atlas, Spacelift, Env0                                                                                                                    |
 
 See [SECURITY_RULES.md](./SECURITY_RULES.md) for the per-pattern table

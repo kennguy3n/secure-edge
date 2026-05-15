@@ -1,19 +1,59 @@
 # ShieldNet Secure Edge — Security Rules Reference
 
 A complete reference of every DLP pattern shipped in
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**718** patterns
-across **16** JSON categories). Sub-sections below group patterns by
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**812** patterns
+across **22** JSON categories). Sub-sections below group patterns by
 family for readability rather than by JSON category. For the schema
 and authoring workflow, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
 
 The bulk of the per-section tables below predates the W1 pattern
-expansion; they are kept as a curated overview of the foundational
+expansion (376 → 720) and the subsequent W4 global-PII expansion
+(720 → 812 across GDPR / Switzerland / UK / GCC / SEA / HIPAA /
+CCPA). They are kept as a curated overview of the foundational
 patterns. The full and current list of every pattern, with its
 severity, prefix, hotword settings, regex, and category, is the
 [`rules/dlp_patterns.json`](./rules/dlp_patterns.json) file itself.
 Counts in the section headers below therefore reflect the
-foundational set, not the W1-expanded set.
+foundational set, not the W1- or W4-expanded set.
+
+### W4 — Global PII coverage (added)
+
+The W4 expansion adds 92 region-specific personal-data patterns
+covering jurisdictions where GDPR, HIPAA, CCPA, GCC privacy laws,
+the UK Data Protection Act, and the Swiss FADP / nFADP require
+specific identifier classes to be treated as personal data. The
+new patterns are grouped by category in `dlp_patterns.json`:
+
+| Category          | Patterns | Coverage                                                                                                                                                                  |
+|-------------------|---------:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pii_eu`          | 30       | GDPR — IBAN, EU VAT, DE Personalausweis / Steueridentifikationsnummer / Sozialversicherungsnummer, FR INSEE / SIREN / SIRET / CNI, IT Codice Fiscale / Partita IVA, ES DNI / NIE / CIF, NL BSN, BE Rijksregister, PL PESEL / NIP, PT NIF, SE Personnummer / Organisationsnummer, FI HETU, GR AFM, HU TAJ |
+| `pii_switzerland` | 4        | Swiss AHV/AVS (756.xxxx.xxxx.xx), Swiss IBAN, Swiss UID (CHE-xxx.xxx.xxx), Swiss Passport                                                                                  |
+| `pii_uk`          | 5        | UK NINO, NHS Number, UK Passport, UK Driver's Licence, UK UTR                                                                                                             |
+| `pii_gcc`         | 15       | UAE Emirates ID (784-...), UAE TRN, UAE IBAN, Saudi National ID (Iqama), Saudi IBAN, Saudi VAT, Qatar QID, Bahrain CPR, Kuwait Civil ID, Oman Civil Number                 |
+| `pii_sea`         | 20       | Singapore NRIC/FIN, Malaysia MyKad, Thai National ID, Philippines SSS/TIN/UMID, Indonesia NIK / NPWP, Vietnam CCCD / MST, Japan My Number / Passport, South Korea RRN / Business Registration, Taiwan National ID, China Resident ID / Passport, India Aadhaar / PAN, Hong Kong HKID |
+| `phi`             | 15 new   | US CLIA, CPT (bulk), HCPCS Level II (bulk), LOINC (bulk), ICD-9-CM (bulk), NDC 11-digit, SNOMED CT (bulk), DSM-5, Medicare HICN (legacy), CMS Certification Number, Insurance Subscriber/Member ID, Patient DOB in clinical context, HL7 v2 OBX / ORC, DICOM (0010,0010) Patient Name Tag |
+| `pii_ccpa`        | 5        | California Driver's Licence, California State ID, California Medi-Cal Beneficiary ID, California Vehicle Plate, CDTFA Sales Tax Permit                                    |
+
+Notes on the W4 set:
+
+- Most national-ID patterns set `require_hotword: true` because their
+  shapes (9–13 digits, sometimes with separators) collide with too
+  many innocent strings to fire safely on shape alone. Each pattern's
+  hotword list uses multi-syllabic, locale-specific phrases (e.g.
+  `numer identyfikacji` for PL NIP, `numéro de sécurité sociale` for
+  FR INSEE/NIR, `身分證` / `Taiwan ID` for TW NID, `subscriber id` /
+  `member id` for insurance IDs) to keep the hotword AC scan
+  selective.
+- Bulk-detection patterns (CPT / HCPCS / LOINC / ICD-9 / SNOMED CT)
+  use the `(?:CODE\b[\s,;|]+){N}CODE\b` form to fire only on lists
+  of N+ codes, which is how these classes appear in real claims
+  data — a single 5-digit number in isolation is not a CPT secret.
+- Test/example values are not pre-excluded — the W4 expansion relies
+  on the existing generic dictionary exclusions
+  (`placeholder`, `example`, `test`, `dummy`, …) in
+  `rules/dlp_exclusions.json`, which apply to every pattern via
+  `applies_to: "*"`.
 
 Columns:
 

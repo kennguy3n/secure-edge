@@ -357,10 +357,13 @@ api_token_required: true
 `
 	// managed mode additionally requires a profile source
 	// (profile_path or profile_url) so an unconfigured managed
-	// install never boots without a baseline.
+	// install never boots without a baseline, plus a signed-rule
+	// public key so the auto-updater never falls back to the
+	// per-file SHA-256 lenient posture.
 	const managedPreamble = teamPreamble + `bridge_mac_required: true
 profile_public_key: "abc123"
 profile_path: /tmp/profile.yaml
+rule_update_public_key: "def456"
 `
 	cases := []struct {
 		in       string
@@ -676,8 +679,16 @@ func TestValidateEnforcementRequirements_ManagedAddsMACAndPubKey(t *testing.T) {
 		t.Fatal("expected error for missing profile_public_key")
 	}
 
-	// Profile key set but no profile source declared (P2 follow-up).
+	// Profile key set but no rule_update_public_key declared
+	// (managed mode pins every signed surface or fails closed).
 	c.ProfilePublicKey = "abc123"
+	if err := c.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected error for missing rule_update_public_key")
+	}
+
+	// Rule-update key set but no profile source declared
+	// (P2 follow-up: managed must declare a baseline at boot).
+	c.RuleUpdatePublicKey = "def456"
 	if err := c.ValidateEnforcementRequirements(); err == nil {
 		t.Fatal("expected error for missing profile_path/profile_url")
 	}
@@ -775,6 +786,11 @@ func TestValidateEnforcementRequirements_ManagedRequiresProfileSource(t *testing
 		APITokenRequired:    true,
 		BridgeMACRequired:   true,
 		ProfilePublicKey:    "abc123",
+		// rule_update_public_key is now part of the managed
+		// secure-default contract; populate the happy-path fixture
+		// here so this test stays focused on the profile-source
+		// gate it was written to pin.
+		RuleUpdatePublicKey: "def456",
 	}
 
 	// Neither profile_path nor profile_url → reject.
@@ -827,5 +843,81 @@ func TestValidateEnforcementRequirements_TeamDoesNotRequireProfileSource(t *test
 	}
 	if err := c.ValidateEnforcementRequirements(); err != nil {
 		t.Errorf("team mode without profile source should pass, got: %v", err)
+	}
+}
+
+// TestValidateEnforcementRequirements_ManagedRequiresRuleUpdatePublicKey
+// pins the secure-default gate added alongside the profile_public_key
+// requirement: managed mode must declare an Ed25519 public key for
+// the rule auto-updater, or the agent refuses to boot. Without this,
+// a managed install with a signed profile would still fall back to
+// the per-file SHA-256 + warn-once verifier on rule manifests — the
+// exact lenient posture managed installs exist to opt out of.
+//
+// The trim half of this test is rolled in alongside the happy path
+// (whitespace-only value is also rejected) because rules/updater.go's
+// parseRuleUpdatePublicKey treats a trimmed-empty value as
+// "verifier disabled" — a managed install could otherwise pass
+// validation with rule_update_public_key: "  " and silently boot on
+// the warn-once path.
+func TestValidateEnforcementRequirements_ManagedRequiresRuleUpdatePublicKey(t *testing.T) {
+	base := Config{
+		EnforcementMode:     "managed",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+		APITokenRequired:    true,
+		BridgeMACRequired:   true,
+		ProfilePublicKey:    "abc123",
+		ProfilePath:         "/etc/secure-edge/profile.yaml",
+	}
+
+	// rule_update_public_key omitted entirely → reject.
+	if err := base.ValidateEnforcementRequirements(); err == nil {
+		t.Fatal("expected rejection when rule_update_public_key is empty")
+	} else if !strings.Contains(err.Error(), "rule_update_public_key") {
+		t.Errorf("error %q should mention rule_update_public_key", err.Error())
+	}
+
+	// Whitespace-only must also be rejected — see comment above for
+	// the parseRuleUpdatePublicKey trim contract.
+	for _, key := range []string{" ", "  ", "\t", "\n", " \t\n "} {
+		c := base
+		c.RuleUpdatePublicKey = key
+		err := c.ValidateEnforcementRequirements()
+		if err == nil {
+			t.Errorf("rule_update_public_key=%q: expected rejection, got nil", key)
+			continue
+		}
+		if !strings.Contains(err.Error(), "rule_update_public_key") {
+			t.Errorf("rule_update_public_key=%q: error %q should mention rule_update_public_key",
+				key, err.Error())
+		}
+	}
+
+	// Full set: every secure-default rule satisfied including the
+	// new rule_update_public_key requirement.
+	c := base
+	c.RuleUpdatePublicKey = "def456"
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("happy path rejected: %v", err)
+	}
+}
+
+// TestValidateEnforcementRequirements_TeamDoesNotRequireRuleUpdateKey
+// pins the asymmetry: team mode tolerates an unsigned rule auto-update
+// path (warn-once + SHA-256), only managed pins the signed verifier.
+// A test that conflates the two would push managed-grade requirements
+// onto every team pilot and silently break the documented config.team
+// example.
+func TestValidateEnforcementRequirements_TeamDoesNotRequireRuleUpdateKey(t *testing.T) {
+	c := Config{
+		EnforcementMode:     "team",
+		AllowedExtensionIDs: []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		APITokenPath:        "/var/lib/secure-edge/api.token",
+		APITokenRequired:    true,
+		// no rule_update_public_key — should still pass for team.
+	}
+	if err := c.ValidateEnforcementRequirements(); err != nil {
+		t.Errorf("team mode without rule_update_public_key should pass, got: %v", err)
 	}
 }

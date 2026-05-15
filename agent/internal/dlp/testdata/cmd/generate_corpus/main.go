@@ -448,6 +448,29 @@ var patternCategory = map[string]string{
 	"Binance API Key":                       "crypto",
 	"Binance API Secret":                    "crypto",
 	"Coinbase Pro API Passphrase":           "crypto",
+
+	// Batch 4: DNS & CDN
+	"Cloudflare Pages Token":            "dns_cdn",
+	"Cloudflare Worker AI Token":        "dns_cdn",
+	"Cloudflare Account ID":             "dns_cdn",
+	"Fastly Read-Only API Token":        "dns_cdn",
+	"Fastly Compute Service Token":      "dns_cdn",
+	"Akamai Property Manager API Token": "dns_cdn",
+	"AWS CloudFront Key Pair ID":        "dns_cdn",
+	"Bunny.net API Key":                 "dns_cdn",
+	"Bunny.net Stream Token":            "dns_cdn",
+	"KeyCDN API Key":                    "dns_cdn",
+	"StackPath Client ID":               "dns_cdn",
+	"StackPath Client Secret":           "dns_cdn",
+	"Imperva API Key":                   "dns_cdn",
+	"NS1 API Key":                       "dns_cdn",
+	"DNSimple API Token":                "dns_cdn",
+	"Constellix API Key":                "dns_cdn",
+	"DNS Made Easy API Key":             "dns_cdn",
+	"Gandi Personal Access Token":       "dns_cdn",
+	"Vercel Edge Config Token":          "dns_cdn",
+	"Sucuri WAF API Key":                "dns_cdn",
+	"Verizon EdgeCast Token":            "dns_cdn",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

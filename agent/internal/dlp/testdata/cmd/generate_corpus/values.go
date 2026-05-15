@@ -1182,4 +1182,68 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Coinbase Pro API Passphrase"] = func(r *rand.Rand) string {
 		return "COINBASE_PASSPHRASE=" + randAlnum(r, 16)
 	}
+	// ---------------- Batch 4: DNS & CDN ----------------
+	valueGenerators["Cloudflare Pages Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_PAGES_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Cloudflare Worker AI Token"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_WORKERSAI_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Cloudflare Account ID"] = func(r *rand.Rand) string {
+		return "CLOUDFLARE_ACCOUNT_ID=" + randHex(r, 32)
+	}
+	valueGenerators["Fastly Read-Only API Token"] = func(r *rand.Rand) string {
+		return "FASTLY_READ_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Fastly Compute Service Token"] = func(r *rand.Rand) string {
+		return "FASTLY_COMPUTE_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Akamai Property Manager API Token"] = func(r *rand.Rand) string {
+		return "AKAMAI_PAPI_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["AWS CloudFront Key Pair ID"] = func(r *rand.Rand) string {
+		return "APK" + randUpperAlnum(r, 18)
+	}
+	valueGenerators["Bunny.net API Key"] = func(r *rand.Rand) string {
+		return "BUNNY_API_KEY=" + randUUID(r) + "-" + randFromAlphabet(r, digits, 4) + "-" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Bunny.net Stream Token"] = func(r *rand.Rand) string {
+		return "BUNNY_STREAM_TOKEN=" + randAlnum(r, 32)
+	}
+	valueGenerators["KeyCDN API Key"] = func(r *rand.Rand) string {
+		return "KEYCDN_API_KEY=" + randAlnum(r, 40)
+	}
+	valueGenerators["StackPath Client ID"] = func(r *rand.Rand) string {
+		return "STACKPATH_CLIENT_ID=" + randAlnum(r, 48)
+	}
+	valueGenerators["StackPath Client Secret"] = func(r *rand.Rand) string {
+		return "STACKPATH_CLIENT_SECRET=" + randAlnum(r, 64)
+	}
+	valueGenerators["Imperva API Key"] = func(r *rand.Rand) string {
+		return "IMPERVA_API_KEY=" + randFromAlphabet(r, alnum+"_-", 32)
+	}
+	valueGenerators["NS1 API Key"] = func(r *rand.Rand) string {
+		return "NS1_API_KEY=" + randAlnum(r, 24)
+	}
+	valueGenerators["DNSimple API Token"] = func(r *rand.Rand) string {
+		return "DNSIMPLE_API_TOKEN=" + randFromAlphabet(r, alnum+"_", 48)
+	}
+	valueGenerators["Constellix API Key"] = func(r *rand.Rand) string {
+		return "CONSTELLIX_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["DNS Made Easy API Key"] = func(r *rand.Rand) string {
+		return "DNSMADEEASY_API_KEY=" + randUUID(r)
+	}
+	valueGenerators["Gandi Personal Access Token"] = func(r *rand.Rand) string {
+		return "GANDI_PAT=" + randAlnum(r, 40)
+	}
+	valueGenerators["Vercel Edge Config Token"] = func(r *rand.Rand) string {
+		return "EDGE_CONFIG_TOKEN=" + randFromAlphabet(r, lower+digits+"_", 48)
+	}
+	valueGenerators["Sucuri WAF API Key"] = func(r *rand.Rand) string {
+		return "SUCURI_API_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Verizon EdgeCast Token"] = func(r *rand.Rand) string {
+		return "EDGECAST_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
 }

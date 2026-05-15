@@ -5923,6 +5923,359 @@
       "require_hotword": true,
       "entropy_min": 3.0,
       "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Pages Token",
+      "regex": "(?i)CLOUDFLARE_PAGES_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "cloudflare_pages_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "pages",
+        "wrangler"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Worker AI Token",
+      "regex": "(?i)CLOUDFLARE_WORKERSAI_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "cloudflare_workersai_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "workers ai",
+        "ai"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cloudflare Account ID",
+      "regex": "(?i)CLOUDFLARE_ACCOUNT_ID\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "cloudflare_account_id",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudflare",
+        "account"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Fastly Read-Only API Token",
+      "regex": "(?i)FASTLY_READ_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{30,}",
+      "prefix": "fastly_read_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "fastly",
+        "read-only",
+        "api"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Fastly Compute Service Token",
+      "regex": "(?i)FASTLY_COMPUTE_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "fastly_compute_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "fastly",
+        "compute",
+        "edge"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Akamai Property Manager API Token",
+      "regex": "(?i)AKAMAI_PAPI_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "akamai_papi_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "akamai",
+        "property manager",
+        "papi"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS CloudFront Key Pair ID",
+      "regex": "APK[A-Z0-9]{16,20}",
+      "prefix": "apk",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cloudfront",
+        "keypair",
+        "aws"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Bunny.net API Key",
+      "regex": "(?i)BUNNY_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-[0-9]{4}-[0-9]{4}",
+      "prefix": "bunny_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bunny",
+        "cdn",
+        "bunnycdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Bunny.net Stream Token",
+      "regex": "(?i)BUNNY_STREAM_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "bunny_stream_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bunny",
+        "stream",
+        "cdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "KeyCDN API Key",
+      "regex": "(?i)KEYCDN_API_KEY\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9]{38,}",
+      "prefix": "keycdn_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "keycdn",
+        "cdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "StackPath Client ID",
+      "regex": "(?i)STACKPATH_CLIENT_ID\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "stackpath_client_id",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "stackpath",
+        "client id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "StackPath Client Secret",
+      "regex": "(?i)STACKPATH_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "stackpath_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "stackpath",
+        "client secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Imperva API Key",
+      "regex": "(?i)IMPERVA_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "imperva_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "imperva",
+        "incapsula",
+        "waf"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "NS1 API Key",
+      "regex": "(?i)NS1_API_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "ns1_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ns1",
+        "dns",
+        "authoritative"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "DNSimple API Token",
+      "regex": "(?i)DNSIMPLE_API_TOKEN\\s*[:=]\\s*['\\\"]?[a-zA-Z0-9_]{40,}",
+      "prefix": "dnsimple_api_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dnsimple",
+        "dns",
+        "registrar"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Constellix API Key",
+      "regex": "(?i)CONSTELLIX_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "constellix_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "constellix",
+        "dns",
+        "sonar"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "DNS Made Easy API Key",
+      "regex": "(?i)DNSMADEEASY_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "dnsmadeeasy_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dnsmadeeasy",
+        "dns",
+        "authoritative"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Gandi Personal Access Token",
+      "regex": "(?i)GANDI_PAT\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{24,}",
+      "prefix": "gandi_pat",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "gandi",
+        "livedns",
+        "domain"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Vercel Edge Config Token",
+      "regex": "(?i)EDGE_CONFIG_TOKEN\\s*[:=]\\s*['\\\"]?[a-z0-9_]{40,}",
+      "prefix": "edge_config_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "vercel",
+        "edge config",
+        "kv"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Sucuri WAF API Key",
+      "regex": "(?i)SUCURI_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "sucuri_api_key",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sucuri",
+        "waf",
+        "cdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Verizon EdgeCast Token",
+      "regex": "(?i)EDGECAST_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "edgecast_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "edgecast",
+        "verizon",
+        "cdn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

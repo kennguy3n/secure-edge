@@ -200,12 +200,61 @@ test("bodyToTextAsync FormData enforces cumulative MAX_SCAN_BYTES cap", async ()
 test("bodyToTextAsync returns empty for ReadableStream (intentional, B1)", async () => {
     // ReadableStream cannot be safely tee'd here without replacing
     // init.body. Returning "" routes the request through
-    // policyForUnavailable (per the JSDoc note) — a conservative
-    // fall-open posture vs. a spurious block.
+    // policyForUnavailable (per the JSDoc note) — fall-open in
+    // personal/team, fail-closed in managed (see the G10 test
+    // below for the managed-mode end-to-end pin).
     const stream = new ReadableStream({
         start(controller) { controller.enqueue(new Uint8Array([65, 66])); controller.close(); },
     });
     assert.equal(await bodyToTextAsync(stream), "");
+});
+
+// G10: ReadableStream + managed mode = block, not silently-allow.
+//
+// bodyToTextAsync returns "" for any ReadableStream body. The
+// network-interceptor bridge then treats that empty string as a
+// missing-body fast-path: scanContent("") returns null, which
+// routes through policyForUnavailable. In managed mode
+// policyForUnavailable returns "block", so the bridge synthesises
+// a POLICY_PATTERN_AGENT_UNAVAILABLE result and the page-world
+// fetch / XHR patch aborts the request. The test below pins that
+// end-to-end so a refactor that, say, special-cases the empty
+// string back to "allow" silently re-opens the ReadableStream
+// upload bypass on managed installs.
+test("G10: ReadableStream body in managed mode produces an agent-unavailable block", async () => {
+    const stream = new ReadableStream({
+        start(controller) {
+            controller.enqueue(new Uint8Array([65, 66]));
+            controller.close();
+        },
+    });
+    // bodyToTextAsync returns "" for ReadableStream. Re-verify the
+    // contract from this test so a future change here also fails the
+    // managed-mode assertion below.
+    const asText = await bodyToTextAsync(stream);
+    assert.equal(asText, "", "ReadableStream must read as empty (precondition for G10)");
+
+    // Drive the bridge with the empty-body request and the managed-
+    // mode policy hooks. The bridge is the single decision point we
+    // care about — bodyToTextAsync above feeds it the empty payload,
+    // and the bridge's "scan returned null" branch is what flips
+    // managed to block.
+    const replies: Array<{ result: ScanResult | null }> = [];
+    await iso.handleBridgeMessage(
+        { source: iso.BRIDGE_SOURCE, kind: "scan-req", id: "g10", content: asText },
+        (m) => { replies.push(m); },
+        async () => null,
+        () => { /* toast swallowed */ },
+        {
+            onUnavailable: () => "block",
+            onOversize: () => "block",
+            showPolicyBlock: () => { /* no UI in unit tests */ },
+        },
+    );
+
+    assert.equal(replies.length, 1);
+    assert.ok(replies[0].result, "managed mode must synthesise a block result for ReadableStream uploads");
+    assert.equal(replies[0].result!.blocked, true);
 });
 
 test("extractFetchBodyAsync handles Blob body on fetch (B1)", async () => {

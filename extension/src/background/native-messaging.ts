@@ -11,7 +11,7 @@
 // installed, port disconnect, response timeout) so callers can
 // trivially fall through to the HTTP path.
 
-import { NATIVE_HOST, ScanResult } from "../shared.js";
+import { NATIVE_HOST, ScanResult, EnforcementMode } from "../shared.js";
 import {
     computeRequestMAC,
     computeResponseMAC,
@@ -19,6 +19,30 @@ import {
     decodeNonceHex,
     importBridgeKey,
 } from "./bridge-mac.js";
+
+// G4: locally-cached enforcement mode used to decide whether a MAC
+// verification failure should fall open (personal / team) or fail
+// closed (managed). The cache is updated by the service worker via
+// setBridgeEnforcementMode() every time the agent's enforcement-mode
+// endpoint is refreshed, mirroring the cachedEnforcementMode in
+// service-worker.ts. Until the first refresh the cache is
+// "personal" — the privacy-first fall-open default, identical to
+// the service worker's cold-start posture so the two stay in sync.
+let cachedEnforcementMode: EnforcementMode = "personal";
+
+/** setBridgeEnforcementMode updates the locally-cached enforcement
+ *  mode that verifyResponseMACAndResolve consults when a reply MAC
+ *  fails to verify. The service worker calls this in lockstep with
+ *  its own cache update so a managed install never sees a window
+ *  where the bridge has out-of-date enforcement state.
+ *
+ *  We do not read chrome.storage.session here because the service
+ *  worker is the single writer; consulting storage from this module
+ *  would race the writer and create a stale-read failure mode in
+ *  exactly the path the gate is meant to harden. */
+export function setBridgeEnforcementMode(mode: EnforcementMode): void {
+    cachedEnforcementMode = mode;
+}
 
 /** Per-request timeout. Same budget as the HTTP fallback so a slow
  *  native host is no worse than a slow loopback. */
@@ -173,10 +197,34 @@ function ensurePort(): chrome.runtime.Port | null {
     return port;
 }
 
-/** Best-effort verification of the agent's response MAC. On
- *  verification failure or absent MAC we log a one-time warning
- *  per connection and resolve with the result anyway (lenient
- *  posture mirrors the agent's bridge_mac_required=false default). */
+/** Best-effort verification of the agent's response MAC.
+ *
+ *  Posture matrix (G4):
+ *
+ *                          | personal / team       | managed
+ *    ------------------------+-----------------------+------------------
+ *    MAC infra absent      | resolve(result)       | resolve(result)
+ *    MAC field missing     | warn → resolve(result)| warn → resolve(null)
+ *    MAC field mismatched  | warn → resolve(result)| warn → resolve(null)
+ *    computeResponseMAC    |                       |
+ *      threw / rejected    | warn → resolve(result)| warn → resolve(null)
+ *
+ *  "MAC infra absent" (no bridgeKey or no bridgeNonce) is the
+ *  legitimate "the agent's bridge_mac_required is false" case and
+ *  cannot be distinguished from a forged hello reply that omitted
+ *  the nonce — we still fall open there because the alternative
+ *  would brick every managed install whose agent has yet to roll
+ *  out C1. The agent enforces its own bridge_mac_required gate on
+ *  request frames so the C1 trust root is the agent, not the
+ *  extension.
+ *
+ *  Every other failure mode (the agent surfaced a MAC, but we
+ *  couldn't verify it) is treated as a positive integrity violation
+ *  in managed mode: the result is discarded (resolve(null)), which
+ *  the caller already routes through the strict
+ *  policyForUnavailable(managed) path that blocks the upload. The
+ *  one-time per-connection warning still fires so the operator's
+ *  tray notification surfaces the bridge degradation.  */
 function verifyResponseMACAndResolve(
     req: PendingRequest,
     msg: NativeMessage,
@@ -185,14 +233,17 @@ function verifyResponseMACAndResolve(
     if (!bridgeKey || !bridgeNonce) {
         // No MAC infrastructure cached (pre-C1 agent or hello
         // didn't surface a nonce). Skip verification — there's
-        // nothing to verify against.
+        // nothing to verify against. Documented above as the one
+        // case we cannot distinguish from a malicious omission;
+        // the agent's request-side bridge_mac_required gate is
+        // the authoritative defence.
         req.resolve(result);
         return;
     }
     const macHex = typeof msg.mac === "string" ? msg.mac : "";
     if (!macHex) {
         warnOncePerConnection("agent reply missing MAC");
-        req.resolve(result);
+        req.resolve(resultForMACFailure(result));
         return;
     }
     let blockedByte: 0x00 | 0x01 | 0xff = 0xff;
@@ -201,7 +252,9 @@ function verifyResponseMACAndResolve(
     }
     // computeResponseMAC is async; we kick it off and resolve the
     // pending request from the .then(). Errors are caught + logged
-    // and we still resolve with the result.
+    // and we still resolve with the managed-aware fallback shape so
+    // a thrown SubtleCrypto call (e.g. a degraded service worker
+    // host) does not leak a falsely-trusted result.
     computeResponseMAC(
         bridgeKey,
         bridgeNonce,
@@ -214,14 +267,32 @@ function verifyResponseMACAndResolve(
         (expected) => {
             if (!constantTimeEqHex(expected, macHex)) {
                 warnOncePerConnection("agent reply MAC mismatch");
+                req.resolve(resultForMACFailure(result));
+                return;
             }
             req.resolve(result);
         },
         (err) => {
             console.warn("secure-edge: failed to compute response MAC", err);
-            req.resolve(result);
+            req.resolve(resultForMACFailure(result));
         },
     );
+}
+
+/** resultForMACFailure picks the value to resolve a pending request
+ *  with when the reply MAC could not be verified. In managed mode we
+ *  return null so the caller's policyForUnavailable("managed") path
+ *  takes over and blocks the upload; in any other mode we preserve
+ *  the legacy lenient posture (resolve with the result so a missing
+ *  / mismatched MAC is observable in the console but not enforced).
+ *
+ *  The function is intentionally null-safe on the input: a
+ *  short-circuit failure can still arrive with result=null (the
+ *  agent surfaced an error without a result body) and we forward
+ *  that through unchanged. */
+function resultForMACFailure(result: ScanResult | null): ScanResult | null {
+    if (cachedEnforcementMode === "managed") return null;
+    return result;
 }
 
 function warnOncePerConnection(reason: string): void {
@@ -327,6 +398,10 @@ export const __test__ = {
         bridgeNonce = null;
         bridgeKeyPromise = null;
         bridgeWarnedOnce = false;
+        // Reset the G4 cache to the cold-start default so a managed-
+        // mode test that runs before a personal-mode one does not
+        // leave the bridge in fail-closed.
+        cachedEnforcementMode = "personal";
         for (const r of pending.values()) {
             clearTimeout(r.timer);
             r.resolve(null);

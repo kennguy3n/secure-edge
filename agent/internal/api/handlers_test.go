@@ -1960,3 +1960,295 @@ func TestControlEndpoints_BodyTooLarge(t *testing.T) {
 		})
 	}
 }
+
+// TestNoBodyControlEndpoints_BodyIsCapped confirms the POST control
+// handlers that do NOT decode r.Body still wrap r.Body in
+// http.MaxBytesReader via capControlBody, so that the server-side
+// drain Go runs to support keep-alive cannot be coerced into
+// transferring megabytes of attacker payload at endpoints that have
+// no business taking a body. These handlers don't return 413 to the
+// client — they return their normal status (200 for happy path,
+// 503 when the backend is unwired) — but after the handler returns
+// r.Body must read as a *http.MaxBytesError once the cap is
+// exceeded. A regression that drops capControlBody would let the
+// drain consume an arbitrarily large body and waste server I/O
+// budget, so the per-endpoint table here pins the wiring.
+func TestNoBodyControlEndpoints_BodyIsCapped(t *testing.T) {
+	oversize := bytes.Repeat([]byte{'x'}, maxControlBytes+1)
+
+	cases := []struct {
+		name       string
+		path       string
+		setup      func(*Server)
+		wantStatus int
+	}{
+		{
+			name: "proxy enable POST (with controller)",
+			path: "/api/proxy/enable",
+			setup: func(s *Server) {
+				s.SetProxyController(&fakeProxyController{statusSnap: ProxyStatus{
+					ListenAddr: "127.0.0.1:8443",
+				}})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "rules update POST (with updater)",
+			path: "/api/rules/update",
+			setup: func(s *Server) {
+				s.SetRuleUpdater(&stubUpdater{})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "stats reset POST",
+			path:       "/api/stats/reset",
+			setup:      func(*Server) {}, // newTestServer wires Stats
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "agent update POST (with updater)",
+			path: "/api/agent/update",
+			setup: func(s *Server) {
+				s.SetAgentUpdater(&stubAgentUpdater{stage: AgentUpdateStage{
+					Version: "0.2.0",
+				}})
+			},
+			wantStatus: http.StatusOK,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(oversize))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+
+			// Happy-path check first — the cap is a no-op for the
+			// handler's response. If this fails, capControlBody is
+			// being called but is somehow breaking the handler’s
+			// normal control flow, which would be a regression.
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d (body=%q), want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
+			}
+
+			// capControlBody mutates req.Body in place by replacing
+			// it with an http.MaxBytesReader. We held the request
+			// pointer across ServeHTTP, so after the handler returns
+			// req.Body should now be the wrapped reader. The next
+			// Read past the cap surfaces *http.MaxBytesError — this
+			// is exactly what Go’s internal drain code sees, and
+			// what tells the server to close the connection instead
+			// of keep-aliving it.
+			buf := make([]byte, maxControlBytes*2)
+			_, readErr := req.Body.Read(buf)
+			var mbe *http.MaxBytesError
+			if !errors.As(readErr, &mbe) {
+				t.Errorf("req.Body.Read err = %v (type %T), want *http.MaxBytesError",
+					readErr, readErr)
+			}
+		})
+	}
+}
+
+// TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn covers the
+// half of the contract the happy-path table above does not: the
+// body cap must also be in place on the 503 (no backend wired) and
+// 403 (profile locked) early-return paths, because those are
+// precisely the paths a hostile peer can reach without any
+// configuration on the agent side — a probe POST to
+// /api/proxy/enable on a non-proxy install, or to /api/agent/update
+// on a managed install with a locked profile, still has to bound
+// the post-response drain or the helper's threat model is moot.
+//
+// Devin Review flagged this on PR #40 (file comment ID
+// 3249293282): capControlBody was placed AFTER the nil-backend
+// guard in handleRulesUpdate, handleProxyEnable, and
+// handleAgentUpdate, so on the 503/403 path r.Body was the raw
+// uncapped reader. The fix moved capControlBody to right after
+// the method check; this test pins that placement.
+func TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn(t *testing.T) {
+	oversize := bytes.Repeat([]byte{'x'}, maxControlBytes+1)
+
+	cases := []struct {
+		name       string
+		path       string
+		setup      func(*Server)
+		wantStatus int
+	}{
+		{
+			// handleRulesUpdate returns 503 when no RuleUpdater is
+			// wired (Phase 1 / Phase 2 deployments). Without the
+			// fix the cap would only be applied after the nil
+			// check, so this oversized body would drain unbounded.
+			name:       "rules update without updater (503 path)",
+			path:       "/api/rules/update",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			// handleProxyEnable returns 503 when no proxy
+			// controller is wired. Same reasoning as above.
+			name:       "proxy enable without controller (503 path)",
+			path:       "/api/proxy/enable",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			// handleAgentUpdate returns 503 when no AgentUpdater
+			// is wired. Same reasoning as above.
+			name:       "agent update without updater (503 path)",
+			path:       "/api/agent/update",
+			setup:      func(*Server) {},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(oversize))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+
+			// Verify we actually hit the early-return path we
+			// designed the test around — otherwise the cap
+			// assertion below is a false positive.
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d (body=%q), want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
+			}
+
+			// Same in-place-wrap trick as the happy-path test:
+			// after the handler returns, req.Body should be the
+			// MaxBytesReader put there by capControlBody, and a
+			// Read past the cap surfaces *http.MaxBytesError.
+			buf := make([]byte, maxControlBytes*2)
+			_, readErr := req.Body.Read(buf)
+			var mbe *http.MaxBytesError
+			if !errors.As(readErr, &mbe) {
+				t.Errorf("req.Body.Read err = %v (type %T), want *http.MaxBytesError "+
+					"— the body cap was not applied on the %d early-return path",
+					readErr, readErr, c.wantStatus)
+			}
+		})
+	}
+}
+
+// deadlineRecorderWriter wraps an httptest.ResponseRecorder and
+// satisfies the SetWriteDeadline interface that
+// http.NewResponseController consults via reflection. The test below
+// uses it to observe whether allowLongWrite calls
+// SetWriteDeadline(time.Time{}) on the three handlers that do
+// long-IO work and would otherwise be cut off by the server-wide
+// 10 s WriteTimeout configured in api/server.go.
+type deadlineRecorderWriter struct {
+	*httptest.ResponseRecorder
+	deadlines []time.Time
+}
+
+func (d *deadlineRecorderWriter) SetWriteDeadline(t time.Time) error {
+	d.deadlines = append(d.deadlines, t)
+	return nil
+}
+
+// TestLongIOHandlers_DropWriteDeadline pins the contract that the
+// three control handlers which do outbound HTTPS — handleRulesUpdate
+// (signed manifest fetch), handleProfileImport (profile URL fetch),
+// handleAgentUpdate (agent binary download) — disable the
+// per-connection write deadline so http.Server.WriteTimeout = 10s
+// does not prematurely cut off their response. A regression that
+// removes the allowLongWrite call would re-introduce the bug Devin
+// Review flagged on PR #37 (the response writer dies mid-stream
+// when the outbound op takes >10s).
+//
+// The expectation is that SetWriteDeadline is called with the zero
+// time.Time — net/http’s documented "no deadline" sentinel.
+//
+// Note on handleProfileImport's row: with an empty body the handler
+// calls allowLongWrite BEFORE it parses the body, then drops through
+// the URL/Profile switch to the default arm and returns 400
+// ("url or profile required"). That's the exact behaviour we want
+// to observe here — the deadline-mutation contract is independent
+// of the body parsing — so the test asserts wantStatus=400 for that
+// row and the zero-deadline call still gets recorded.
+func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
+	cases := []struct {
+		name       string
+		path       string
+		body       []byte
+		setup      func(*Server)
+		wantStatus int
+	}{
+		{
+			name: "rules update",
+			path: "/api/rules/update",
+			setup: func(s *Server) {
+				s.SetRuleUpdater(&stubUpdater{})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "agent update",
+			path: "/api/agent/update",
+			setup: func(s *Server) {
+				s.SetAgentUpdater(&stubAgentUpdater{stage: AgentUpdateStage{
+					Version: "0.2.0",
+				}})
+			},
+			wantStatus: http.StatusOK,
+		},
+		{
+			// Third long-IO handler (handleProfileImport). Empty
+			// body short-circuits to the 400 "url or profile
+			// required" arm of the switch, but allowLongWrite runs
+			// before that point, so the deadline-drop is still
+			// recorded. A regression that removes the allowLongWrite
+			// call would fail this case identically to the other two.
+			name: "profile import",
+			path: "/api/profile/import",
+			body: []byte{},
+			setup: func(s *Server) {
+				s.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			c.setup(srv)
+			rec := &deadlineRecorderWriter{ResponseRecorder: httptest.NewRecorder()}
+			req := newLocalRequest(http.MethodPost, c.path, bytes.NewBuffer(c.body))
+			srv.Handler().ServeHTTP(rec, req)
+
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status = %d body=%q, want %d",
+					rec.Code, rec.Body.String(), c.wantStatus)
+			}
+			// Exactly one SetWriteDeadline(zero) call expected per
+			// handler invocation — if the handler is wrapping more
+			// than one allowLongWrite that’s harmless but unusual,
+			// so the test asserts presence of zero rather than count.
+			foundZero := false
+			for _, d := range rec.deadlines {
+				if d.IsZero() {
+					foundZero = true
+					break
+				}
+			}
+			if !foundZero {
+				t.Errorf("SetWriteDeadline never called with zero time; observed = %v",
+					rec.deadlines)
+			}
+		})
+	}
+}
+
+

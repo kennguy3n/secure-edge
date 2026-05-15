@@ -167,6 +167,37 @@ changes between feature releases — breaking entries are flagged explicitly.
   pinned to the WiX dotnet tool `v5.0.2`.
 - The release `SHA256SUMS` pipeline uses NUL-separated piping so
   artefacts whose names contain spaces hash correctly.
+- **Long-IO control handlers no longer hit `WriteTimeout`.** Three
+  control endpoints do outbound HTTPS that can outlast the
+  server-wide 10 s `http.Server.WriteTimeout` set on the control API
+  (`agent/internal/api/server.go`): `POST /api/rules/update`
+  (signed-manifest fetch), `POST /api/agent/update` (binary
+  download), and `POST /api/profile/import` (profile URL fetch).
+  Each now calls `http.NewResponseController(w).SetWriteDeadline(time.Time{})`
+  via the new `allowLongWrite` helper at the top of the handler, so
+  the write deadline is dropped only for these three endpoints while
+  everything else still benefits from the global 10 s cap. Per-handler
+  client timeouts (`RuleUpdater`, `AgentUpdater`, profile `http.Client`)
+  continue to bound the wall-clock budget so removing the deadline does
+  not open a hang vector. Pinned by `TestLongIOHandlers_DropWriteDeadline`
+  in `handlers_test.go`.
+- **No-body control endpoints bound their post-response drain.**
+  `POST /api/proxy/enable`, `POST /api/rules/update`,
+  `POST /api/stats/reset`, and `POST /api/agent/update` do not decode
+  `r.Body`, but Go's `http.Server` drains the body after the handler
+  returns to keep the keep-alive connection reusable. Without a cap a
+  hostile peer could ship megabytes at endpoints that have no business
+  taking a body. Each now calls the new `capControlBody` helper, which
+  wraps `r.Body` in `http.MaxBytesReader(maxControlBytes)` so the drain
+  returns `*http.MaxBytesError` once the 64 KiB cap is hit and the
+  server closes the connection instead of reusing it. `capControlBody`
+  runs immediately after the method check — *before* any nil-backend
+  or profile-locked guard — so the cap is also in place on the
+  503 / 403 early-return paths a hostile peer can reach without any
+  agent-side configuration. Pinned by
+  `TestNoBodyControlEndpoints_BodyIsCapped` and
+  `TestNoBodyControlEndpoints_CapAppliedOnEarlyReturn` in
+  `handlers_test.go`.
 
 ## [0.5.0] — 2026-05-13
 

@@ -150,6 +150,43 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
+// capControlBody applies maxControlBytes to r.Body without decoding
+// it. Use this on POST/PUT control handlers whose business logic
+// does not read the body — e.g. `POST /api/proxy/enable`,
+// `POST /api/rules/update`, `POST /api/stats/reset`,
+// `POST /api/agent/update` — so the server-side body drain that
+// keeps the connection alive is bounded. Without this, a hostile
+// peer can ship megabytes of payload at an endpoint that does not
+// look at it and waste server I/O budget; MaxBytesReader returns an
+// error from the reader once the cap is hit and tells the
+// ResponseWriter to close the connection. Cheap belt-and-suspenders
+// for the JSON control surface; the body-reading siblings call
+// decodeControlBody instead.
+func capControlBody(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlBytes)
+}
+
+// allowLongWrite drops the per-connection write deadline that
+// http.Server.WriteTimeout sets on every request. The control API
+// runs with a 10 s WriteTimeout (set in api/server.go) so a stalled
+// peer cannot pin a listener thread, but three control handlers
+// legitimately do outbound IO that can outlast 10 s and need the
+// response budget extended: handleRulesUpdate (signed rule manifest
+// fetch), handleAgentUpdate (agent binary download), and
+// handleProfileImport (profile URL fetch). Each handler is still
+// bounded by its own client timeout and by r.Context() (which
+// inherits ReadHeaderTimeout + ReadTimeout for the request side),
+// so removing the write deadline does not open a hang vector —
+// the worst case for a stuck handler is the client-timeout budget,
+// not an unbounded wait.
+//
+// A zero time.Time means "no deadline" per net/http semantics.
+// http.NewResponseController is the supported way to mutate the
+// per-request deadline introduced in Go 1.20.
+func allowLongWrite(w http.ResponseWriter) {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+}
+
 // decodeControlBody caps r.Body at maxControlBytes via
 // http.MaxBytesReader and json.Decodes into dst. It writes a 413
 // when the body exceeds the cap (so the caller doesn't conflate
@@ -162,7 +199,7 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 // should `return` immediately when it is false because an error
 // response has already been written.
 func decodeControlBody(w http.ResponseWriter, r *http.Request, dst any, allowEmpty bool) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, maxControlBytes)
+	capControlBody(w, r)
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		if allowEmpty && errors.Is(err, io.EOF) {
 			return true
@@ -429,6 +466,7 @@ func (s *Server) handleStatsReset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	capControlBody(w, r)
 	if err := s.Stats.Reset(r.Context()); err != nil {
 		writeError(w, http.StatusInternalServerError, "reset failed")
 		return
@@ -626,10 +664,18 @@ func (s *Server) handleRulesUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	// Body cap must be in place before any early-return guard so a
+	// 503 path (no updater wired) still bounds the post-response
+	// drain. Same reasoning in handleProxyEnable / handleAgentUpdate.
+	capControlBody(w, r)
 	if s.RuleUpdater == nil {
 		writeError(w, http.StatusServiceUnavailable, "rule updater not configured")
 		return
 	}
+	// Outbound HTTPS to fetch the signed rule manifest can exceed the
+	// server-wide 10 s WriteTimeout; the RuleUpdater client has its
+	// own timeout that bounds the operation.
+	allowLongWrite(w)
 	res, err := s.RuleUpdater.CheckNow(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "rule update failed: "+err.Error())
@@ -672,6 +718,7 @@ func (s *Server) handleProxyEnable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	capControlBody(w, r)
 	if s.Proxy == nil {
 		writeError(w, http.StatusServiceUnavailable, "proxy not configured")
 		return
@@ -769,6 +816,11 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "profile holder not configured")
 		return
 	}
+
+	// When `url` is set the handler fetches the profile from a remote
+	// HTTPS endpoint; that fetch can outlast the server-wide 10 s
+	// WriteTimeout and is bounded only by the profile HTTP client.
+	allowLongWrite(w)
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxProfileBytes)
 	raw, err := io.ReadAll(r.Body)
@@ -1018,6 +1070,7 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	capControlBody(w, r)
 	if s.AgentUpdate == nil {
 		writeError(w, http.StatusServiceUnavailable, "agent updater not configured")
 		return
@@ -1026,6 +1079,10 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "profile is locked by enterprise policy")
 		return
 	}
+	// Downloading the agent binary is a long outbound HTTPS operation
+	// that easily exceeds the server-wide 10 s WriteTimeout; the
+	// AgentUpdater client bounds the wall-clock budget.
+	allowLongWrite(w)
 	staged, err := s.AgentUpdate.DownloadAndStage(r.Context())
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "stage failed: "+err.Error())

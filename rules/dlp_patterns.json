@@ -10345,6 +10345,554 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "Zoom JWT Token (legacy)",
+      "regex": "(?i)ZOOM_JWT\\s*[:=]\\s*['\\\"]?eyJhbGciOiJIUzI1[A-Za-z0-9_\\-\\.]{60,}",
+      "prefix": "zoom_jwt",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "zoom",
+        "jwt",
+        "meeting sdk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Zoom OAuth Access Token",
+      "regex": "(?i)ZOOM_OAUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9._\\-]{60,}",
+      "prefix": "zoom_oauth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "zoom",
+        "oauth",
+        "access"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Zoom Server-to-Server OAuth Secret",
+      "regex": "(?i)ZOOM_S2S_CLIENT_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "zoom_s2s_client_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "zoom",
+        "server-to-server",
+        "oauth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Microsoft Teams Incoming Webhook URL",
+      "regex": "https?://[a-z0-9\\-]+\\.webhook\\.office\\.com/webhookb2/[a-f0-9\\-]{36}@[a-f0-9\\-]{36}/IncomingWebhook/[a-f0-9]{32}/[a-f0-9\\-]{36}",
+      "prefix": ".webhook.office.com",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "teams",
+        "microsoft",
+        "webhook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Microsoft Teams Bot Framework Secret",
+      "regex": "(?i)BOTFRAMEWORK_APP_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9~_\\-\\.]{30,}",
+      "prefix": "botframework_app_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "teams",
+        "bot framework",
+        "azure bot"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Microsoft Graph Subscription Client Secret",
+      "regex": "(?i)GRAPH_SUBSCRIPTION_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9~_\\-\\.]{30,}",
+      "prefix": "graph_subscription_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "graph",
+        "subscription",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cisco Webex Bot Access Token",
+      "regex": "[A-Za-z0-9]{12}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}",
+      "prefix": "",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "webex",
+        "cisco",
+        "bot"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cisco Webex Guest Issuer Token",
+      "regex": "(?i)WEBEX_GUEST_ISSUER_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "webex_guest_issuer_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "webex",
+        "guest issuer",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vonage API Key",
+      "regex": "(?i)VONAGE_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}",
+      "prefix": "vonage_api_key",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "vonage",
+        "nexmo",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Vonage API Secret",
+      "regex": "(?i)VONAGE_API_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{16}",
+      "prefix": "vonage_api_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vonage",
+        "nexmo",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Vonage Application Private Key",
+      "regex": "-----BEGIN PRIVATE KEY-----[\\s\\S]{0,800}vonage[\\s\\S]{0,400}-----END PRIVATE KEY-----",
+      "prefix": "-----begin private key-----",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "vonage",
+        "nexmo",
+        "jwt",
+        "application"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "MessageBird API Key (live)",
+      "regex": "(?i)MESSAGEBIRD_API_KEY\\s*[:=]\\s*['\\\"]?live_[A-Za-z0-9]{20,}",
+      "prefix": "messagebird_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "messagebird",
+        "bird",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "MessageBird Test API Key",
+      "regex": "test_[A-Za-z0-9]{20,}",
+      "prefix": "test_",
+      "severity": "low",
+      "score_weight": 1,
+      "hotwords": [
+        "messagebird",
+        "test",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Plivo Auth ID",
+      "regex": "MA[A-Z0-9]{18}",
+      "prefix": "ma",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "plivo",
+        "auth id",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Plivo Auth Token",
+      "regex": "(?i)PLIVO_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40}",
+      "prefix": "plivo_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "plivo",
+        "auth token",
+        "sms"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Bandwidth API Token",
+      "regex": "(?i)BANDWIDTH_API_TOKEN\\s*[:=]\\s*['\\\"]?t-[A-Za-z0-9]{20,}",
+      "prefix": "bandwidth_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bandwidth",
+        "sms",
+        "voice"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Bandwidth Application Secret",
+      "regex": "(?i)BANDWIDTH_SECRET\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{30,}",
+      "prefix": "bandwidth_secret",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "bandwidth",
+        "app",
+        "secret"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Sinch Application Token",
+      "regex": "(?i)SINCH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "sinch_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sinch",
+        "sms",
+        "voice"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Telnyx API Key",
+      "regex": "(?i)TELNYX_API_KEY\\s*[:=]\\s*['\\\"]?KEY[A-Z0-9_]{40,}",
+      "prefix": "telnyx_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "telnyx",
+        "sms",
+        "voice"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twilio Account SID + Auth Token Pair",
+      "regex": "AC[a-f0-9]{32}:[a-f0-9]{32}",
+      "prefix": "ac",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twilio",
+        "account sid",
+        "auth token"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twilio Functions Token",
+      "regex": "(?i)TWILIO_FUNCTIONS_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "twilio_functions_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "twilio",
+        "functions",
+        "serverless"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twilio API Key (SK...)",
+      "regex": "SK[a-f0-9]{32}",
+      "prefix": "sk",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "twilio",
+        "api key",
+        "sk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Slack User OAuth Token",
+      "regex": "xoxp-\\d+-\\d+-\\d+-[a-f0-9]{32,}",
+      "prefix": "xoxp-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "slack",
+        "oauth",
+        "user",
+        "xoxp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Slack Workflow Builder Webhook",
+      "regex": "https?://hooks\\.slack\\.com/triggers/[A-Z0-9]+/\\d+/[A-Za-z0-9]{30,}",
+      "prefix": "hooks.slack.com/triggers",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "slack",
+        "workflow",
+        "trigger",
+        "webhook"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Slack Refresh Token",
+      "regex": "xoxe\\.xoxr-\\d+-[a-f0-9]{32,}",
+      "prefix": "xoxe.xoxr-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "slack",
+        "refresh",
+        "oauth",
+        "xoxe"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "WhatsApp Cloud API Access Token",
+      "regex": "(?i)WHATSAPP_CLOUD_TOKEN\\s*[:=]\\s*['\\\"]?EAA[A-Za-z0-9]{180,}",
+      "prefix": "whatsapp_cloud_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "whatsapp",
+        "cloud",
+        "meta"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "WhatsApp Business System User Token",
+      "regex": "(?i)WABA_SYSTEM_USER_TOKEN\\s*[:=]\\s*['\\\"]?EAA[A-Za-z0-9]{180,}",
+      "prefix": "waba_system_user_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "whatsapp",
+        "waba",
+        "system user"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "PagerDuty Integration Key (Events V2)",
+      "regex": "(?i)PD_EVENTS_INTEGRATION_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{32}",
+      "prefix": "pd_events_integration_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "pagerduty",
+        "events v2",
+        "integration"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Twist OAuth Token",
+      "regex": "(?i)TWIST_OAUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "twist_oauth_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "twist",
+        "doist",
+        "chat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Rocket.Chat Personal Access Token",
+      "regex": "(?i)ROCKETCHAT_PAT\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "rocketchat_pat",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rocketchat",
+        "rocket.chat",
+        "pat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Mattermost Personal Access Token",
+      "regex": "(?i)MATTERMOST_TOKEN\\s*[:=]\\s*['\\\"]?[a-z0-9]{26}",
+      "prefix": "mattermost_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "mattermost",
+        "pat",
+        "chat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Matrix Homeserver Access Token",
+      "regex": "(?i)MATRIX_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?syt_[A-Za-z0-9_\\-]{40,}",
+      "prefix": "matrix_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "matrix",
+        "element",
+        "homeserver"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
     }
   ]
 }

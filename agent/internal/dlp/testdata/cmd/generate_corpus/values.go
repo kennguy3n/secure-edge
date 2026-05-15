@@ -1973,4 +1973,101 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Codecov Repo Upload Token"] = func(r *rand.Rand) string {
 		return "CODECOV_TOKEN=" + randUUID(r)
 	}
+	// ---------------- Batch 14: Communication Platforms ----------------
+	valueGenerators["Zoom JWT Token (legacy)"] = func(r *rand.Rand) string {
+		return "ZOOM_JWT=eyJhbGciOiJIUzI1" + randFromAlphabet(r, alnum+"_-.", 120)
+	}
+	valueGenerators["Zoom OAuth Access Token"] = func(r *rand.Rand) string {
+		return "ZOOM_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"._-", 80)
+	}
+	valueGenerators["Zoom Server-to-Server OAuth Secret"] = func(r *rand.Rand) string {
+		return "ZOOM_S2S_CLIENT_SECRET=" + randAlnum(r, 56)
+	}
+	valueGenerators["Microsoft Teams Incoming Webhook URL"] = func(r *rand.Rand) string {
+		return "https://outlook.webhook.office.com/webhookb2/" + randUUID(r) + "@" + randUUID(r) + "/IncomingWebhook/" + randHex(r, 32) + "/" + randUUID(r)
+	}
+	valueGenerators["Microsoft Teams Bot Framework Secret"] = func(r *rand.Rand) string {
+		return "BOTFRAMEWORK_APP_PASSWORD=" + randFromAlphabet(r, alnum+"~_-.", 40)
+	}
+	valueGenerators["Microsoft Graph Subscription Client Secret"] = func(r *rand.Rand) string {
+		return "GRAPH_SUBSCRIPTION_SECRET=" + randFromAlphabet(r, alnum+"~_-.", 40)
+	}
+	valueGenerators["Cisco Webex Bot Access Token"] = func(r *rand.Rand) string {
+		return randAlnum(r, 12) + "-" + randAlnum(r, 4) + "-" + randAlnum(r, 4) + "-" + randAlnum(r, 4) + "-" + randAlnum(r, 12)
+	}
+	valueGenerators["Cisco Webex Guest Issuer Token"] = func(r *rand.Rand) string {
+		return "WEBEX_GUEST_ISSUER_SECRET=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Vonage API Key"] = func(r *rand.Rand) string {
+		return "VONAGE_API_KEY=" + randHex(r, 8)
+	}
+	valueGenerators["Vonage API Secret"] = func(r *rand.Rand) string {
+		return "VONAGE_API_SECRET=" + randAlnum(r, 16)
+	}
+	valueGenerators["Vonage Application Private Key"] = func(r *rand.Rand) string {
+		return "-----BEGIN PRIVATE KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 200) + "vonage" + randFromAlphabet(r, alnum+"+/=", 200) + "\n-----END PRIVATE KEY-----"
+	}
+	valueGenerators["MessageBird API Key (live)"] = func(r *rand.Rand) string {
+		return "MESSAGEBIRD_API_KEY=live_" + randAlnum(r, 25)
+	}
+	valueGenerators["MessageBird Test API Key"] = func(r *rand.Rand) string {
+		return "test_" + randAlnum(r, 25)
+	}
+	valueGenerators["Plivo Auth ID"] = func(r *rand.Rand) string {
+		return "MA" + randUpperAlnum(r, 18)
+	}
+	valueGenerators["Plivo Auth Token"] = func(r *rand.Rand) string {
+		return "PLIVO_AUTH_TOKEN=" + randAlnum(r, 40)
+	}
+	valueGenerators["Bandwidth API Token"] = func(r *rand.Rand) string {
+		return "BANDWIDTH_API_TOKEN=t-" + randAlnum(r, 32)
+	}
+	valueGenerators["Bandwidth Application Secret"] = func(r *rand.Rand) string {
+		return "BANDWIDTH_SECRET=" + randAlnum(r, 40)
+	}
+	valueGenerators["Sinch Application Token"] = func(r *rand.Rand) string {
+		return "SINCH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Telnyx API Key"] = func(r *rand.Rand) string {
+		return "TELNYX_API_KEY=KEY" + randFromAlphabet(r, upper+digits+"_", 56)
+	}
+	valueGenerators["Twilio Account SID + Auth Token Pair"] = func(r *rand.Rand) string {
+		return "AC" + randHex(r, 32) + ":" + randHex(r, 32)
+	}
+	valueGenerators["Twilio Functions Token"] = func(r *rand.Rand) string {
+		return "TWILIO_FUNCTIONS_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Twilio API Key (SK...)"] = func(r *rand.Rand) string {
+		return "SK" + randHex(r, 32)
+	}
+	valueGenerators["Slack User OAuth Token"] = func(r *rand.Rand) string {
+		return "xoxp-" + randFromAlphabet(r, digits, 12) + "-" + randFromAlphabet(r, digits, 12) + "-" + randFromAlphabet(r, digits, 12) + "-" + randHex(r, 32)
+	}
+	valueGenerators["Slack Workflow Builder Webhook"] = func(r *rand.Rand) string {
+		return "https://hooks.slack.com/triggers/T" + randUpperAlnum(r, 10) + "/" + randFromAlphabet(r, digits, 12) + "/" + randAlnum(r, 40)
+	}
+	valueGenerators["Slack Refresh Token"] = func(r *rand.Rand) string {
+		return "xoxe.xoxr-" + randFromAlphabet(r, digits, 12) + "-" + randHex(r, 64)
+	}
+	valueGenerators["WhatsApp Cloud API Access Token"] = func(r *rand.Rand) string {
+		return "WHATSAPP_CLOUD_TOKEN=EAA" + randAlnum(r, 200)
+	}
+	valueGenerators["WhatsApp Business System User Token"] = func(r *rand.Rand) string {
+		return "WABA_SYSTEM_USER_TOKEN=EAA" + randAlnum(r, 200)
+	}
+	valueGenerators["PagerDuty Integration Key (Events V2)"] = func(r *rand.Rand) string {
+		return "PD_EVENTS_INTEGRATION_KEY=" + randHex(r, 32)
+	}
+	valueGenerators["Twist OAuth Token"] = func(r *rand.Rand) string {
+		return "TWIST_OAUTH_TOKEN=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Rocket.Chat Personal Access Token"] = func(r *rand.Rand) string {
+		return "ROCKETCHAT_PAT=" + randFromAlphabet(r, alnum+"_-", 56)
+	}
+	valueGenerators["Mattermost Personal Access Token"] = func(r *rand.Rand) string {
+		return "MATTERMOST_TOKEN=" + randLowerAlnum(r, 26)
+	}
+	valueGenerators["Matrix Homeserver Access Token"] = func(r *rand.Rand) string {
+		return "MATRIX_ACCESS_TOKEN=syt_" + randFromAlphabet(r, alnum+"_-", 56)
+	}
 }

@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-05-15T07:09:20Z",
+  "generated_at": "2026-05-15T18:29:56Z",
   "corpus": "secure-edge/agent/internal/dlp/testdata/corpus",
-  "total_samples": 5108,
-  "total_positives": 2608,
+  "total_samples": 14020,
+  "total_positives": 11520,
   "total_negatives": 2500,
-  "tp": 2606,
-  "fn": 2,
+  "tp": 11512,
+  "fn": 8,
   "fp": 0,
   "tn": 2500,
   "precision": 1,
-  "recall": 0.9992331288343558,
-  "f1": 0.9996164173379363,
+  "recall": 0.9993055555555556,
+  "f1": 0.9996526571726294,
   "fp_rate": 0,
-  "fn_rate": 0.0007668711656441718,
+  "fn_rate": 0.0006944444444444445,
   "budget": {
     "overall_fp_max": 0.05,
     "overall_fn_max": 0.03,
@@ -86,8 +86,21 @@
     },
     {
       "category": "cloud_providers",
-      "total": 384,
-      "tp": 384,
+      "total": 1232,
+      "tp": 1232,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "code_secrets",
+      "total": 816,
+      "tp": 816,
       "fn": 0,
       "fp": 0,
       "tn": 0,
@@ -107,6 +120,45 @@
       "precision": 0,
       "recall": 0,
       "f1": 0,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "communications",
+      "total": 512,
+      "tp": 512,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "container_orchestration",
+      "total": 448,
+      "tp": 448,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "crypto",
+      "total": 528,
+      "tp": 528,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
       "fp_rate": 0,
       "fn_rate": 0
     },
@@ -150,6 +202,32 @@
       "fn_rate": 0
     },
     {
+      "category": "dev_tools",
+      "total": 784,
+      "tp": 784,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "dns_cdn",
+      "total": 336,
+      "tp": 336,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
       "category": "documentation",
       "total": 300,
       "tp": 0,
@@ -163,9 +241,61 @@
       "fn_rate": 0
     },
     {
+      "category": "email_marketing",
+      "total": 304,
+      "tp": 304,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "financial",
+      "total": 336,
+      "tp": 336,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
       "category": "frontend",
       "total": 80,
       "tp": 80,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "healthcare",
+      "total": 320,
+      "tp": 318,
+      "fn": 2,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 0.99375,
+      "f1": 0.9968652037617556,
+      "fp_rate": 0,
+      "fn_rate": 0.00625
+    },
+    {
+      "category": "iot",
+      "total": 240,
+      "tp": 240,
       "fn": 0,
       "fp": 0,
       "tn": 0,
@@ -267,6 +397,19 @@
       "fn_rate": 0
     },
     {
+      "category": "monitoring",
+      "total": 416,
+      "tp": 416,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
       "category": "natural_language",
       "total": 100,
       "tp": 0,
@@ -276,6 +419,19 @@
       "precision": 0,
       "recall": 0,
       "f1": 0,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "networking",
+      "total": 240,
+      "tp": 240,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
       "fp_rate": 0,
       "fn_rate": 0
     },
@@ -358,9 +514,61 @@
       "fn_rate": 0
     },
     {
+      "category": "regional_cloud",
+      "total": 448,
+      "tp": 448,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
       "category": "rust_ecosystem",
       "total": 48,
       "tp": 48,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "saas",
+      "total": 1392,
+      "tp": 1392,
+      "fn": 0,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "fp_rate": 0,
+      "fn_rate": 0
+    },
+    {
+      "category": "secret_formats",
+      "total": 592,
+      "tp": 588,
+      "fn": 4,
+      "fp": 0,
+      "tn": 0,
+      "precision": 1,
+      "recall": 0.9932432432432432,
+      "f1": 0.9966101694915254,
+      "fp_rate": 0,
+      "fn_rate": 0.006756756756756757
+    },
+    {
+      "category": "social_media",
+      "total": 352,
+      "tp": 352,
       "fn": 0,
       "fp": 0,
       "tn": 0,
@@ -426,6 +634,18 @@
   "pattern_false_positives": null,
   "pattern_false_negatives": [
     {
+      "pattern": "SSH known_hosts Entry",
+      "fn_count": 4,
+      "total_positives": 16,
+      "fn_rate": 0.25,
+      "example_labels": [
+        "tp-ssh-known-hosts-entry-07939",
+        "tp-ssh-known-hosts-entry-07942",
+        "tp-ssh-known-hosts-entry-07945",
+        "tp-ssh-known-hosts-entry-07950"
+      ]
+    },
+    {
       "pattern": "Cassandra Auth Provider Credentials",
       "fn_count": 2,
       "total_positives": 16,
@@ -433,6 +653,16 @@
       "example_labels": [
         "tp-cassandra-auth-provider--01512",
         "tp-cassandra-auth-provider--01520"
+      ]
+    },
+    {
+      "pattern": "ICD-10-CM Diagnosis Code List",
+      "fn_count": 2,
+      "total_positives": 16,
+      "fn_rate": 0.125,
+      "example_labels": [
+        "tp-icd-10-cm-diagnosis-code-11140",
+        "tp-icd-10-cm-diagnosis-code-11142"
       ]
     }
   ]

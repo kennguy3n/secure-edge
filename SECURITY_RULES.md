@@ -1,11 +1,19 @@
 # ShieldNet Secure Edge — Security Rules Reference
 
 A complete reference of every DLP pattern shipped in
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**163** patterns
-across **13** JSON categories). Sub-sections below group patterns by
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**720** patterns
+across **16** JSON categories). Sub-sections below group patterns by
 family for readability rather than by JSON category. For the schema
 and authoring workflow, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
+
+The bulk of the per-section tables below predates the W1 pattern
+expansion; they are kept as a curated overview of the foundational
+patterns. The full and current list of every pattern, with its
+severity, prefix, hotword settings, regex, and category, is the
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) file itself.
+Counts in the section headers below therefore reflect the
+foundational set, not the W1-expanded set.
 
 Columns:
 

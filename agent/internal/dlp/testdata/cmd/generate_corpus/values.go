@@ -1371,4 +1371,90 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Reddit Refresh Token"] = func(r *rand.Rand) string {
 		return "REDDIT_REFRESH_TOKEN=" + randFromAlphabet(r, digits, 6) + "-" + randFromAlphabet(r, alnum+"_-", 40)
 	}
+	// ---------------- Batch 7: Container / Orchestration ----------------
+	valueGenerators["Kubernetes Service Account Token (JWT)"] = func(r *rand.Rand) string {
+		return "eyJhbGciOi" + randFromAlphabet(r, alnum+"_-", 60) + ".eyJpc3MiOi" + randFromAlphabet(r, alnum+"_-", 120) + "." + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Kubernetes Kubeconfig client-certificate-data"] = func(r *rand.Rand) string {
+		return "client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t" + randFromAlphabet(r, alnum+"+/=", 200)
+	}
+	valueGenerators["Kubernetes Kubeconfig client-key-data"] = func(r *rand.Rand) string {
+		return "client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLS" + randFromAlphabet(r, alnum+"+/=", 240)
+	}
+	valueGenerators["Kubernetes Bootstrap Token"] = func(r *rand.Rand) string {
+		return "KUBE_BOOTSTRAP_TOKEN=" + randLowerAlnum(r, 6) + "." + randLowerAlnum(r, 16)
+	}
+	valueGenerators["Kubernetes Dashboard Token"] = func(r *rand.Rand) string {
+		return "K8S_DASHBOARD_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 220)
+	}
+	valueGenerators["Helm Repository Basic Auth"] = func(r *rand.Rand) string {
+		return "HELM_REPO_PASSWORD=" + randAlnum(r, 20)
+	}
+	valueGenerators["Helm Plugin Secret"] = func(r *rand.Rand) string {
+		return "HELM_SECRETS_DRIVER_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["Helm OCI Registry Token"] = func(r *rand.Rand) string {
+		return "HELM_REGISTRY_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	valueGenerators["Docker Hub Personal Access Token"] = func(r *rand.Rand) string {
+		return "dckr_pat_" + randFromAlphabet(r, alnum+"_-", 36)
+	}
+	valueGenerators["Docker Hub Organization Access Token"] = func(r *rand.Rand) string {
+		return "dckr_oat_" + randFromAlphabet(r, alnum+"_-", 44)
+	}
+	valueGenerators["Docker Hub Refresh Token"] = func(r *rand.Rand) string {
+		return "DOCKER_HUB_REFRESH_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-.", 180)
+	}
+	valueGenerators["Harbor User PAT"] = func(r *rand.Rand) string {
+		return "HARBOR_PAT=" + randFromAlphabet(r, alnum+"_-", 60)
+	}
+	valueGenerators["Rancher API Token"] = func(r *rand.Rand) string {
+		return "token-" + randLowerAlnum(r, 5) + ":" + randLowerAlnum(r, 54)
+	}
+	valueGenerators["Rancher Kubeconfig Token"] = func(r *rand.Rand) string {
+		return "RANCHER_KUBECONFIG_TOKEN=token-" + randLowerAlnum(r, 5) + ":" + randLowerAlnum(r, 54)
+	}
+	valueGenerators["ArgoCD Bearer Token (JWT)"] = func(r *rand.Rand) string {
+		return "ARGOCD_AUTH_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-", 80) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 200) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["ArgoCD CLI Login Password"] = func(r *rand.Rand) string {
+		return "ARGOCD_CLI_PASSWORD=" + randAlnum(r, 24)
+	}
+	valueGenerators["ArgoCD Service Account Token"] = func(r *rand.Rand) string {
+		return "ARGOCD_PROJ_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-.", 240)
+	}
+	valueGenerators["FluxCD Notification Provider Token"] = func(r *rand.Rand) string {
+		return "FLUX_NOTIFICATION_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["FluxCD Git Source Password"] = func(r *rand.Rand) string {
+		return "FLUX_GIT_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["GHCR Personal Access Token"] = func(r *rand.Rand) string {
+		return "GHCR_PAT=ghp_" + randAlnum(r, 36)
+	}
+	valueGenerators["Quay.io OAuth Access Token"] = func(r *rand.Rand) string {
+		return "QUAY_OAUTH_TOKEN=" + randAlnum(r, 60)
+	}
+	valueGenerators["Quay.io Robot Account Token"] = func(r *rand.Rand) string {
+		return "QUAY_ROBOT_TOKEN=" + randAlnum(r, 56)
+	}
+	valueGenerators["Tekton Pipeline Secret"] = func(r *rand.Rand) string {
+		return "TEKTON_GIT_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["Buildkite Agent Token"] = func(r *rand.Rand) string {
+		return "BUILDKITE_AGENT_TOKEN=" + randAlnum(r, 48)
+	}
+	valueGenerators["OpenShift Cluster Auth Token"] = func(r *rand.Rand) string {
+		return "sha256~" + randFromAlphabet(r, alnum+"_-", 43)
+	}
+	valueGenerators["HashiCorp Nomad ACL Token"] = func(r *rand.Rand) string {
+		return "NOMAD_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["HashiCorp Consul ACL Token"] = func(r *rand.Rand) string {
+		return "CONSUL_HTTP_TOKEN=" + randUUID(r)
+	}
+	valueGenerators["Spinnaker API Token"] = func(r *rand.Rand) string {
+		return "SPINNAKER_API_TOKEN=" + randFromAlphabet(r, alnum+"_-", 48)
+	}
+	// ---------------- Batch 7: Container / Orchestration ----------------
 }

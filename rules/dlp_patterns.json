@@ -6977,6 +6977,487 @@
       "require_hotword": false,
       "entropy_min": 3.5,
       "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Service Account Token (JWT)",
+      "regex": "eyJhbGciOi[A-Za-z0-9_\\-]{20,}\\.eyJpc3MiOi[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "eyjhbgcioi",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kubernetes",
+        "k8s",
+        "service account",
+        "serviceaccount.io"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Kubeconfig client-certificate-data",
+      "regex": "(?i)client-certificate-data\\s*[:=]\\s*['\\\"]?LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t[A-Za-z0-9+/=\\s]{100,}",
+      "prefix": "client-certificate-data",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kubernetes",
+        "k8s",
+        "certificate",
+        "kubeconfig"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Kubeconfig client-key-data",
+      "regex": "(?i)client-key-data\\s*[:=]\\s*['\\\"]?LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLS[A-Za-z0-9+/=\\s]{100,}",
+      "prefix": "client-key-data",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kubernetes",
+        "k8s",
+        "private key",
+        "kubeconfig"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Bootstrap Token",
+      "regex": "(?i)KUBE_BOOTSTRAP_TOKEN\\s*[:=]\\s*['\\\"]?[a-z0-9]{6}\\.[a-z0-9]{16}",
+      "prefix": "kube_bootstrap_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kubernetes",
+        "k8s",
+        "bootstrap",
+        "kubeadm"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Kubernetes Dashboard Token",
+      "regex": "(?i)K8S_DASHBOARD_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{120,}",
+      "prefix": "k8s_dashboard_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "kubernetes",
+        "dashboard",
+        "admin"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Helm Repository Basic Auth",
+      "regex": "(?i)HELM_REPO_(?:USERNAME|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{8,}",
+      "prefix": "helm_repo_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "helm",
+        "repository",
+        "basic auth"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Helm Plugin Secret",
+      "regex": "(?i)HELM_SECRETS_DRIVER_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{16,}",
+      "prefix": "helm_secrets_driver_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "helm",
+        "secrets",
+        "driver"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Helm OCI Registry Token",
+      "regex": "(?i)HELM_REGISTRY_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "helm_registry_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "helm",
+        "oci",
+        "registry"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Docker Hub Personal Access Token",
+      "regex": "dckr_pat_[A-Za-z0-9_\\-]{36}",
+      "prefix": "dckr_pat_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "docker hub",
+        "pat",
+        "personal access",
+        "registry"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Docker Hub Organization Access Token",
+      "regex": "dckr_oat_[A-Za-z0-9_\\-]{40,}",
+      "prefix": "dckr_oat_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "docker hub",
+        "oat",
+        "organization"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Docker Hub Refresh Token",
+      "regex": "(?i)DOCKER_HUB_REFRESH_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-\\.]{100,}",
+      "prefix": "docker_hub_refresh_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "docker hub",
+        "refresh",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Harbor User PAT",
+      "regex": "(?i)HARBOR_PAT\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "harbor_pat",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "harbor",
+        "goharbor",
+        "pat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Rancher API Token",
+      "regex": "token-[a-z0-9]{5}:[a-z0-9]{54}",
+      "prefix": "token-",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rancher",
+        "api",
+        "kubeconfig"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Rancher Kubeconfig Token",
+      "regex": "(?i)RANCHER_KUBECONFIG_TOKEN\\s*[:=]\\s*['\\\"]?token-[a-z0-9]{5}:[a-z0-9]{54}",
+      "prefix": "rancher_kubeconfig_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "rancher",
+        "kubeconfig",
+        "cluster"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "ArgoCD Bearer Token (JWT)",
+      "regex": "(?i)ARGOCD_AUTH_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{20,}\\.eyJ[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}",
+      "prefix": "argocd_auth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "argocd",
+        "argo",
+        "gitops"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "ArgoCD CLI Login Password",
+      "regex": "(?i)ARGOCD_CLI_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{8,}",
+      "prefix": "argocd_cli_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "argocd",
+        "cli",
+        "login"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "ArgoCD Service Account Token",
+      "regex": "(?i)ARGOCD_PROJ_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-\\.]{120,}",
+      "prefix": "argocd_proj_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "argocd",
+        "project",
+        "service account"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "FluxCD Notification Provider Token",
+      "regex": "(?i)FLUX_NOTIFICATION_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{32,}",
+      "prefix": "flux_notification_token",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "flux",
+        "fluxcd",
+        "notification"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "FluxCD Git Source Password",
+      "regex": "(?i)FLUX_GIT_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{16,}",
+      "prefix": "flux_git_password",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "flux",
+        "gitops",
+        "git source"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "GHCR Personal Access Token",
+      "regex": "(?i)GHCR_PAT\\s*[:=]\\s*['\\\"]?ghp_[A-Za-z0-9]{36}",
+      "prefix": "ghcr_pat",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ghcr",
+        "github",
+        "container registry"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Quay.io OAuth Access Token",
+      "regex": "(?i)QUAY_OAUTH_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "quay_oauth_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "quay",
+        "redhat",
+        "registry"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Quay.io Robot Account Token",
+      "regex": "(?i)QUAY_ROBOT_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "quay_robot_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "quay",
+        "robot",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Tekton Pipeline Secret",
+      "regex": "(?i)TEKTON_GIT_(?:SSH_KEY|USERNAME|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{8,}",
+      "prefix": "tekton_git_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "tekton",
+        "pipeline",
+        "cd"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Buildkite Agent Token",
+      "regex": "(?i)BUILDKITE_AGENT_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{40,}",
+      "prefix": "buildkite_agent_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "buildkite",
+        "agent",
+        "ci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "OpenShift Cluster Auth Token",
+      "regex": "sha256~[A-Za-z0-9_\\-]{43}",
+      "prefix": "sha256~",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "openshift",
+        "oc",
+        "cluster"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "HashiCorp Nomad ACL Token",
+      "regex": "(?i)NOMAD_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "nomad_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "nomad",
+        "hashicorp",
+        "acl"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "HashiCorp Consul ACL Token",
+      "regex": "(?i)CONSUL_HTTP_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
+      "prefix": "consul_http_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "consul",
+        "hashicorp",
+        "acl"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Spinnaker API Token",
+      "regex": "(?i)SPINNAKER_API_TOKEN\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{40,}",
+      "prefix": "spinnaker_api_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "spinnaker",
+        "gate",
+        "cd"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

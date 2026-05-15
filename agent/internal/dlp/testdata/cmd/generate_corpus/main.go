@@ -516,6 +516,38 @@ var patternCategory = map[string]string{
 	"Pinterest API Access Token":      "social_media",
 	"Reddit OAuth Client Secret":      "social_media",
 	"Reddit Refresh Token":            "social_media",
+
+	// Batch 7: Container / Orchestration
+	"Kubernetes Service Account Token (JWT)":        "container_orchestration",
+	"Kubernetes Kubeconfig client-certificate-data": "container_orchestration",
+	"Kubernetes Kubeconfig client-key-data":         "container_orchestration",
+	"Kubernetes Bootstrap Token":                    "container_orchestration",
+	"Kubernetes Dashboard Token":                    "container_orchestration",
+	"Helm Repository Basic Auth":                    "container_orchestration",
+	"Helm Plugin Secret":                            "container_orchestration",
+	"Helm OCI Registry Token":                       "container_orchestration",
+	"Docker Hub Personal Access Token":              "container_orchestration",
+	"Docker Hub Organization Access Token":          "container_orchestration",
+	"Docker Hub Refresh Token":                      "container_orchestration",
+	"Harbor User PAT":                               "container_orchestration",
+	"Rancher API Token":                             "container_orchestration",
+	"Rancher Kubeconfig Token":                      "container_orchestration",
+	"ArgoCD Bearer Token (JWT)":                     "container_orchestration",
+	"ArgoCD CLI Login Password":                     "container_orchestration",
+	"ArgoCD Service Account Token":                  "container_orchestration",
+	"FluxCD Notification Provider Token":            "container_orchestration",
+	"FluxCD Git Source Password":                    "container_orchestration",
+	"GHCR Personal Access Token":                    "container_orchestration",
+	"Quay.io OAuth Access Token":                    "container_orchestration",
+	"Quay.io Robot Account Token":                   "container_orchestration",
+	"Tekton Pipeline Secret":                        "container_orchestration",
+	"Buildkite Agent Token":                         "container_orchestration",
+	"OpenShift Cluster Auth Token":                  "container_orchestration",
+	"HashiCorp Nomad ACL Token":                     "container_orchestration",
+	"HashiCorp Consul ACL Token":                    "container_orchestration",
+	"Spinnaker API Token":                           "container_orchestration",
+
+	// Batch 7: Container / Orchestration
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

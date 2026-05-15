@@ -507,3 +507,137 @@ test("B3 / row 13: clipboardData=null is a clean no-op (defensive)", async () =>
     assert.equal(preventCalls.n, 0);
     assert.equal(stopCalls.n, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Row 14 — text path + oversize + team mode (warn-toast equivalent)
+//
+// Rows 3a / 3b cover oversize text in managed (block) and personal
+// (silent-allow). The team-mode behaviour is the same silent-allow
+// as personal — `policyForOversize` only flips to "block" for
+// managed — but the test pins the contract so a future change to
+// `policyForOversize` cannot silently move the team posture without
+// flipping a test.
+// ---------------------------------------------------------------------------
+
+test("B3 / row 14: text-only oversize, team mode silently allows (matches personal posture)", async () => {
+    scanClientTest.setCachedEnforcementMode("team");
+    noFetch();
+    const huge = "A".repeat(2 * 1024 * 1024 + 1);
+    const { ev, preventCalls } = makePasteEvent({ text: huge });
+    await onPaste(ev);
+    assert.equal(
+        preventCalls.n,
+        0,
+        "team mode must let oversize text paste through (no block toast, no suppression)",
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Rows 15a / 15b / 15c — text-path agent-unavailable, all three modes
+//
+// Rows 11a / 11b cover the FILE path on agent-unavailable. The text
+// path has its own resumption story (a clean / fall-open verdict
+// re-emits the paste via `resumePaste`), so the three policy
+// branches need their own coverage to pin that:
+//   personal — silent fall-open, resumePaste runs (no toast)
+//   team     — warn toast, resumePaste still runs
+//   managed  — block toast, NO resumePaste
+//
+// `mockFetch({ ok: false, body: null })` simulates a non-2xx
+// response from the agent so scanContent returns null and the
+// onPaste handler hits the policyForUnavailable() branch.
+// ---------------------------------------------------------------------------
+
+test("B3 / row 15a: text paste + agent unavailable + personal mode = silent fall-open (no toast)", async () => {
+    scanClientTest.setCachedEnforcementMode("personal");
+    mockFetch({ ok: false, body: null });
+    const stub = stubDocument();
+    const { ev, preventCalls } = makePasteEvent({ text: "ordinary clipboard text" });
+    await onPaste(ev);
+    assert.equal(preventCalls.n, 1, "text path always preventDefaults while it asks the agent");
+    assert.equal(
+        stub.appendCount.n,
+        0,
+        "personal mode must not surface a toast when the agent is unavailable",
+    );
+});
+
+test("B3 / row 15b: text paste + agent unavailable + team mode surfaces a warn toast and resumes", async () => {
+    scanClientTest.setCachedEnforcementMode("team");
+    mockFetch({ ok: false, body: null });
+    const stub = stubDocument();
+    const { ev } = makePasteEvent({ text: "ordinary clipboard text" });
+    await onPaste(ev);
+    assert.equal(
+        stub.appendCount.n,
+        1,
+        "team mode must surface a single warn toast on agent-unavailable",
+    );
+});
+
+test("B3 / row 15c: text paste + agent unavailable + managed mode blocks (toast, no resume)", async () => {
+    scanClientTest.setCachedEnforcementMode("managed");
+    mockFetch({ ok: false, body: null });
+    const stub = stubDocument();
+    const { ev, preventCalls } = makePasteEvent({ text: "ordinary clipboard text" });
+    await onPaste(ev);
+    assert.equal(preventCalls.n, 1);
+    assert.equal(
+        stub.appendCount.n,
+        1,
+        "managed mode must surface a single policy block toast on agent-unavailable",
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Row 16 — items[]-only screenshot paste integration test
+//
+// `collectClipboardFiles` already has a unit test for the
+// items[].getAsFile() surface (line ~189), but the full `onPaste`
+// integration is only exercised on the `clipboardData.files`
+// surface in rows 5 / 6 / 7. Pin the items[]-only path through the
+// full handler so a future refactor of onPaste that drops the
+// items[] branch cannot pass typecheck + the helper test alone.
+// ---------------------------------------------------------------------------
+
+test("B3 / row 16: screenshot-style PNG via items[] (files empty) is suppressed and scanned", async () => {
+    const fetchMock = mockFetch({
+        ok: true,
+        body: { blocked: false, pattern_name: "", score: 0 } satisfies ScanBody,
+    });
+    const stub = stubDocument();
+    const png = new File(
+        [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])],
+        "screenshot.png",
+        { type: "image/png" },
+    );
+
+    // Build the event by hand: clipboardData.files is empty; the
+    // only File payload is on items[].
+    const preventCalls = { n: 0 };
+    const stopCalls = { n: 0 };
+    const data = {
+        getData: () => "",
+        files: makeFileList([]),
+        items: [makeDataTransferItem(png, "file")],
+    } as unknown as DataTransfer;
+    const ev = {
+        clipboardData: data,
+        target: null,
+        preventDefault: () => { preventCalls.n++; },
+        stopPropagation: () => { stopCalls.n++; },
+    } as unknown as ClipboardEvent;
+    await onPaste(ev);
+
+    assert.equal(preventCalls.n, 1, "items[]-only screenshot paste must be suppressed too");
+    assert.equal(stopCalls.n, 1);
+    // Clean verdict on the (effectively unreadable) PNG bytes —
+    // see the screenshot/image DLP limitation documented in the
+    // file header and docs/admin-guide.md §8.1.
+    assert.equal(fetchMock.calls.length, 1, "the FILE path still runs scanContent on best-effort decoded bytes");
+    assert.equal(
+        stub.appendCount.n,
+        0,
+        "a clean (best-effort) screenshot scan must not surface any toast",
+    );
+});

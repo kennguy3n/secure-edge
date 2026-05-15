@@ -926,6 +926,28 @@ var patternCategory = map[string]string{
 	"Qatar IBAN":                  "pii_gcc",
 	"Oman IBAN":                   "pii_gcc",
 	"Qatar TIN":                   "pii_gcc",
+
+	// W4 Batch 5: Southeast & East Asia.
+	"Singapore NRIC/FIN":                        "pii_sea",
+	"Malaysia MyKad":                            "pii_sea",
+	"Thailand National ID":                      "pii_sea",
+	"Philippines SSS Number":                    "pii_sea",
+	"Philippines TIN":                           "pii_sea",
+	"Philippines UMID":                          "pii_sea",
+	"Indonesia NIK":                             "pii_sea",
+	"Indonesia NPWP":                            "pii_sea",
+	"Vietnam CCCD":                              "pii_sea",
+	"Vietnam MST":                               "pii_sea",
+	"Japan My Number":                           "pii_sea",
+	"Japan Passport Number":                     "pii_sea",
+	"South Korea RRN":                           "pii_sea",
+	"South Korea Business Registration Number":  "pii_sea",
+	"Taiwan National ID":                        "pii_sea",
+	"China Resident ID":                         "pii_sea",
+	"China Passport Number":                     "pii_sea",
+	"India Aadhaar":                             "pii_sea",
+	"India PAN":                                 "pii_sea",
+	"Hong Kong HKID":                            "pii_sea",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

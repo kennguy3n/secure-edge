@@ -12445,7 +12445,7 @@
     },
     {
       "name": "EU VAT Number",
-      "regex": "(?i)\\b(?:DE|FR|IT|ES|NL|BE|AT|PL|PT|SE|FI|GR|EL|IE|DK|CZ|HU|RO|BG|HR|SK|SI|LT|LV|EE|CY|LU|MT|XI)[0-9A-Z]{8,12}\\b",
+      "regex": "\\b(?:DE|FR|IT|ES|NL|BE|AT|PL|PT|SE|FI|GR|EL|IE|DK|CZ|HU|RO|BG|HR|SK|SI|LT|LV|EE|CY|LU|MT|XI)[0-9A-Z]{8,12}\\b",
       "prefix": "",
       "severity": "medium",
       "score_weight": 1,
@@ -13398,6 +13398,379 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_gcc"
+    },
+    {
+      "name": "Singapore NRIC/FIN",
+      "regex": "\\b[STFGM]\\d{7}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nric",
+        "fin",
+        "national registration",
+        "singapore identity",
+        "singpass",
+        "ica singapore"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Malaysia MyKad",
+      "regex": "\\b\\d{6}-\\d{2}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mykad",
+        "malaysia ic",
+        "malaysian identity card",
+        "jpn malaysia",
+        "mykid",
+        "kad pengenalan"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Thailand National ID",
+      "regex": "\\b\\d{13}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "thai national id",
+        "thailand id card",
+        "\u0e1a\u0e31\u0e15\u0e23\u0e1b\u0e23\u0e30\u0e08\u0e33\u0e15\u0e31\u0e27\u0e1b\u0e23\u0e30\u0e0a\u0e32\u0e0a\u0e19",
+        "department of provincial administration",
+        "tabienraj"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines SSS Number",
+      "regex": "\\b\\d{2}-\\d{7}-\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sss number",
+        "philippines social security",
+        "ss number philippines"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines TIN",
+      "regex": "\\b\\d{3}-\\d{3}-\\d{3}-\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "philippines tin",
+        "bir tin",
+        "bureau of internal revenue philippines",
+        "tin philippines"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines UMID",
+      "regex": "\\b\\d{4}-\\d{7}-\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "umid",
+        "unified multi-purpose id",
+        "gsis",
+        "philhealth",
+        "pagibig"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Indonesia NIK",
+      "regex": "\\b\\d{16}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nik",
+        "nomor induk kependudukan",
+        "ktp",
+        "kartu tanda penduduk",
+        "dukcapil"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Indonesia NPWP",
+      "regex": "\\b\\d{2}\\.\\d{3}\\.\\d{3}\\.\\d-\\d{3}\\.\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "npwp",
+        "nomor pokok wajib pajak",
+        "pajak indonesia"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Vietnam CCCD",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cccd",
+        "c\u0103n c\u01b0\u1edbc c\u00f4ng d\u00e2n",
+        "can cuoc cong dan",
+        "vietnam national id",
+        "cmnd"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Vietnam MST",
+      "regex": "\\b\\d{10}(?:-\\d{3})?\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "m\u00e3 s\u1ed1 thu\u1ebf",
+        "ma so thue",
+        "vietnam tax code",
+        "t\u1ed5ng c\u1ee5c thu\u1ebf",
+        "tong cuc thue"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Japan My Number",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "my number",
+        "\u30de\u30a4\u30ca\u30f3\u30d0\u30fc",
+        "\u500b\u4eba\u756a\u53f7",
+        "japan social security and tax number",
+        "kojin bang\u014d"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Japan Passport Number",
+      "regex": "\\b[A-Z]{2}\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "japan passport",
+        "japanese passport",
+        "ministry of foreign affairs japan",
+        "\u30d1\u30b9\u30dd\u30fc\u30c8 \u65e5\u672c"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "South Korea RRN",
+      "regex": "\\b\\d{6}-[1-4]\\d{6}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "\uc8fc\ubbfc\ub4f1\ub85d\ubc88\ud638",
+        "resident registration number",
+        "korea rrn",
+        "jumin",
+        "korean national id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "South Korea Business Registration Number",
+      "regex": "\\b\\d{3}-\\d{2}-\\d{5}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "\uc0ac\uc5c5\uc790\ub4f1\ub85d\ubc88\ud638",
+        "business registration number korea",
+        "hometax",
+        "nts korea"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Taiwan National ID",
+      "regex": "\\b[A-Z][12]\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "\u8eab\u5206\u8b49",
+        "national identification card taiwan",
+        "ministry of the interior taiwan",
+        "taiwan id",
+        "\u8eab\u5206\u8bc1\u5b57\u53f7"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "China Resident ID",
+      "regex": "\\b\\d{17}[\\dX]\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "\u5c45\u6c11\u8eab\u4efd\u8bc1",
+        "resident identity card china",
+        "prc national id",
+        "\u8eab\u4efd\u8bc1\u53f7",
+        "\u516c\u5b89\u90e8"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "China Passport Number",
+      "regex": "\\b[EG]\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "china passport",
+        "prc passport",
+        "\u4e2d\u56fd\u62a4\u7167",
+        "national immigration administration china"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "India Aadhaar",
+      "regex": "\\b\\d{4}\\s\\d{4}\\s\\d{4}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aadhaar",
+        "aadhar",
+        "uidai",
+        "unique identification authority",
+        "\u0906\u0927\u093e\u0930"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "India PAN",
+      "regex": "\\b[A-Z]{5}\\d{4}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pan card",
+        "permanent account number",
+        "income tax department india",
+        "incometaxindia",
+        "pan no"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Hong Kong HKID",
+      "regex": "\\b[A-Z]{1,2}\\d{6}\\([\\dA]\\)",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hkid",
+        "hong kong identity card",
+        "\u9999\u6e2f\u8eab\u4efd\u8b49",
+        "immigration department hong kong"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
     }
   ]
 }

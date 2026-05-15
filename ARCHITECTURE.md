@@ -345,9 +345,21 @@ Cloud / App Store Connect, Android signing / `google-services.json` /
 databases (Postgres, MySQL, MongoDB SRV, Redis, MSSQL, SQLite PRAGMA,
 Cassandra, Elasticsearch), private keys (PEM), JWTs, generic
 password-in-code patterns, and PII (SSN, credit cards, emails, phones).
-Accuracy is enforced by
-[`agent/internal/dlp/accuracy_test.go`](./agent/internal/dlp/accuracy_test.go)
-with budgets `FP < 10%` and `FN < 5%`.
+Accuracy is enforced by a two-tier test setup. A fast smoke check
+in
+[`agent/internal/dlp/accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)
+uses a 50-sample corpus with budgets `FP < 10%` / `FN < 5%`, and a
+large-scale evaluation in
+[`agent/internal/dlp/accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)
+loads the 5,000+-sample corpus from
+[`agent/internal/dlp/testdata/corpus/`](./agent/internal/dlp/testdata/corpus/),
+enforcing tightened budgets `overall FP < 5%`, `overall FN < 3%`, and
+`per-category FN < 10%`, and writing a structured JSON report
+(`testdata/corpus/last_run_report.json`) for CI archival. A companion
+regression test
+([`accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go))
+diffs each run against the committed `baseline_report.json` to surface
+recall regressions across rule updates.
 
 ### 3. Local MITM Proxy (Optional)
 

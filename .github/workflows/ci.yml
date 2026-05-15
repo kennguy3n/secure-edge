@@ -50,6 +50,25 @@ jobs:
           path: agent/coverage.out
           if-no-files-found: error
 
+      - name: go test -tags=large (DLP accuracy + regression)
+        working-directory: agent
+        run: |
+          # The large-corpus accuracy test (~5,000 samples) and the
+          # regression test that diffs against the committed
+          # baseline_report.json are gated behind the `large` build tag
+          # so the default coverage run stays fast. Run both here so CI
+          # blocks on regressions and so we can archive the per-run
+          # JSON report.
+          go test -tags=large -run 'TestDLPAccuracy(Large|Regression)' ./internal/dlp/
+
+      - name: upload DLP accuracy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlp-accuracy-report
+          path: agent/internal/dlp/testdata/corpus/last_run_report.json
+          if-no-files-found: warn
+
       - name: go vet
         working-directory: agent
         run: make lint

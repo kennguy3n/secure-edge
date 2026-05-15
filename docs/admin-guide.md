@@ -560,6 +560,7 @@ binary, writes `config.yaml`, and drops the signed `profile.json` into
     ```
     secure-edge-windows-amd64.exe
     install.ps1
+    register-service.ps1   # shipped at scripts/windows/register-service.ps1
     profile.json
     config.yaml
     ```
@@ -572,7 +573,7 @@ binary, writes `config.yaml`, and drops the signed `profile.json` into
     $ErrorActionPreference = 'Stop'
     $PSNativeCommandUseErrorActionPreference = $true
 
-    $installDir = "$env:ProgramFiles\SecureEdge"
+    $installDir = "$env:ProgramFiles\SecureEdge\bin"
     $dataDir = "$env:ProgramData\SecureEdge"
 
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
@@ -582,14 +583,18 @@ binary, writes `config.yaml`, and drops the signed `profile.json` into
     Copy-Item config.yaml "$dataDir\"
     Copy-Item profile.json "$dataDir\"
 
-    # The first-run bootstrap mints the api_token, writes
+    # Register the SecureEdge Windows service via the shipped script.
+    # The script's defaults match the install layout above
+    # (C:\Program Files\SecureEdge\bin\secure-edge-agent.exe +
+    # C:\ProgramData\SecureEdge\config.yaml). The agent's first run
+    # under the service mints the api_token, writes it to
     # %ProgramData%\SecureEdge\api_token, and starts fetching the
     # signed manifest from rule_update_url. See §1 and §4.
-    & "$installDir\secure-edge-agent.exe" --install-service
+    & "$PSScriptRoot\register-service.ps1" install
     ```
 
     Detection rule: file exists at
-    `%ProgramFiles%\SecureEdge\secure-edge-agent.exe` AND
+    `%ProgramFiles%\SecureEdge\bin\secure-edge-agent.exe` AND
     `%ProgramData%\SecureEdge\api_token`.
 
 2. **Device configuration policy — ADMX.** Use the Chrome ADMX

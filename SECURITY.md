@@ -65,7 +65,27 @@ guarantees that we consider in-scope for this policy are:
    (false: warn, still serve; true: reject mismatched / missing
    MAC). Bypasses of the MAC verification when
    `bridge_mac_required=true` are **high-severity**.
-6. **Risky-extension upload block** — the browser extension's
+6. **Enterprise-profile authenticity** — managed-deployment
+   enterprise profiles loaded from disk (`profile_path`), fetched
+   from a URL (`profile_url`), or imported through `POST
+   /api/profile/import` (both the URL fetch and the inline-body
+   path) carry an Ed25519 signature over the canonical body
+   (`profile.CanonicalForSigning`, which physically excludes the
+   `signature` field via a dedicated body struct). When the
+   operator configures `profile_public_key`, every loaded profile
+   MUST verify against that key — unsigned, tampered, or
+   wrong-key-signed profiles are rejected before any policy is
+   applied. When the key is absent, the agent runs in a
+   backwards-compatible warn-once posture (accepts unsigned
+   profiles, logs a single line per process). The `signature`
+   field is omitted from the canonical bytes by construction, so
+   re-signing or stripping the signature can never produce a
+   profile that verifies under a different operator's key. A
+   bypass of profile signature verification when
+   `profile_public_key` is configured — e.g., a tampered profile
+   being applied, or a profile signed by the wrong key being
+   accepted — is **high-severity**.
+7. **Risky-extension upload block** — the browser extension's
    `file-upload-interceptor` content script blocks uploads of
    files whose extension is on a policy-controlled risky list
    (default: 34 executable, installer, script, disk-image, and

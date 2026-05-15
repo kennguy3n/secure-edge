@@ -220,21 +220,22 @@ type AgentSelfUpdater interface {
 
 // Server is the API server (handlers and dependencies).
 type Server struct {
-	Store        *store.Store
-	Policy       PolicyEngine
-	Stats        StatsView
-	DLP          DLPScanner
-	RuleUpdater  RuleUpdater
-	Proxy        ProxyController
-	Profile      *profile.Holder
-	ProfileApply profile.PolicyStore
-	Tamper       TamperReporter
-	Rules        RuleOverride
-	AgentUpdate  AgentSelfUpdater
-	RuleFiles    []string // optional paths whose mtimes feed /api/status
-	startedAt    time.Time
-	scanLimiter  *rateLimiter
-	once         sync.Once
+	Store           *store.Store
+	Policy          PolicyEngine
+	Stats           StatsView
+	DLP             DLPScanner
+	RuleUpdater     RuleUpdater
+	Proxy           ProxyController
+	Profile         *profile.Holder
+	ProfileApply    profile.PolicyStore
+	ProfileVerifier *profile.Verifier
+	Tamper          TamperReporter
+	Rules           RuleOverride
+	AgentUpdate     AgentSelfUpdater
+	RuleFiles       []string // optional paths whose mtimes feed /api/status
+	startedAt       time.Time
+	scanLimiter     *rateLimiter
+	once            sync.Once
 
 	// allowedExtensionIDs is the optional pinned-ID allowlist set
 	// via SetAllowedExtensionIDs. nil / empty means "accept any
@@ -339,6 +340,17 @@ func (s *Server) SetProxyController(p ProxyController) { s.Proxy = p }
 func (s *Server) SetProfile(h *profile.Holder, ps profile.PolicyStore) {
 	s.Profile = h
 	s.ProfileApply = ps
+}
+
+// SetProfileVerifier wires the D2 Ed25519 verifier into the server.
+// Both POST /api/profile/import paths (URL fetch and inline-body)
+// enforce the operator's trust posture through this verifier. A nil
+// verifier (or one constructed from an empty public key) operates
+// in the backwards-compatible warn-once-and-accept posture; a
+// verifier with a configured key rejects unsigned / tampered /
+// wrong-signature profiles.
+func (s *Server) SetProfileVerifier(v *profile.Verifier) {
+	s.ProfileVerifier = v
 }
 
 // SetTamperReporter wires the tamper detector into the server.

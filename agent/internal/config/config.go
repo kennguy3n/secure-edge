@@ -211,6 +211,17 @@ type Config struct {
 	// deployments while making the upgrade path opt-in.
 	RuleUpdatePublicKey string `yaml:"rule_update_public_key"`
 
+	// ProfilePublicKey is the hex-encoded Ed25519 public key used
+	// to verify enterprise-profile signatures (Phase 7 work item
+	// D2). When set, the profile loader and POST /api/profile/import
+	// reject any profile whose signature does not verify against
+	// this key. When empty, the loader falls back to accepting
+	// unsigned profiles and logs a one-time warning — preserving
+	// backwards compatibility with existing deployments while
+	// making the upgrade path opt-in. Trust posture mirrors the
+	// rule-manifest verifier (RuleUpdatePublicKey above) exactly.
+	ProfilePublicKey string `yaml:"profile_public_key"`
+
 	// RiskyFileExtensions is the lowercase, dot-less list of file
 	// extensions the browser extension hard-blocks at the upload
 	// gesture (Phase 7 work item B2). The agent itself does not
@@ -453,6 +464,9 @@ func merge(defaults, override Config) Config {
 	}
 	if override.RuleUpdatePublicKey != "" {
 		out.RuleUpdatePublicKey = override.RuleUpdatePublicKey
+	}
+	if override.ProfilePublicKey != "" {
+		out.ProfilePublicKey = override.ProfilePublicKey
 	}
 	// RiskyFileExtensions distinguishes "absent" (use the
 	// extension's baked-in default) from "explicit empty list"

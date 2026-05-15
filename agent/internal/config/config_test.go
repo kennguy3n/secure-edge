@@ -437,6 +437,48 @@ func TestLoad_RuleUpdatePublicKey_DefaultEmpty(t *testing.T) {
 	}
 }
 
+// TestLoad_ProfilePublicKey ensures the D2 opt-in field round-trips
+// through the YAML loader. The value is hex-decoded by main.go before
+// being handed to profile.NewVerifierFromHex; config-layer validation
+// only confirms the key is parsed off the YAML at all (mirrors the
+// rule-manifest equivalent above).
+func TestLoad_ProfilePublicKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profile-key.yaml")
+	// 64 hex chars = 32 bytes = Ed25519 public key size. The config
+	// layer doesn't actually verify length (main.go does); pass a
+	// realistic value so the test mirrors real usage.
+	content := `profile_public_key: "` +
+		"feedfacedeadbeef00000000000000000000000000000000000000000000abcd" +
+		"\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	const want = "feedfacedeadbeef00000000000000000000000000000000000000000000abcd"
+	if cfg.ProfilePublicKey != want {
+		t.Errorf("ProfilePublicKey = %q, want %q", cfg.ProfilePublicKey, want)
+	}
+}
+
+// TestLoad_ProfilePublicKey_DefaultEmpty pins the staged-rollout
+// default: a deployment that hasn't enabled profile signing sees an
+// empty key string, which profile.NewVerifierFromHex treats as
+// "skip verification, log a warning". Matches the equivalent rule
+// updater posture and keeps the upgrade path opt-in.
+func TestLoad_ProfilePublicKey_DefaultEmpty(t *testing.T) {
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ProfilePublicKey != "" {
+		t.Errorf("default ProfilePublicKey = %q, want empty", cfg.ProfilePublicKey)
+	}
+}
+
 // TestLoad_RiskyFileExtensions_AbsentMeansBakedInDefault pins the
 // privacy-first product stance: a deployment that doesn't opt in to
 // a list keeps the extension's baked-in default by leaving the

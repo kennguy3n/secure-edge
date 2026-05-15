@@ -141,6 +141,36 @@ may introduce breaking changes between feature releases.
   byte-for-byte in both `agent/internal/api/bridge_mac_test.go`
   and `extension/src/background/__tests__/bridge-mac.test.ts`
   so any drift in the HMAC input layout is caught on both sides.
+- **D2**: Sign enterprise profiles with Ed25519. The
+  `agent/internal/profile` package now carries a `Signature` field
+  alongside a dedicated `profileBody` canonical-form struct (the
+  same belt-and-suspenders pattern shipped for the A3 rule
+  manifest in PR #20). `CanonicalForSigning` marshals through
+  `profileBody`, which physically lacks a Signature field, so a
+  future addition to `Profile` that forgets `omitempty` cannot
+  silently change the bytes a previously-valid signature was
+  computed over; a reflection test
+  (`TestProfileBody_MirrorsProfileMinusSignature`) catches drift
+  at every CI run. A new `profile.Verifier` enforces the
+  operator's trust posture on every load: the disk-load
+  (`LoadFromFile`), URL-fetch (`LoadFromURL`), and inline-import
+  paths (`POST /api/profile/import` for both `{"url": …}` and
+  `{"profile": {…}}` payloads) all route through the same
+  verifier, so the three import surfaces share one posture. The
+  staged rollout mirrors the rule-manifest verifier: when the new
+  `profile_public_key` config key is absent the agent runs in
+  warn-once mode (accepts unsigned profiles, logs a single line
+  per process); when configured, the agent rejects unsigned /
+  malformed / tampered / wrong-key-signed profiles before any
+  policy is applied. A companion CLI
+  (`agent/cmd/sign-enterprise-profile`) mirrors
+  `sign-rule-manifest` so operators sign profile JSON with one
+  command before distribution. An orphaned-key startup warning
+  fires when `profile_public_key` is set but both `profile_path`
+  and `profile_url` are empty (the key still applies to runtime
+  `POST /api/profile/import`, but the warning surfaces the
+  partial-rollout footgun the same way the rule-manifest variant
+  did).
 - **B2**: Block risky file extensions at the upload gesture. The
   `file-upload-interceptor` content script now matches every
   selected / dropped file's extension against a baked-in 34-entry

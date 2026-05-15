@@ -3,6 +3,9 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -943,6 +946,123 @@ func TestProfileImportRequiresPayload(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("empty payload code=%d body=%s", w.Code, w.Body.String())
 	}
+}
+
+// signInlineProfile returns the JSON request body POST
+// /api/profile/import expects, with the inline-Profile object
+// signed by priv using the same canonical-form helper the agent
+// verifies against. Used by the D2 inline-import trust-matrix
+// tests below.
+func signInlineProfile(t *testing.T, priv ed25519.PrivateKey, p profile.Profile) []byte {
+	t.Helper()
+	body, err := profile.CanonicalForSigning(p)
+	if err != nil {
+		t.Fatalf("CanonicalForSigning: %v", err)
+	}
+	p.Signature = hex.EncodeToString(ed25519.Sign(priv, body))
+	wrapped := map[string]any{"profile": p}
+	raw, err := json.Marshal(wrapped)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return raw
+}
+
+// TestProfileImportInline_VerifierTrustMatrix exercises the D2
+// inline-body path through the four-cell trust matrix the verifier
+// enforces. The URL fetch path is covered by the profile package's
+// TestLoadFromURL_WithVerifier; this test pins the parallel
+// behaviour on inline-Profile imports so the two sides of POST
+// /api/profile/import can't drift apart in the future.
+func TestProfileImportInline_VerifierTrustMatrix(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("ed25519.GenerateKey: %v", err)
+	}
+	_, otherPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("ed25519.GenerateKey other: %v", err)
+	}
+
+	base := profile.Profile{Name: "acme", Version: "1.0.0", Managed: true,
+		Categories: map[string]string{"AI Allowed": "allow"}}
+
+	cases := []struct {
+		name     string
+		verifier *profile.Verifier
+		body     []byte
+		wantCode int
+	}{
+		{
+			name:     "no verifier (pre-D2 behaviour) accepts unsigned",
+			verifier: nil,
+			body:     []byte(`{"profile":{"name":"acme","version":"1.0.0","managed":true,"categories":{"AI Allowed":"allow"}}}`),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "unconfigured verifier (warn-once) accepts unsigned",
+			verifier: mustVerifier(t, nil),
+			body:     []byte(`{"profile":{"name":"acme","version":"1.0.0","managed":true,"categories":{"AI Allowed":"allow"}}}`),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "configured verifier rejects unsigned",
+			verifier: mustVerifier(t, pub),
+			body:     []byte(`{"profile":{"name":"acme","version":"1.0.0","managed":true,"categories":{"AI Allowed":"allow"}}}`),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "configured verifier accepts validly-signed",
+			verifier: mustVerifier(t, pub),
+			body:     signInlineProfile(t, priv, base),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "configured verifier rejects signed-by-other-key",
+			verifier: mustVerifier(t, pub),
+			body:     signInlineProfile(t, otherPriv, base),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "configured verifier rejects tampered body",
+			verifier: mustVerifier(t, pub),
+			body: func() []byte {
+				// Sign one body, then mutate the JSON in flight
+				// so the verifier sees a different canonical body
+				// than the one the signature was computed over.
+				raw := signInlineProfile(t, priv, base)
+				return bytes.Replace(raw, []byte(`"acme"`), []byte(`"hijack"`), 1)
+			}(),
+			wantCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			srv.SetProfile(profile.NewHolder(nil), &fakePolicyStore{})
+			srv.SetProfileVerifier(tc.verifier)
+
+			w := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(w, newLocalRequest(http.MethodPost, "/api/profile/import",
+				bytes.NewBuffer(tc.body)))
+			if w.Code != tc.wantCode {
+				t.Fatalf("code=%d (want %d) body=%s", w.Code, tc.wantCode, w.Body.String())
+			}
+		})
+	}
+}
+
+// mustVerifier wraps profile.NewVerifier with a t.Fatal on any
+// constructor error so the table-driven test above stays readable.
+// nil pub returns an unconfigured (warn-once) verifier.
+func mustVerifier(t *testing.T, pub ed25519.PublicKey) *profile.Verifier {
+	t.Helper()
+	v, err := profile.NewVerifier(pub)
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
+	}
+	return v
 }
 
 func TestTamperStatusUnconfigured(t *testing.T) {

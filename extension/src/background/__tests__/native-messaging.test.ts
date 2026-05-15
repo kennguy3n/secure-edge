@@ -17,7 +17,12 @@ if (typeof (globalThis as { crypto?: unknown }).crypto === "undefined") {
     (globalThis as { crypto: unknown }).crypto = webcrypto;
 }
 
-import { __test__, helloViaNativeMessaging, scanViaNativeMessaging } from "../native-messaging.js";
+import {
+    __test__,
+    helloViaNativeMessaging,
+    scanViaNativeMessaging,
+    setBridgeEnforcementMode,
+} from "../native-messaging.js";
 import {
     computeRequestMAC,
     computeResponseMAC,
@@ -337,5 +342,235 @@ test("hello reply with malformed bridge_nonce hex is silently ignored", async ()
     const r = await helloP;
     assert.equal(r, "tok");
     assert.equal(__test__.bridgeKeyReady(), false);
+    clearChrome();
+});
+
+// ---------------------------------------------------------------
+// G4: extension fail-closed on MAC mismatch in managed mode.
+//
+// The C1 bridge already verifies the agent's response MAC and warns
+// once per connection on mismatch, but the pre-G4 behaviour resolved
+// the pending request with the unverified result anyway. In managed
+// mode that posture defeats the bridge MAC's reason for existing —
+// a forged result could pass through the bridge undetected.
+//
+// The tests below pin the documented matrix:
+//
+//   * personal / team        + MAC mismatch / missing → fall open
+//   * managed                + MAC mismatch / missing → resolve(null)
+//   * managed                + MAC verified ok        → resolve(result)
+//   * managed                + bridge MAC infra absent → resolve(result)
+//
+// The last branch is the documented "agent's bridge_mac_required is
+// off" case; the agent's request-side gate is the trust root there.
+// ---------------------------------------------------------------
+
+test("managed mode fails closed on response MAC mismatch", async () => {
+    __test__.reset();
+    const hooks = installFakeChrome();
+    setBridgeEnforcementMode("managed");
+
+    // Bootstrap the bridge so cachedKey + cachedNonce are populated.
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc", bridge_nonce: NONCE_HEX });
+    await helloP;
+    for (let i = 0; i < 20 && !__test__.bridgeKeyReady(); i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    assert.equal(__test__.bridgeKeyReady(), true);
+
+    // Send a scan and deliver a reply whose MAC is *not* the
+    // expected HMAC over the documented input tuple. The
+    // verifyResponseMACAndResolve path must discard the unverified
+    // result in managed mode rather than passing it to the caller.
+    const scanP = scanViaNativeMessaging("AKIAEXAMPLE");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: false, pattern_name: "", score: 0 },
+        // Deliberately wrong MAC — same length so the parse path is
+        // hit before the verify path, ensuring the mismatch branch
+        // (not the absent-MAC branch) is what we observe.
+        mac: "0".repeat(64),
+    });
+    const r = await scanP;
+    assert.equal(r, null,
+        "managed mode must discard a result whose response MAC does not verify");
+    clearChrome();
+});
+
+test("managed mode fails closed on missing response MAC", async () => {
+    __test__.reset();
+    const hooks = installFakeChrome();
+    setBridgeEnforcementMode("managed");
+
+    // Same bootstrap as the mismatch case — bridge infra present.
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc", bridge_nonce: NONCE_HEX });
+    await helloP;
+    for (let i = 0; i < 20 && !__test__.bridgeKeyReady(); i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+
+    const scanP = scanViaNativeMessaging("AKIAEXAMPLE");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+    // Deliver a reply with NO `mac` field. Pre-G4 this was a
+    // warn-once + resolve(result); in managed mode we now treat
+    // it as a positive integrity violation.
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: false, pattern_name: "", score: 0 },
+    });
+    const r = await scanP;
+    assert.equal(r, null,
+        "managed mode must discard a result whose response MAC is missing");
+    clearChrome();
+});
+
+test("personal mode falls open on response MAC mismatch (legacy posture)", async () => {
+    __test__.reset();
+    const hooks = installFakeChrome();
+    // Default mode is personal — this test does NOT call
+    // setBridgeEnforcementMode so we also pin the cold-start
+    // default. A reset that flipped the default to "managed" would
+    // make this assertion fail loudly.
+
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc", bridge_nonce: NONCE_HEX });
+    await helloP;
+    for (let i = 0; i < 20 && !__test__.bridgeKeyReady(); i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+
+    const scanP = scanViaNativeMessaging("AKIAEXAMPLE");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: true, pattern_name: "aws_key", score: 0.99 },
+        mac: "0".repeat(64),
+    });
+    const r = await scanP;
+    assert.deepEqual(r, { blocked: true, pattern_name: "aws_key", score: 0.99 },
+        "personal mode must preserve the legacy warn-and-resolve posture");
+    clearChrome();
+});
+
+test("team mode falls open on response MAC mismatch (legacy posture)", async () => {
+    __test__.reset();
+    const hooks = installFakeChrome();
+    setBridgeEnforcementMode("team");
+
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc", bridge_nonce: NONCE_HEX });
+    await helloP;
+    for (let i = 0; i < 20 && !__test__.bridgeKeyReady(); i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+
+    const scanP = scanViaNativeMessaging("AKIAEXAMPLE");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: false, pattern_name: "", score: 0 },
+        mac: "0".repeat(64),
+    });
+    const r = await scanP;
+    assert.deepEqual(r, { blocked: false, pattern_name: "", score: 0 },
+        "team mode must preserve the legacy warn-and-resolve posture");
+    clearChrome();
+});
+
+test("managed mode accepts a correctly-MACed response", async () => {
+    // Round-trip test confirms the fail-closed gate doesn't drop
+    // legitimate replies — a regression that resolved every managed
+    // reply with null would not show up in the mismatch tests above
+    // (they assert null on the wrong path).
+    __test__.reset();
+    const hooks = installFakeChrome();
+    setBridgeEnforcementMode("managed");
+
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc", bridge_nonce: NONCE_HEX });
+    await helloP;
+    for (let i = 0; i < 20 && !__test__.bridgeKeyReady(); i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+
+    const scanP = scanViaNativeMessaging("AKIAEXAMPLE");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+
+    const refKey = await importBridgeKey("tok-abc");
+    const refNonce = decodeNonceHex(NONCE_HEX)!;
+    const replyMAC = await computeResponseMAC(
+        refKey, refNonce, scanPosted.id, "scan", 0x00, "", "");
+
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: false, pattern_name: "", score: 0 },
+        mac: replyMAC,
+    });
+    const r = await scanP;
+    assert.deepEqual(r, { blocked: false, pattern_name: "", score: 0 },
+        "managed mode must pass through results whose MAC verifies");
+    clearChrome();
+});
+
+test("managed mode without bridge infra preserves agent-side trust root", async () => {
+    // Pre-C1 agent: bridge_nonce never surfaces, so bridgeKey +
+    // bridgeNonce stay null. The verifyResponseMACAndResolve
+    // function falls open in this branch by design — it cannot
+    // distinguish this from a forged hello reply that omitted the
+    // nonce, and the agent's request-side bridge_mac_required gate
+    // is the trust root. This test pins that posture so a refactor
+    // that adds an over-eager managed gate here doesn't brick every
+    // managed install whose agent has yet to roll out C1.
+    __test__.reset();
+    const hooks = installFakeChrome();
+    setBridgeEnforcementMode("managed");
+
+    const helloP = helloViaNativeMessaging();
+    await Promise.resolve();
+    const helloPosted = hooks.posted[0] as { id: number };
+    hooks.deliver({ id: helloPosted.id, api_token: "tok-abc" });
+    await helloP;
+    assert.equal(__test__.bridgeKeyReady(), false);
+
+    const scanP = scanViaNativeMessaging("x");
+    for (let i = 0; i < 20 && hooks.posted.length < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+    }
+    const scanPosted = hooks.posted[1] as { id: number };
+    hooks.deliver({
+        id: scanPosted.id,
+        result: { blocked: false, pattern_name: "", score: 0 },
+    });
+    const r = await scanP;
+    assert.deepEqual(r, { blocked: false, pattern_name: "", score: 0 },
+        "agent-side trust root: managed mode falls open when bridge MAC infra never bootstrapped");
     clearChrome();
 });

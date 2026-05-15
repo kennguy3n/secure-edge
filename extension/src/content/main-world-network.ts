@@ -299,11 +299,17 @@ function bodyValueToText(body: unknown): string {
  *  ReadableStream caveat: a single ReadableStream cannot be teed
  *  reliably after Request / Response has already locked it, and
  *  swapping `init.body` would break user code that wires response
- *  bytes through. Returning "" here is conservative — the policy
- *  layer then routes through `policyForUnavailable()` rather than
- *  showing a spurious block. ReadableStream uploads are extremely
- *  rare in the AI-tool UIs covered by this extension; covering them
- *  is tracked separately. */
+ *  bytes through. Returning "" here routes through the empty-body
+ *  fast path in the bridge, which short-circuits to scanContent
+ *  returning null, and the policy layer then routes through
+ *  `policyForUnavailable()`. In managed mode that path is fail-
+ *  closed (`policyForUnavailable("managed") === "block"`), so a
+ *  ReadableStream upload from a managed install is blocked at the
+ *  bridge — not silently allowed. In personal / team that path is
+ *  the legacy fall-open / warn-and-allow posture. The G8 row D test
+ *  pins the managed-mode outcome end-to-end and the G10 ReadableStream
+ *  regression test in `network-interceptor.test.ts` pins the
+ *  bodyValueToTextAsync → "" half of the contract. */
 async function bodyValueToTextAsync(body: unknown): Promise<string> {
     if (typeof body === "string") return body;
     if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams) {

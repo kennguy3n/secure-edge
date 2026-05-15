@@ -69,6 +69,30 @@ changes between feature releases — breaking entries are flagged explicitly.
   or `api_token_required: true`; `managed` additionally requires
   `bridge_mac_required: true` and a non-empty `profile_public_key`.
   Whitespace-only values are treated as empty.
+- **Browser extension fails closed on Native Messaging MAC mismatch in
+  managed mode.** `extension/src/background/native-messaging.ts` now
+  caches the agent's enforcement mode and, when a reply MAC is
+  missing, mismatched, or unverifiable (compute error), discards the
+  result in managed mode instead of resolving with it. The bridge's
+  per-connection warn-once log is preserved; personal and team mode
+  retain the pre-existing warn-and-resolve posture.
+- **Content scripts now inject into every frame.** All three packaging
+  manifests (`extension/manifest.json`, `manifest.firefox.json`,
+  `manifest.safari.json`) flip `all_frames` from `false` to `true` on
+  every `content_scripts` entry so Tier-2 AI surfaces that render
+  their input inside same-origin iframes (e.g. embedded chat widgets,
+  artefact / canvas views) stay covered by the DLP scanner. A new
+  `manifest-all-frames.test.ts` pins the contract per manifest target.
+- **Adversarial bridge test matrix.** New
+  `extension/src/content/__tests__/adversarial.test.ts` consolidates
+  the four documented bridge threat shapes in one file: page-forged
+  `scan-resp` after the legitimate reply (first-reply-wins), pre-
+  injection `fetch()` (documented limitation, deferred to the proxy +
+  OS egress controls), oversize content in managed mode
+  (`POLICY_PATTERN_OVERSIZE` block), and scan-null in managed mode
+  (`POLICY_PATTERN_AGENT_UNAVAILABLE` block). Symmetric "must not
+  block in personal mode" assertions guard against an over-eager
+  promotion of the block branches.
 - `paste-interceptor.ts` shares the `MAX_SCAN_BYTES` constant with the
   other interceptors; a parity test pins the value across the isolated
   and MAIN worlds.

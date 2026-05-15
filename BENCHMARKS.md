@@ -50,9 +50,9 @@ finish in ~110ns.
 | `Flush`                         | 528   | 0    | 0         | Drains in-mem → store  |
 
 Counter increments are lock-free atomics; even at 100k qps the
-counter is < 0.1% of one CPU. `Flush` runs on the configured
-flush interval (default 30s) and dominates only when the store is
-on slow disk.
+counter is < 0.1 % of one CPU. `Flush` runs on the configured
+flush interval (`stats_flush_interval`, default 60 s) and
+dominates only when the store is on slow disk.
 
 ## Notes
 

@@ -67,17 +67,20 @@ If a block looks wrong:
 
 1. **Note the pattern name** shown in the tray notification (e.g.
    *Stripe Secret Key*).
-2. Open a **False Positive** issue on the [GitHub repo](https://github.com/kennguy3n/secure-edge/issues/new?template=false_positive.md).
-3. Include the pattern name and a **redacted snippet** of the content that
-   triggered the block. Do **not** paste the actual secret-looking string —
-   replace the secret-shaped part with `<redacted>` or generic placeholders.
-4. The rule contributor team will triage and either tighten the pattern
-   regex, add an exclusion, or close the issue with an explanation.
+2. Open a bug report on the
+   [GitHub repo](https://github.com/kennguy3n/secure-edge/issues/new?template=bug_report.md)
+   titled `[false positive] <pattern name>`.
+3. Include the pattern name and a **redacted snippet** of the content
+   that triggered the block. Do **not** paste the actual secret-looking
+   string — replace the secret-shaped part with `<redacted>` or generic
+   placeholders.
+4. Maintainers will triage and either tighten the pattern, add an
+   exclusion, or close the issue with an explanation.
 
-We track FP/FN rates against a 50-sample corpus in
-[`agent/internal/dlp/accuracy_test.go`](../agent/internal/dlp/accuracy_test.go).
-The budget is **FP < 10%** and **FN < 5%**; we will not merge a pattern that
-takes us out of budget.
+We track FP / FN rates against a 50-sample smoke corpus in
+[`agent/internal/dlp/accuracy_smoke_test.go`](../agent/internal/dlp/accuracy_smoke_test.go).
+The budget is **FP < 10 %** and **FN < 5 %**; a pattern that takes us out
+of budget will not merge.
 
 ## 5. Browser extension behaviour
 

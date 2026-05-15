@@ -222,14 +222,17 @@ cd agent && go test -race -count=1 -v ./internal/dlp/ \
     -run 'TestExtendedPatterns_TruePositives/My_new_pattern'
 ```
 
-Then run the full corpus to confirm the FP/FN budget is still met:
+Then run the smoke corpus to confirm the FP / FN budget is still met:
 
 ```bash
 cd agent && go test -race -count=1 ./internal/dlp/ \
-    -run TestDLPAccuracyCorpus
+    -run TestDLPAccuracySmokeCorpus
 ```
 
-The accuracy test asserts FP rate < 10% and FN rate < 5%.
+The smoke test asserts **FP < 10 %** and **FN < 5 %**. The larger
+5,000+-sample corpus and per-category regression check are gated
+behind the `large` build tag — see
+[SECURITY_RULES.md → Coverage notes](../SECURITY_RULES.md#coverage-notes).
 
 ## 9. Updating the manifest
 

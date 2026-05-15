@@ -1,23 +1,19 @@
 # ShieldNet Secure Edge — Security Rules Reference
 
-This is a complete reference table of every DLP pattern shipped in
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json), grouped by category.
-Use this page to look up whether a given secret format is covered and how the
-detector behaves.
-
-For details on the schema and how to author or modify patterns, see
+A complete reference of every DLP pattern shipped in
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**163** patterns
+across **13** JSON categories). Sub-sections below group patterns by
+family for readability rather than by JSON category. For the schema
+and authoring workflow, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
-
-Total patterns: **163** across the **13** JSON categories in `rules/dlp_patterns.json`.
-The sub-sections below group patterns by family for readability.
 
 Columns:
 
-- **Pattern** — `name` in the pattern JSON; also what appears in the
-  block notification.
+- **Pattern** — the `name` field; also what appears in the block
+  notification.
 - **Severity** — `critical` / `high` / `medium` / `low`.
-- **Prefix** — Aho-Corasick literal prefix; `_(none)_` means the pattern
-  runs via the full-content fallback path.
+- **Prefix** — Aho-Corasick literal prefix; `_(none)_` means the
+  pattern runs via the full-content fallback path.
 - **Hotword required** — `yes` if `require_hotword: true`; the pattern
   does not block unless a hotword fires.
 
@@ -300,31 +296,31 @@ Columns:
 
 ## Coverage notes
 
-- Patterns whose ambient shape is shared with benign text use
-  `require_hotword: true` to keep the FP rate within budget.
-- Accuracy is enforced at two levels:
-  - A fast 50-sample smoke check in
-    [`agent/internal/dlp/accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)
-    (25 TP + 25 TN, budget **FP < 10%**, **FN < 5%**) that runs on every
-    local `go test ./...` invocation and on every CI job.
-  - A large-scale evaluation in
-    [`agent/internal/dlp/accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)
-    that loads the full 5,000+-sample corpus from
-    [`agent/internal/dlp/testdata/corpus/`](./agent/internal/dlp/testdata/corpus/).
-    The large test is gated behind the `large` build tag (run with
-    `go test -tags=large ./internal/dlp/`), enforces tightened budgets
-    of **overall FP < 5%**, **overall FN < 3%**, and
-    **per-category FN < 10%**, and writes a structured JSON report to
-    `testdata/corpus/last_run_report.json` so CI can archive per-run
-    accuracy snapshots.
-  - A regression check in
-    [`agent/internal/dlp/accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go)
-    (also tagged `large`) compares each run against the committed
-    `testdata/corpus/baseline_report.json` and fails the build if any
-    category's recall drops by more than **2 percentage points** or the
-    overall FP rate rises by more than **1 percentage point**. Re-seed
-    the baseline after an intentional rule update with
-    `go test -tags=large -run TestDLPAccuracyRegression ./internal/dlp/ -args -update-baseline`.
-- See [`agent/internal/dlp/testdata/corpus/README.md`](./agent/internal/dlp/testdata/corpus/README.md)
-  for the corpus layout, JSONL record format, and contribution
-  guidelines (synthetic samples only — no real secrets).
+Patterns whose ambient shape overlaps with benign text use
+`require_hotword: true` to keep the false-positive rate within budget.
+Accuracy is enforced at three layers:
+
+- **Smoke** —
+  [`accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)
+  (25 TP + 25 TN; **FP < 10 %**, **FN < 5 %**); runs on every
+  `go test ./...` and in CI.
+- **Large** —
+  [`accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)
+  loads the full 5,000+-sample corpus under
+  [`testdata/corpus/`](./agent/internal/dlp/testdata/corpus/) behind
+  the `large` build tag (`go test -tags=large ./internal/dlp/`).
+  Budgets: **overall FP < 5 %**, **overall FN < 3 %**, **per-category
+  FN < 10 %**. Writes `testdata/corpus/last_run_report.json` for
+  CI archival.
+- **Regression** —
+  [`accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go)
+  (also `-tags=large`) diffs each run against
+  `testdata/corpus/baseline_report.json` and fails the build when any
+  category's recall drops by more than **2 pp** or the overall FP
+  rate rises by more than **1 pp**. Re-seed the baseline after an
+  intentional rule update:
+  `go test -tags=large -run TestDLPAccuracyRegression ./internal/dlp/ -args -update-baseline`.
+
+Corpus layout and contribution rules (synthetic samples only — never
+real secrets) live in
+[`agent/internal/dlp/testdata/corpus/README.md`](./agent/internal/dlp/testdata/corpus/README.md).

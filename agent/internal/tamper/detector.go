@@ -20,9 +20,9 @@ import (
 	"time"
 )
 
-// DefaultInterval is the cadence between DNS / proxy checks. 60s
-// matches PROPOSAL.md and is rare enough not to add measurable
-// overhead.
+// DefaultInterval is the cadence between DNS / proxy checks. 60s is
+// rare enough not to add measurable overhead while still catching a
+// hostile restart of the resolver or proxy.
 const DefaultInterval = 60 * time.Second
 
 // Status is the data exposed to GET /api/tamper/status.

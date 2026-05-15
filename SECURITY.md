@@ -55,71 +55,58 @@ guarantees that we consider in-scope for this policy are:
    installations. Issues here are **high-severity**.
 5. **Native-messaging bridge integrity** — every non-`hello` frame
    on the extension ↔ agent Native Messaging connection is signed
-   with HMAC-SHA256 over `nonce || direction_byte || id || kind
-   || (content | blocked + token + error)`, keyed by the per-
-   install API token. The 16-byte nonce is minted per connection
-   and surfaced in the (intentionally unsigned, TOFU) `hello`
-   reply. The agent enforces a strict-monotonic request id and
-   rejects a second `hello` on the same connection. A
-   `bridge_mac_required` knob lets operators stage the rollout
-   (false: warn, still serve; true: reject mismatched / missing
-   MAC). Bypasses of the MAC verification when
-   `bridge_mac_required=true` are **high-severity**.
-6. **Enterprise-profile authenticity** — managed-deployment
-   enterprise profiles loaded from disk (`profile_path`), fetched
-   from a URL (`profile_url`), or imported through `POST
-   /api/profile/import` (both the URL fetch and the inline-body
-   path) carry an Ed25519 signature over the canonical body
-   (`profile.CanonicalForSigning`, which physically excludes the
-   `signature` field via a dedicated body struct). When the
-   operator configures `profile_public_key`, every loaded profile
-   MUST verify against that key — unsigned, tampered, or
-   wrong-key-signed profiles are rejected before any policy is
-   applied. When the key is absent, the agent runs in a
-   backwards-compatible warn-once posture (accepts unsigned
-   profiles, logs a single line per process). The `signature`
-   field is omitted from the canonical bytes by construction, so
-   re-signing or stripping the signature can never produce a
-   profile that verifies under a different operator's key. A
-   bypass of profile signature verification when
-   `profile_public_key` is configured — e.g., a tampered profile
-   being applied, or a profile signed by the wrong key being
-   accepted — is **high-severity**.
+   with HMAC-SHA256 (keyed by the per-install API token) over
+   `nonce || direction_byte || id || kind || (content | blocked +
+   token + error)`. The 16-byte nonce is minted per connection and
+   surfaced in the intentionally unsigned (TOFU) `hello` reply.
+   The agent enforces a strict-monotonic request id and rejects a
+   second `hello` on the same connection. `bridge_mac_required`
+   stages the rollout (`false`: warn, still serve; `true`: reject
+   mismatched or missing MAC). Bypasses of MAC verification when
+   `bridge_mac_required: true` are **high-severity**.
+6. **Enterprise-profile authenticity** — enterprise profiles
+   loaded from `profile_path`, fetched from `profile_url`, or
+   imported through `POST /api/profile/import` carry an Ed25519
+   signature over `profile.CanonicalForSigning` (which physically
+   excludes the `signature` field via a dedicated body struct, so
+   stripping or re-signing cannot produce a profile that verifies
+   under a different operator's key). When `profile_public_key`
+   is set, every loaded profile MUST verify against it; unsigned,
+   tampered, or wrong-key-signed profiles are rejected before any
+   policy is applied. With no key configured, the agent runs in a
+   backwards-compatible warn-once posture. Bypasses of profile
+   verification when `profile_public_key` is configured are
+   **high-severity**.
 7. **Risky-extension upload block** — the browser extension's
    `file-upload-interceptor` and `paste-interceptor` content
-   scripts block uploads of files whose extension is on a
-   policy-controlled risky list (default: 34 executable,
-   installer, script, disk-image, and Java-archive extensions;
-   `.js` intentionally excluded). The check runs synchronously
-   before any content is read or sent to the agent, so the
-   filename and contents never leave the page when a risky
-   extension match fires. Both the `<input type=file>` / drag-drop path **and**
-   the clipboard-paste path (`clipboardData.files` /
-   `clipboardData.items[].getAsFile()`)
-   are guarded. Operators may override the baked-in list via the
-   agent's `risky_file_extensions` config key. A bypass that
-   lets a file with a listed extension reach the page's upload
-   handler — through any of: `<input type=file>`, drag-drop, or
-   clipboard paste — or a misuse that leaks the filename or
-   contents to the agent before the local check fires, is
-   **medium-severity**.
-8. **Clipboard-paste file scanning** — pasting a file (the user
-   copied a file in their file manager, or pasted a screenshot
-   from a clipboard tool) is handled by the same scan path as
-   `<input type=file>` uploads. The paste interceptor reads
-   `clipboardData.files` AND
+   scripts block uploads whose extension is on a policy-controlled
+   risky list (default: 34 executable, installer, script,
+   disk-image, and Java-archive extensions; `.js` intentionally
+   excluded). The check runs synchronously before any content is
+   read or sent to the agent, so neither filename nor contents
+   leave the page when a match fires. All three entry points are
+   guarded: `<input type=file>`, drag-drop, and clipboard paste
+   (`clipboardData.files` and `clipboardData.items[].getAsFile()`).
+   Operators may override the baked-in list via the agent's
+   `risky_file_extensions` config key. Any bypass that lets a
+   file with a listed extension reach the page's upload handler
+   — or that leaks the filename or contents to the agent before
+   the local check fires — is **medium-severity**.
+8. **Clipboard-paste file scanning** — pasting a file (e.g. the
+   user copied a file from their file manager, or pasted a
+   screenshot from a clipboard tool) is handled by the same scan
+   path as `<input type=file>` uploads. The paste interceptor
+   reads `clipboardData.files` and
    `clipboardData.items[i].getAsFile()`, deduplicates, then
-   routes the gesture through the synchronous-first contract:
-   `preventDefault()` and `stopPropagation()` fire **before**
-   any `await`, the risky-extension guard (#7 above) runs first,
-   and on a clean verdict the gesture is left suppressed (there
-   is no portable way to programmatically re-construct
-   `DataTransfer.files` on the page side, matching the
-   no-resume contract in `file-upload-interceptor`). On a mixed
-   text-and-file paste the file path wins and the text fragment
-   is never forwarded to the agent. A bypass that lets a file
-   pasted onto a Tier-2 AI tool surface reach the page's
-   upload handler without first passing the scan pipeline is
+   honours the synchronous-first contract: `preventDefault()` and
+   `stopPropagation()` fire **before** any `await`, the
+   risky-extension guard from #7 runs first, and on a clean
+   verdict the gesture is left suppressed (there is no portable
+   way to programmatically reconstruct `DataTransfer.files` on
+   the page side). On a mixed text-and-file paste the file path
+   wins and the text fragment is never forwarded. Bypasses that
+   let a clipboard-pasted file reach a Tier-2 page's upload
+   handler without first passing the scan pipeline are
    **medium-severity**.
 
 The following are explicitly **out of scope**:

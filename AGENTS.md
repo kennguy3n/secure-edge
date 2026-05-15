@@ -124,8 +124,7 @@ be achieved by:
   [existing issues](https://github.com/kennguy3n/secure-edge/issues)
   and to discuss directly with the maintainers before writing code
 - Providing useful links and pointers found throughout the codebase
-  (`README.md`, `ARCHITECTURE.md`, `PROPOSAL.md`, `SECURITY.md`,
-  `SECURITY_RULES.md`)
+  (`README.md`, `ARCHITECTURE.md`, `SECURITY.md`, `SECURITY_RULES.md`)
 - Helping the user reproduce a bug locally, read failing tests, or
   understand a stack trace — without writing the fix for them
 

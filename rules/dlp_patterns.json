@@ -6430,24 +6430,6 @@
       "category": "cloud"
     },
     {
-      "name": "Amazon SES SMTP Username",
-      "regex": "AKIA[0-9A-Z]{16}",
-      "prefix": "akia",
-      "severity": "high",
-      "score_weight": 1,
-      "hotwords": [
-        "ses",
-        "smtp",
-        "email",
-        "aws"
-      ],
-      "hotword_window": 200,
-      "hotword_boost": 2,
-      "require_hotword": true,
-      "entropy_min": 3.0,
-      "category": "cloud"
-    },
-    {
       "name": "Amazon SES SMTP Password",
       "regex": "(?i)AWS_SES_SMTP_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{44,}",
       "prefix": "aws_ses_smtp_password",

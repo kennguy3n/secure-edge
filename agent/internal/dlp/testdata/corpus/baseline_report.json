@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-05-15T18:35:21Z",
+  "generated_at": "2026-05-15T18:38:22Z",
   "corpus": "secure-edge/agent/internal/dlp/testdata/corpus",
-  "total_samples": 14004,
-  "total_positives": 11504,
+  "total_samples": 13988,
+  "total_positives": 11488,
   "total_negatives": 2500,
-  "tp": 11496,
-  "fn": 8,
+  "tp": 11475,
+  "fn": 13,
   "fp": 0,
   "tn": 2500,
   "precision": 1,
-  "recall": 0.9993045897079277,
-  "f1": 0.9996521739130434,
+  "recall": 0.9988683844011143,
+  "f1": 0.9994338718808518,
   "fp_rate": 0,
-  "fn_rate": 0.0006954102920723226,
+  "fn_rate": 0.001131615598885794,
   "budget": {
     "overall_fp_max": 0.05,
     "overall_fn_max": 0.03,
@@ -242,8 +242,8 @@
     },
     {
       "category": "email_marketing",
-      "total": 304,
-      "tp": 304,
+      "total": 288,
+      "tp": 288,
       "fn": 0,
       "fp": 0,
       "tn": 0,
@@ -555,15 +555,15 @@
     {
       "category": "secret_formats",
       "total": 592,
-      "tp": 588,
-      "fn": 4,
+      "tp": 583,
+      "fn": 9,
       "fp": 0,
       "tn": 0,
       "precision": 1,
-      "recall": 0.9932432432432432,
-      "f1": 0.9966101694915254,
+      "recall": 0.9847972972972973,
+      "f1": 0.9923404255319148,
       "fp_rate": 0,
-      "fn_rate": 0.006756756756756757
+      "fn_rate": 0.015202702702702704
     },
     {
       "category": "social_media",
@@ -635,14 +635,15 @@
   "pattern_false_negatives": [
     {
       "pattern": "SSH known_hosts Entry",
-      "fn_count": 4,
+      "fn_count": 9,
       "total_positives": 16,
-      "fn_rate": 0.25,
+      "fn_rate": 0.5625,
       "example_labels": [
-        "tp-ssh-known-hosts-entry-07939",
-        "tp-ssh-known-hosts-entry-07942",
-        "tp-ssh-known-hosts-entry-07945",
-        "tp-ssh-known-hosts-entry-07950"
+        "tp-ssh-known-hosts-entry-07922",
+        "tp-ssh-known-hosts-entry-07923",
+        "tp-ssh-known-hosts-entry-07924",
+        "tp-ssh-known-hosts-entry-07925",
+        "tp-ssh-known-hosts-entry-07926"
       ]
     },
     {
@@ -661,8 +662,8 @@
       "total_positives": 16,
       "fn_rate": 0.125,
       "example_labels": [
-        "tp-icd-10-cm-diagnosis-code-11140",
-        "tp-icd-10-cm-diagnosis-code-11142"
+        "tp-icd-10-cm-diagnosis-code-11134",
+        "tp-icd-10-cm-diagnosis-code-11135"
       ]
     }
   ]

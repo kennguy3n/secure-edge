@@ -270,7 +270,10 @@ allowedPatterns: []string{"Cloudflare API Token"},
 label: "Vercel token",
 content: "// .env.production for vercel\n" +
 "VERCEL_TOKEN=NXqL9pZmK2cVjRT4HfYbWoEiUaJdGxRY",
-allowedPatterns: []string{"Vercel Token"},
+allowedPatterns: []string{
+"Vercel Token",
+"Vercel Personal Access Token",
+},
 },
 {
 label: "DigitalOcean personal token",
@@ -544,6 +547,7 @@ allowedPatterns: []string{
 "OIDC ID Token Assignment",
 // Generic JWT pattern may win on the eyJ shape.
 "JWT Token",
+"OpenID Connect ID Token (JWT)",
 },
 },
 {

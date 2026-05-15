@@ -67,8 +67,32 @@ changes between feature releases — breaking entries are flagged explicitly.
 - **Breaking (team & managed):** the new secure-defaults validator
   rejects configs that omit `allowed_extension_ids`, `api_token_path`,
   or `api_token_required: true`; `managed` additionally requires
-  `bridge_mac_required: true` and a non-empty `profile_public_key`.
+  `bridge_mac_required: true`, a non-empty `profile_public_key`, and
+  (added in this release) a non-empty `rule_update_public_key`.
   Whitespace-only values are treated as empty.
+- **Local API and proxy HTTP servers set the full timeout tuple.** Both
+  `agent/internal/api/server.go` and `agent/internal/proxy/proxy.go` now
+  set `ReadTimeout` / `WriteTimeout` / `IdleTimeout` / `MaxHeaderBytes`
+  on the underlying `*http.Server` so a slowloris or write-stall cannot
+  hold a listener thread indefinitely. The control API uses 10 s / 10 s
+  / 60 s / 16 KiB; the proxy uses 30 s / 30 s / 120 s / 16 KiB.
+- **JSON control endpoints are capped at 64 KiB.** A new
+  `decodeControlBody` helper in `agent/internal/api/handlers.go` wraps
+  `r.Body` in `http.MaxBytesReader(maxControlBytes=64 KiB)` and returns
+  `413 Request Entity Too Large` instead of buffering megabytes of
+  attacker-controlled JSON. Wired into `PUT /api/policies/:category`,
+  `PUT /api/dlp/config`, `POST /api/rules/override`, and
+  `POST /api/proxy/disable`. `/api/dlp/scan` (4 MiB) and
+  `/api/profile/import` (1 MiB) keep their existing higher caps.
+- **CA private-key permission check on every load.** `loadCA()` in
+  `agent/internal/proxy/ca.go` refuses to read a Root CA key whose
+  POSIX mode bits include group / world access (mask `0o077`), and
+  `NewCA()` re-stats after `writeCA()` to fail closed when a hostile
+  umask or stale file leaks the key. The proxy controller's `Enable()`
+  path re-checks on every call so a runtime `POST /api/proxy/enable`
+  refuses to start if the key file was tampered with between calls.
+  No-op on Windows where ACLs, not mode bits, are the access-control
+  mechanism.
 - `paste-interceptor.ts` shares the `MAX_SCAN_BYTES` constant with the
   other interceptors; a parity test pins the value across the isolated
   and MAIN worlds.

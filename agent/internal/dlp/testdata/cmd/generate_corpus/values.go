@@ -2465,4 +2465,39 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Norwegian Fodselsnummer"] = func(r *rand.Rand) string {
 		return "Fødselsnummer (skatteetaten): " + randFromAlphabet(r, digits, 11)
 	}
+
+	// W4 Batch 2: Switzerland.
+	valueGenerators["Swiss AHV/AVS Number"] = func(r *rand.Rand) string {
+		return "AHV/AVS-Nummer: 756." + randFromAlphabet(r, digits, 4) + "." + randFromAlphabet(r, digits, 4) + "." + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["Swiss UID"] = func(r *rand.Rand) string {
+		return "UID (Handelsregister): CHE-" + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Swiss Passport Number"] = func(r *rand.Rand) string {
+		return "Schweizer Pass — Passnummer: " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["Swiss New Old-Age Insurance Number (ZAS)"] = func(r *rand.Rand) string {
+		return "Zentrale Ausgleichsstelle — Versichertennummer: " + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3)
+	}
+
+	// W4 Batch 3: United Kingdom.
+	valueGenerators["UK National Insurance Number"] = func(r *rand.Rand) string {
+		prefixAlph := "ABCEGHJKLMNOPRSTWXYZ"
+		suffixAlph := "ABCDFM"
+		return "National Insurance number: " + randFromAlphabet(r, prefixAlph, 2) + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, suffixAlph, 1)
+	}
+	valueGenerators["UK NHS Number"] = func(r *rand.Rand) string {
+		return "NHS number (National Health Service): " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["UK Passport Number"] = func(r *rand.Rand) string {
+		return "UK passport number (British passport): " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["UK Driving Licence Number"] = func(r *rand.Rand) string {
+		// 5 letters or 9 + 6 digits + 2 letters or 9 + 1 digit + 2 letters.
+		surnameAlph := "ABCDEFGHIJKLMNOPQRSTUVWXYZ9"
+		return "DVLA Driving Licence number: " + randFromAlphabet(r, surnameAlph, 5) + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, surnameAlph, 2) + randFromAlphabet(r, digits, 1) + randFromAlphabet(r, upper, 2)
+	}
+	valueGenerators["UK UTR"] = func(r *rand.Rand) string {
+		return "HMRC UTR (Unique Taxpayer Reference): " + randFromAlphabet(r, digits, 10)
+	}
 }

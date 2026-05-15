@@ -896,6 +896,19 @@ var patternCategory = map[string]string{
 	"Romanian CNP":                       "pii_eu",
 	"Danish CPR":                         "pii_eu",
 	"Norwegian Fodselsnummer":            "pii_eu",
+
+	// W4 Batch 2: Switzerland.
+	"Swiss AHV/AVS Number":                    "pii_switzerland",
+	"Swiss UID":                               "pii_switzerland",
+	"Swiss Passport Number":                   "pii_switzerland",
+	"Swiss New Old-Age Insurance Number (ZAS)": "pii_switzerland",
+
+	// W4 Batch 3: United Kingdom.
+	"UK National Insurance Number": "pii_uk",
+	"UK NHS Number":                "pii_uk",
+	"UK Passport Number":           "pii_uk",
+	"UK Driving Licence Number":    "pii_uk",
+	"UK UTR":                       "pii_uk",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

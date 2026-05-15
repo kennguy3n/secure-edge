@@ -12949,6 +12949,177 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_eu"
+    },
+    {
+      "name": "Swiss AHV/AVS Number",
+      "regex": "\\b756\\.\\d{4}\\.\\d{4}\\.\\d{2}\\b",
+      "prefix": "756.",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ahv",
+        "avs",
+        "ahv-nummer",
+        "avs-nummer",
+        "sozialversicherung schweiz",
+        "s\u00e9curit\u00e9 sociale suisse"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss UID",
+      "regex": "\\bCHE-\\d{3}\\.\\d{3}\\.\\d{3}\\b",
+      "prefix": "che-",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "unternehmens-identifikationsnummer",
+        "handelsregister",
+        "mwst",
+        "uid-bfs",
+        "num\u00e9ro d'identification de l'entreprise"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss Passport Number",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "schweizer pass",
+        "passnummer schweiz",
+        "swiss passport",
+        "passeport suisse",
+        "passaporto svizzero"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss New Old-Age Insurance Number (ZAS)",
+      "regex": "\\b\\d{3}\\.\\d{2}\\.\\d{3}\\.\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "zentrale ausgleichsstelle",
+        "caisse f\u00e9d\u00e9rale de compensation",
+        "cassa di compensazione",
+        "versichertennummer schweiz"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "UK National Insurance Number",
+      "regex": "\\b[A-CEGHJ-PR-TW-Z]{2}\\d{6}[A-DFM]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "national insurance",
+        "ni number",
+        "nino",
+        "hmrc",
+        "department for work and pensions",
+        "dwp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK NHS Number",
+      "regex": "\\b\\d{3}\\s?\\d{3}\\s?\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nhs number",
+        "national health service",
+        "nhs digital",
+        "summary care record",
+        "patient nhs"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK Passport Number",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "uk passport",
+        "british passport",
+        "gb passport",
+        "her majesty's passport office",
+        "passport number uk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK Driving Licence Number",
+      "regex": "\\b[A-Z9]{5}\\d{6}[A-Z9]{2}\\d[A-Z]{2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "driving licence",
+        "driver's licence",
+        "dvla",
+        "driving license number",
+        "driving licence number"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK UTR",
+      "regex": "\\b\\d{10}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "unique taxpayer reference",
+        "utr number",
+        "self assessment",
+        "hmrc utr"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
     }
   ]
 }

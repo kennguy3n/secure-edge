@@ -10,6 +10,39 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP pattern coverage expanded from 376 to 718 rules (Workstream 1).**
+  Adds 342 new detectors across 17 themed batches: additional cloud
+  providers (DigitalOcean / Linode / Vultr / Cloudflare / Hetzner /
+  OVH / Scaleway / Backblaze / Wasabi), SaaS platform tokens
+  (Salesforce / HubSpot / Zendesk / Intercom / Segment / Amplitude /
+  Mixpanel / LaunchDarkly / Sentry / Datadog / New Relic / PagerDuty /
+  ServiceNow / Jira / Confluence), crypto and blockchain
+  (Infura / Alchemy / Moralis / ETH+SOL+BTC private keys), DNS/CDN
+  signing keys, email/marketing platforms, social/media APIs,
+  container/orchestration (Kubernetes / Helm / Docker Hub / Harbor /
+  Rancher / ArgoCD), monitoring/logging (Grafana / Splunk HEC /
+  Sumologic / Loki), networking/VPN (WireGuard / OpenVPN / Tailscale /
+  Cloudflare Tunnel), IoT/edge, additional secret formats (TOTP/HOTP
+  URIs, SAML, OAuth refresh tokens, X.509, SSH known\_hosts, GPG
+  private keys), regional clouds (Yandex / Tencent / Baidu / Naver),
+  developer tools (Vercel / Netlify / Heroku / Railway / Render /
+  Supabase / Firebase / Planetscale / Neon / Turso / Clerk /
+  Supertokens), communication platforms (Zoom JWT / Teams webhook /
+  Webex / Vonage / MessageBird / Plivo / Bandwidth), language- and
+  framework-specific code secrets (Python / Ruby / PHP / .NET /
+  Java/Gradle/Maven / Go / Node / Terraform / Ansible / Chef / Puppet /
+  Docker / Kubernetes / iOS / Android / shell), healthcare/HIPAA
+  identifiers (FHIR / SMART-on-FHIR / Epic / Cerner / HL7 v2 / DICOM /
+  NPI / DEA / MBI / NDC / MRN / ICD-10), and financial-services tokens
+  (Plaid / Dwolla / Wise / Adyen / Mollie / GoCardless / additional
+  Stripe / Square / PayPal / Coinbase / Razorpay / ACH literals).
+  Final accuracy on the synthetic corpus (14 020 samples, 36
+  corpus categories): precision 1.0000, recall 0.9993, F1 0.9996,
+  fp\_rate 0.0000 (budget 0.05), fn\_rate 0.0007 (budget 0.03), all
+  per-category FN budgets green. The committed regression baseline
+  has been re-seeded so future PRs are gated against the post-W1
+  accuracy state. Patterns whose ambient shape overlaps with benign
+  text were tagged `require_hotword: true` to keep FP at zero.
 - **DLP classifier-scoped patterns.** `Pattern` now accepts an optional
   `content_types` field (any subset of `code`, `structured`, `credentials`,
   `natural`) that restricts which `ClassifyContent` verdicts a pattern is

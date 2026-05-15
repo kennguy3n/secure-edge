@@ -115,3 +115,43 @@ func joinLines(lines ...string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// colonHexPairs returns n hex byte pairs joined by ':',
+// matching the (?:[0-9a-f]{2}:){n-1}[0-9a-f]{2} shape used in
+// API key fingerprints (e.g. Oracle Cloud OCI).
+func colonHexPairs(r *rand.Rand, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	pairs := make([]string, n)
+	for i := range pairs {
+		pairs[i] = randHex(r, 2)
+	}
+	return strings.Join(pairs, ":")
+}
+
+// bip39LikePhrase returns a 12- or 24-word lowercase phrase that
+// matches the loose mnemonic regex used by W1 batch 3 crypto patterns.
+// The words are not the real BIP-39 dictionary; they are random
+// lowercase letter clusters between 3 and 8 characters long so the
+// regex engine sees the expected shape ("word word word ... word").
+func bip39LikePhrase(r *rand.Rand, n int) string {
+	if n <= 0 {
+		n = 12
+	}
+	out := make([]string, n)
+	for i := range out {
+		out[i] = randFromAlphabet(r, "abcdefghijklmnopqrstuvwxyz", 3+r.Intn(6))
+	}
+	return strings.Join(out, " ")
+}
+
+// solanaKeypair returns the JSON-array form of a Solana 64-byte
+// secret key, e.g. "[12,34,56,...,200]" (64 numbers, each 0-255).
+func solanaKeypair(r *rand.Rand) string {
+	nums := make([]string, 64)
+	for i := range nums {
+		nums[i] = fmt.Sprintf("%d", r.Intn(256))
+	}
+	return "[" + strings.Join(nums, ",") + "]"
+}

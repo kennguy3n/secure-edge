@@ -86,6 +86,7 @@ allowedPatterns: []string{
 "JDBC MySQL URL with Password",
 "Database Connection String",
 "Password Assignment",
+"Java application.properties JDBC Password",
 },
 },
 {
@@ -269,7 +270,10 @@ allowedPatterns: []string{"Cloudflare API Token"},
 label: "Vercel token",
 content: "// .env.production for vercel\n" +
 "VERCEL_TOKEN=NXqL9pZmK2cVjRT4HfYbWoEiUaJdGxRY",
-allowedPatterns: []string{"Vercel Token"},
+allowedPatterns: []string{
+"Vercel Token",
+"Vercel Personal Access Token",
+},
 },
 {
 label: "DigitalOcean personal token",
@@ -287,7 +291,10 @@ allowedPatterns: []string{"Netlify Personal Access Token"},
 label: "Supabase service role key",
 content: "// supabase service_role key\n" +
 "SUPABASE_SERVICE_ROLE=" + "sbp_" + "K9p2qRmZnL5cVxBT4YjHfWoEiUaJdGxRYTUN0Pq2",
-allowedPatterns: []string{"Supabase Service Role Key"},
+allowedPatterns: []string{
+"Supabase Service Role Key",
+"Supabase Personal Access Token",
+},
 },
 
 // -- Task 11: CI/CD ------------------------------------------
@@ -423,7 +430,10 @@ label: "Spacelift API key secret",
 content: "# CI env for Spacelift stack runs\n" +
 "export SPACELIFT_API_KEY_ID=01HG2K9P2QRMZNL5CVXBT4YJHF\n" +
 "export SPACELIFT_API_KEY_SECRET=\"WoEi" + "UaJdGxRYTUNL_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789\"",
-allowedPatterns: []string{"Spacelift API Key"},
+allowedPatterns: []string{
+"Spacelift API Key",
+"Shell script export TOKEN/PASSWORD",
+},
 },
 {
 label: "env0 API key secret",
@@ -499,6 +509,7 @@ content: "# aws secretsmanager get-secret-value output\n" +
 allowedPatterns: []string{
 "AWS Secrets Manager SecretString Paste",
 "Password Assignment",
+"AWS Secrets Manager ARN",
 },
 },
 {
@@ -536,6 +547,7 @@ allowedPatterns: []string{
 "OIDC ID Token Assignment",
 // Generic JWT pattern may win on the eyJ shape.
 "JWT Token",
+"OpenID Connect ID Token (JWT)",
 },
 },
 {

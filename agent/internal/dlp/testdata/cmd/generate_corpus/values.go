@@ -1582,4 +1582,50 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Ngrok Authtoken"] = func(r *rand.Rand) string {
 		return "NGROK_AUTHTOKEN=" + randFromAlphabet(r, digits, 1) + randAlnum(r, 18) + "_" + randAlnum(r, 28)
 	}
+	// ---------------- Batch 10: IoT / Edge ----------------
+	valueGenerators["AWS IoT Core Certificate ARN"] = func(r *rand.Rand) string {
+		return "arn:aws:iot:us-east-1:" + randFromAlphabet(r, digits, 12) + ":cert/" + randHex(r, 64)
+	}
+	valueGenerators["AWS IoT Device Certificate (PEM)"] = func(r *rand.Rand) string {
+		return "-----BEGIN CERTIFICATE-----\n" + randFromAlphabet(r, alnum+"+/=", 400) + "AWSIoT" + randFromAlphabet(r, alnum+"+/=", 400) + "\n-----END CERTIFICATE-----"
+	}
+	valueGenerators["AWS IoT Greengrass Token Exchange Role"] = func(r *rand.Rand) string {
+		return "GREENGRASS_TES_TOKEN=" + randFromAlphabet(r, alnum+"_-", 40)
+	}
+	valueGenerators["Azure IoT Hub Connection String"] = func(r *rand.Rand) string {
+		return "HostName=" + randLowerAlnum(r, 12) + ".azure-devices.net;DeviceId=" + randAlnum(r, 16) + ";SharedAccessKey=" + randFromAlphabet(r, alnum+"+/=", 44)
+	}
+	valueGenerators["Azure IoT DPS Symmetric Key"] = func(r *rand.Rand) string {
+		return "IOT_DPS_SYMMETRIC_KEY=" + randFromAlphabet(r, alnum+"+/=", 44)
+	}
+	valueGenerators["Azure IoT Edge Module SAS Token"] = func(r *rand.Rand) string {
+		return "SharedAccessSignature sr=mydevice.azure-devices.net%2Fdevices%2Fdevice1&sig=" + randFromAlphabet(r, alnum+"%+/", 44) + "&se=1715000000"
+	}
+	valueGenerators["Google Cloud IoT Registry JWT"] = func(r *rand.Rand) string {
+		return "GCP_IOT_JWT=eyJ" + randFromAlphabet(r, alnum+"_-", 80) + ".eyJ" + randFromAlphabet(r, alnum+"_-", 120) + "." + randFromAlphabet(r, alnum+"_-", 64)
+	}
+	valueGenerators["Google Cloud IoT Device Public Key"] = func(r *rand.Rand) string {
+		return "-----BEGIN PUBLIC KEY-----\n" + randFromAlphabet(r, alnum+"+/=", 200) + "cloudiot" + randFromAlphabet(r, alnum+"+/=", 200) + "\n-----END PUBLIC KEY-----"
+	}
+	valueGenerators["Particle.io API Access Token"] = func(r *rand.Rand) string {
+		return "PARTICLE_ACCESS_TOKEN=" + randHex(r, 40)
+	}
+	valueGenerators["Balena CLI Auth Token"] = func(r *rand.Rand) string {
+		return "BALENA_TOKEN=eyJ" + randFromAlphabet(r, alnum+"_-.", 200)
+	}
+	valueGenerators["Sigfox API Login + Password"] = func(r *rand.Rand) string {
+		return "SIGFOX_PASSWORD=" + randAlnum(r, 32)
+	}
+	valueGenerators["The Things Network App Key"] = func(r *rand.Rand) string {
+		return "TTN_APP_KEY=" + randHexUpper(r, 32)
+	}
+	valueGenerators["MQTT Broker Password"] = func(r *rand.Rand) string {
+		return "MQTT_PASSWORD=" + randAlnum(r, 24)
+	}
+	valueGenerators["HiveMQ Cloud Credentials"] = func(r *rand.Rand) string {
+		return "HIVEMQ_PASSWORD=" + randAlnum(r, 24)
+	}
+	valueGenerators["Cisco Meraki API Key"] = func(r *rand.Rand) string {
+		return "MERAKI_API_KEY=" + randHex(r, 40)
+	}
 }

@@ -592,6 +592,23 @@ var patternCategory = map[string]string{
 	"Bastion SSH Tunnel Token":      "networking",
 	"Ngrok Authtoken":               "networking",
 
+	// Batch 10: IoT / Edge
+	"AWS IoT Core Certificate ARN":           "iot",
+	"AWS IoT Device Certificate (PEM)":       "iot",
+	"AWS IoT Greengrass Token Exchange Role": "iot",
+	"Azure IoT Hub Connection String":        "iot",
+	"Azure IoT DPS Symmetric Key":            "iot",
+	"Azure IoT Edge Module SAS Token":        "iot",
+	"Google Cloud IoT Registry JWT":          "iot",
+	"Google Cloud IoT Device Public Key":     "iot",
+	"Particle.io API Access Token":           "iot",
+	"Balena CLI Auth Token":                  "iot",
+	"Sigfox API Login + Password":            "iot",
+	"The Things Network App Key":             "iot",
+	"MQTT Broker Password":                   "iot",
+	"HiveMQ Cloud Credentials":               "iot",
+	"Cisco Meraki API Key":                   "iot",
+
 	// Batch 7: Container / Orchestration
 }
 

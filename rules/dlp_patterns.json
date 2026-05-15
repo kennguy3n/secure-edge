@@ -8154,6 +8154,261 @@
       "require_hotword": false,
       "entropy_min": 4.0,
       "category": "cloud"
+    },
+    {
+      "name": "AWS IoT Core Certificate ARN",
+      "regex": "arn:aws:iot:[a-z0-9\\-]+:\\d{12}:cert/[a-f0-9]{64}",
+      "prefix": "arn:aws:iot:",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "aws iot",
+        "iot core",
+        "thing"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS IoT Device Certificate (PEM)",
+      "regex": "-----BEGIN CERTIFICATE-----[\\s\\S]{0,800}AWSIoT[\\s\\S]{0,800}-----END CERTIFICATE-----",
+      "prefix": "-----begin certificate-----",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aws iot",
+        "thing",
+        "device certificate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "AWS IoT Greengrass Token Exchange Role",
+      "regex": "(?i)GREENGRASS_TES_(?:ALIAS|TOKEN)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{20,}",
+      "prefix": "greengrass_tes_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "greengrass",
+        "aws iot",
+        "token exchange"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure IoT Hub Connection String",
+      "regex": "HostName=[a-z0-9\\-]+\\.azure-devices\\.net;DeviceId=[A-Za-z0-9_\\-]+;SharedAccessKey=[A-Za-z0-9+/=]{40,}",
+      "prefix": ".azure-devices.net",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure iot",
+        "iot hub",
+        "sharedaccesskey"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure IoT DPS Symmetric Key",
+      "regex": "(?i)IOT_DPS_SYMMETRIC_KEY\\s*[:=]\\s*['\\\"]?[A-Za-z0-9+/=]{40,}",
+      "prefix": "iot_dps_symmetric_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure iot",
+        "dps",
+        "provisioning"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Azure IoT Edge Module SAS Token",
+      "regex": "SharedAccessSignature\\s+sr=[^&]+&sig=[A-Za-z0-9%+/]+&se=\\d{10}",
+      "prefix": "sharedaccesssignature",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "azure iot",
+        "edge",
+        "sas"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Google Cloud IoT Registry JWT",
+      "regex": "(?i)GCP_IOT_JWT\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-]{40,}\\.eyJ[A-Za-z0-9_\\-]{40,}\\.[A-Za-z0-9_\\-]{40,}",
+      "prefix": "gcp_iot_jwt",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "gcp iot",
+        "cloud iot",
+        "jwt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Google Cloud IoT Device Public Key",
+      "regex": "-----BEGIN PUBLIC KEY-----[\\s\\S]{0,400}cloudiot[\\s\\S]{0,400}-----END PUBLIC KEY-----",
+      "prefix": "-----begin public key-----",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "gcp iot",
+        "cloud iot",
+        "public key"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Particle.io API Access Token",
+      "regex": "(?i)PARTICLE_ACCESS_TOKEN\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "particle_access_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "particle",
+        "particle.io",
+        "iot"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "Balena CLI Auth Token",
+      "regex": "(?i)BALENA_TOKEN\\s*[:=]\\s*['\\\"]?eyJ[A-Za-z0-9_\\-\\.]{80,}",
+      "prefix": "balena_token",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "balena",
+        "balenacloud",
+        "cli"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 4.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Sigfox API Login + Password",
+      "regex": "(?i)SIGFOX_(?:LOGIN|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9]{20,}",
+      "prefix": "sigfox_",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "sigfox",
+        "iot",
+        "unb"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "The Things Network App Key",
+      "regex": "(?i)TTN_APP_KEY\\s*[:=]\\s*['\\\"]?[A-Fa-f0-9]{32}",
+      "prefix": "ttn_app_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "ttn",
+        "the things network",
+        "lorawan"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
+    },
+    {
+      "name": "MQTT Broker Password",
+      "regex": "(?i)MQTT_PASSWORD\\s*[:=]\\s*['\\\"]?[A-Za-z0-9!@#$%_\\-]{8,}",
+      "prefix": "mqtt_password",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mqtt",
+        "broker",
+        "mosquitto"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "HiveMQ Cloud Credentials",
+      "regex": "(?i)HIVEMQ_(?:USERNAME|PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_\\-]{8,}",
+      "prefix": "hivemq_",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hivemq",
+        "mqtt",
+        "cloud"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 3.0,
+      "category": "cloud"
+    },
+    {
+      "name": "Cisco Meraki API Key",
+      "regex": "(?i)MERAKI_API_KEY\\s*[:=]\\s*['\\\"]?[a-f0-9]{40}",
+      "prefix": "meraki_api_key",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "meraki",
+        "cisco",
+        "dashboard"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 3.5,
+      "category": "cloud"
     }
   ]
 }

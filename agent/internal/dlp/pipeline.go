@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 )
 
 // LargeContentThreshold is the byte threshold above which Pipeline
@@ -62,6 +64,14 @@ type Pipeline struct {
 	// reaches its original fast-path early return when no other
 	// adaptive filter (large payload, disabled categories) is active.
 	hasContentTypeFilter bool
+
+	// mlLayer is the optional ML-augmented detection layer (W3,
+	// draft). Nil or non-Ready means the pipeline is fully
+	// deterministic and behaves exactly as before. SetMLLayer
+	// installs a Layer at runtime; the pipeline guarantees no
+	// observable behaviour change until SetMLLayer is called with
+	// a Ready layer AND ScoreWeights.MLBoost > 0.
+	mlLayer *ml.Layer
 
 	// cache deduplicates identical pastes that arrive in rapid
 	// succession (paste + form-submit + fetch interceptors).
@@ -195,6 +205,31 @@ func (p *Pipeline) EnableCache(c *ScanCache) {
 	p.mu.Unlock()
 }
 
+// SetMLLayer installs (or removes) the optional ML-augmented
+// detection layer. Passing nil restores fully-deterministic
+// behaviour. The scan cache is reset alongside the swap so
+// verdicts produced under the previous layer (or with no layer)
+// cannot leak past the change. Safe to call concurrently with Scan.
+//
+// Privacy note: the Layer owns its own embedder lifecycle. Pipeline
+// only holds the pointer and never touches the underlying model
+// artefacts.
+func (p *Pipeline) SetMLLayer(l *ml.Layer) {
+	p.mu.Lock()
+	p.mlLayer = l
+	cache := p.cache
+	p.mu.Unlock()
+	cache.Reset()
+}
+
+// MLLayer returns the currently installed ML layer, or nil if none.
+// Useful for /api/dlp/config inspection.
+func (p *Pipeline) MLLayer() *ml.Layer {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.mlLayer
+}
+
 // Cache returns the attached ScanCache, or nil if caching is disabled.
 func (p *Pipeline) Cache() *ScanCache {
 	p.mu.RLock()
@@ -256,6 +291,7 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	largeThreshold := p.largeThreshold
 	disabledCats := p.disabledCategories
 	hasContentTypeFilter := p.hasContentTypeFilter
+	mlLayer := p.mlLayer
 	cache := p.cache
 	p.mu.RUnlock()
 
@@ -294,6 +330,30 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	// classifier verdict that does not match contentType.
 	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats, contentType)
 
+	// Optional ML pre-filter (W3). Runs after the AC scan so we
+	// know the candidate severity distribution, and only short-
+	// circuits when ALL of the following hold:
+	//
+	//   - mlLayer is Ready (model + centroids loaded),
+	//   - the embedder thinks the content is much closer to the TN
+	//     centroid than to the TP centroid (VerdictLikelyBenign),
+	//   - no surviving candidate has Critical or High severity.
+	//
+	// The severity guard is what keeps the deterministic pipeline
+	// in charge of every confident block: a Critical/High AC
+	// candidate ALWAYS goes through regex + scoring + threshold,
+	// regardless of what the ML pre-filter says. The pre-filter is
+	// a *latency* shortcut for low-severity noise, never a recall
+	// hazard for high-severity secrets.
+	if mlLayer != nil && mlLayer.Ready() && !candidatesIncludeHighSeverity(candidates) {
+		if mlLayer.PreFilter(ctx, content) == ml.VerdictLikelyBenign {
+			if cache != nil {
+				cache.Put(content, ScanResult{})
+			}
+			return ScanResult{}
+		}
+	}
+
 	// Step 3: regex validation of candidates.
 	matches := ValidateCandidates(content, candidates)
 	if len(matches) == 0 {
@@ -309,15 +369,26 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 		perPattern[m.Pattern] = append(perPattern[m.Pattern], m)
 	}
 
+	// Optional ML disambiguator score for the *scan content* as a
+	// whole. Computed once and applied to every borderline
+	// per-pattern evaluation below — calling the embedder per
+	// pattern would blow the latency budget for content with many
+	// matches. Zero (and a no-op nudge in ScoreMatch) when the ML
+	// layer is disabled.
+	var mlScore float32
+	if mlLayer != nil && mlLayer.Ready() && weights.MLBoost > 0 {
+		mlScore = mlLayer.DisambiguatorScore(ctx, content)
+	}
+
 	// For large payloads we evaluate the per-pattern groups in
 	// parallel. The pipeline state we read above is captured by value
 	// so each worker can run without further locking.
 	var best ScanResult
 	if len(content) >= ConcurrentEvalThreshold && len(perPattern) > 1 {
-		best = scanConcurrent(content, perPattern, exclusions, weights, threshold)
+		best = scanConcurrent(content, perPattern, exclusions, weights, threshold, mlScore)
 	} else {
 		for pat, ms := range perPattern {
-			res := evaluatePattern(content, pat, ms, exclusions, weights, threshold)
+			res := evaluatePattern(content, pat, ms, exclusions, weights, threshold, mlScore)
 			if res.Blocked && (!best.Blocked || res.Score > best.Score) {
 				best = res
 			}
@@ -333,6 +404,11 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 // evaluatePattern runs steps 4a-4d and the threshold check for a
 // single pattern group. Pure function with no shared state — safe to
 // invoke from worker goroutines in the concurrent path.
+//
+// mlScore is the ML disambiguator output for the entire scan content
+// (0 when ML is disabled). The scorer only applies it when this
+// pattern's deterministic score lands within mlBorderlineWidth of
+// the per-severity block threshold.
 func evaluatePattern(
 	content string,
 	pat *Pattern,
@@ -340,6 +416,7 @@ func evaluatePattern(
 	exclusions []Exclusion,
 	weights ScoreWeights,
 	threshold *ThresholdEngine,
+	mlScore float32,
 ) ScanResult {
 	if pat.MinMatches > 0 && len(ms) < pat.MinMatches {
 		return ScanResult{}
@@ -358,13 +435,15 @@ func evaluatePattern(
 		}
 		ent := ShannonEntropy(m.Value)
 		score := ScoreMatch(ScoreInput{
-			Pattern:        *pat,
-			Match:          m,
-			HotwordPresent: hotword,
-			Entropy:        ent,
-			NumMatches:     len(ms),
-			ExclusionHit:   excl.Hit,
-			Weights:        weights,
+			Pattern:           *pat,
+			Match:             m,
+			HotwordPresent:    hotword,
+			Entropy:           ent,
+			NumMatches:        len(ms),
+			ExclusionHit:      excl.Hit,
+			Weights:           weights,
+			MLScore:           mlScore,
+			SeverityThreshold: threshold.Lookup(string(pat.Severity)),
 		})
 		if !haveScored || score > topScore {
 			topScore = score
@@ -390,12 +469,17 @@ func evaluatePattern(
 // pool and reduces the per-group results into the single best block
 // decision. The number of workers is bounded by GOMAXPROCS so we never
 // oversubscribe the CPU.
+//
+// mlScore is the per-scan ML disambiguator output (0 when ML is
+// disabled). Forwarded unchanged to every worker so the per-pattern
+// scoring sees the same ML signal.
 func scanConcurrent(
 	content string,
 	perPattern map[*Pattern][]Match,
 	exclusions []Exclusion,
 	weights ScoreWeights,
 	threshold *ThresholdEngine,
+	mlScore float32,
 ) ScanResult {
 	type job struct {
 		pat *Pattern
@@ -427,7 +511,7 @@ func scanConcurrent(
 		go func() {
 			defer wg.Done()
 			for j := range jobCh {
-				results <- evaluatePattern(content, j.pat, j.ms, exclusions, weights, threshold)
+				results <- evaluatePattern(content, j.pat, j.ms, exclusions, weights, threshold, mlScore)
 			}
 		}()
 	}
@@ -511,6 +595,24 @@ func filterCandidates(
 func contentTypeAllowed(allowed []ContentType, ct ContentType) bool {
 	for _, a := range allowed {
 		if a == ct {
+			return true
+		}
+	}
+	return false
+}
+
+// candidatesIncludeHighSeverity reports whether the supplied
+// AC-candidate slice contains at least one pattern of Critical or
+// High severity. Used by the ML pre-filter as a recall guard: if
+// a high-severity candidate is in flight, the pre-filter is not
+// allowed to short-circuit the regex pass.
+func candidatesIncludeHighSeverity(cs []Candidate) bool {
+	for _, c := range cs {
+		if c.Pattern == nil {
+			continue
+		}
+		switch c.Pattern.Severity {
+		case SeverityCritical, SeverityHigh:
 			return true
 		}
 	}

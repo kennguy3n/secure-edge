@@ -49,6 +49,17 @@ func (e *ThresholdEngine) ShouldBlock(score int, severity string) bool {
 	return score >= thresholdFor(t, severity)
 }
 
+// Lookup returns the numeric block threshold for severity. Used by
+// the scoring step (ScoreMatch's ML borderline nudge) to know how
+// close the deterministic score is to the block decision without
+// duplicating the severity-to-threshold map.
+func (e *ThresholdEngine) Lookup(severity string) int {
+	e.mu.RLock()
+	t := e.t
+	e.mu.RUnlock()
+	return thresholdFor(t, severity)
+}
+
 func thresholdFor(t Thresholds, severity string) int {
 	switch Severity(strings.ToLower(strings.TrimSpace(severity))) {
 	case SeverityCritical:

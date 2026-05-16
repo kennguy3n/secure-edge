@@ -10,6 +10,30 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP optional ML-augmented detection layer (Workstream 3, draft).**
+  Adds `agent/internal/dlp/ml/` — a strictly-additive ML layer that
+  bolts onto the deterministic DLP pipeline. Two integration points:
+  (1) a *pre-filter* that may skip regex validation when the embedder
+  thinks content is benign **and** no Critical / High AC candidate is
+  in flight, and (2) a *disambiguator* that nudges borderline scores
+  (within `mlBorderlineWidth == 1` of the per-severity block
+  threshold) by `±MLBoost`. High-confidence deterministic decisions
+  are immune to the ML signal in both directions, so the
+  deterministic pipeline retains veto power. Default model is
+  `paraphrase-multilingual-MiniLM-L12-v2` int8 (~45 MB, 50+
+  languages); the ONNX-backed embedder lives behind the `onnx`
+  build tag so the default build and CI use only the in-tree
+  `NullEmbedder` and remain CGO-free. Model artefacts (centroids,
+  disambiguator weights, ONNX model) load from
+  `~/.shieldnet/models/` and are absent by default — the pipeline
+  silently falls back to the fully-deterministic path when any
+  artefact is missing. Per-OS ONNX C++ shared-library bundling in
+  `release.yml`, the model-distribution channel, and the
+  corpus-building tools for centroids / linear-head weights ship as
+  separate follow-up commits. The accuracy regression
+  (`TestDLPAccuracyLarge`, `TestDLPAccuracyRegression`) is green
+  with the layer absent — the W4 baseline is fully preserved.
+
 - **DLP global-PII coverage expanded from 718 to 812 rules (Workstream 4).**
   Adds 94 jurisdiction-specific personal-data detectors across 7 themed
   batches covering GDPR (EU), Switzerland, the UK, the GCC / Middle

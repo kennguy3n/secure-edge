@@ -1274,9 +1274,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["SparkPost EU API Key"] = func(r *rand.Rand) string {
 		return "SPARKPOST_EU_API_KEY=" + randHex(r, 40)
 	}
-	valueGenerators["Amazon SES SMTP Username"] = func(r *rand.Rand) string {
-		return "AKIA" + randUpperAlnum(r, 16)
-	}
 	valueGenerators["Amazon SES SMTP Password"] = func(r *rand.Rand) string {
 		return "AWS_SES_SMTP_PASSWORD=" + randFromAlphabet(r, alnum+"+/=", 48)
 	}
@@ -2289,9 +2286,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Plaid Client ID"] = func(r *rand.Rand) string {
 		return "PLAID_CLIENT_ID=" + randHex(r, 24)
 	}
-	valueGenerators["Plaid Production Secret"] = func(r *rand.Rand) string {
-		return "PLAID_SECRET=" + randHex(r, 30)
-	}
 	valueGenerators["Plaid Public Token"] = func(r *rand.Rand) string {
 		return "public-production-" + randHex(r, 8) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 12)
 	}
@@ -2318,9 +2312,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	}
 	valueGenerators["Mollie API Key (live)"] = func(r *rand.Rand) string {
 		return "MOLLIE_API_KEY=live_" + randAlnum(r, 35) + "\n# mollie checkout"
-	}
-	valueGenerators["Mollie API Key (test)"] = func(r *rand.Rand) string {
-		return "MOLLIE_TEST_KEY=test_" + randAlnum(r, 35) + "\n# mollie test mode"
 	}
 	valueGenerators["GoCardless Live Access Token"] = func(r *rand.Rand) string {
 		return "GOCARDLESS_ACCESS_TOKEN=live_" + randFromAlphabet(r, alnum+"_-", 50) + "\n# gocardless direct debit"
@@ -2352,10 +2343,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["ACH Routing+Account Numbers Together"] = func(r *rand.Rand) string {
 		return "Routing Number: " + randFromAlphabet(r, digits, 9) + "\nAccount Number: " + randFromAlphabet(r, digits, 12)
 	}
-	valueGenerators["SWIFT/BIC code with bank+account"] = func(r *rand.Rand) string {
-		return "SWIFT/BIC: " + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upper, 2) + randFromAlphabet(r, upper+digits, 2) + "\nIBAN: GB29NWBK60161331926819"
-	}
-
 	// W4 Batch 1: GDPR / EU national identifiers.
 	euCountries := []string{"AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"}
 	valueGenerators["EU IBAN (SEPA)"] = func(r *rand.Rand) string {
@@ -2382,7 +2369,19 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		sex := pick(r, []string{"1", "2"})
 		yr := fmt.Sprintf("%02d", r.Intn(100))
 		mo := fmt.Sprintf("%02d", 1+r.Intn(12))
-		dep := fmt.Sprintf("%02d", 1+r.Intn(95))
+		// French départements 01–95 are numeric; 2A and 2B are the two
+		// Corsican départements (Haute-Corse / Corse-du-Sud). The regex
+		// allows the (?:[0-9]{2}|2A|2B) branch, so emit Corsica ~6% of
+		// the time so the alternation is exercised by the corpus.
+		var dep string
+		switch r.Intn(16) {
+		case 0:
+			dep = "2A"
+		case 1:
+			dep = "2B"
+		default:
+			dep = fmt.Sprintf("%02d", 1+r.Intn(95))
+		}
 		return "Numéro de sécurité sociale: " + sex + yr + mo + dep + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, digits, 2)
 	}
 	valueGenerators["French CNI Number"] = func(r *rand.Rand) string {

@@ -12636,11 +12636,14 @@
       "score_weight": 1,
       "hotwords": [
         "documento nacional de identidad",
-        "documento de identidad"
+        "documento de identidad",
+        "n\u00famero de identificaci\u00f3n",
+        "dni:",
+        "dni "
       ],
       "hotword_window": 200,
       "hotword_boost": 2,
-      "require_hotword": false,
+      "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_eu"
     },
@@ -13675,7 +13678,7 @@
       ],
       "hotword_window": 200,
       "hotword_boost": 2,
-      "require_hotword": false,
+      "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_sea"
     },
@@ -13694,7 +13697,7 @@
       ],
       "hotword_window": 200,
       "hotword_boost": 2,
-      "require_hotword": false,
+      "require_hotword": true,
       "entropy_min": 0.0,
       "category": "pii_sea"
     },

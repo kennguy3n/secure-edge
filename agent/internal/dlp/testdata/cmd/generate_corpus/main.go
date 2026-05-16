@@ -482,7 +482,6 @@ var patternCategory = map[string]string{
 	"Postmark Account API Token":      "email_marketing",
 	"SparkPost API Key":               "email_marketing",
 	"SparkPost EU API Key":            "email_marketing",
-	"Amazon SES SMTP Username":        "email_marketing",
 	"Amazon SES SMTP Password":        "email_marketing",
 	"Mandrill API Key":                "email_marketing",
 	"ConvertKit API Secret":           "email_marketing",
@@ -818,8 +817,7 @@ var patternCategory = map[string]string{
 
 	// Batch 17: Financial Services
 	"Plaid Client ID":                        "financial",
-	"Plaid Production Secret":                "financial",
-	"Plaid Public Token":                     "financial",
+		"Plaid Public Token":                     "financial",
 	"Dwolla API Key":                         "financial",
 	"Dwolla API Secret":                      "financial",
 	"Wise (TransferWise) Personal API Token": "financial",
@@ -828,8 +826,7 @@ var patternCategory = map[string]string{
 	"Adyen Client Key":                       "financial",
 	"Adyen Webhook HMAC Key":                 "financial",
 	"Mollie API Key (live)":                  "financial",
-	"Mollie API Key (test)":                  "financial",
-	"GoCardless Live Access Token":           "financial",
+		"GoCardless Live Access Token":           "financial",
 	"Stripe Webhook Signing Secret (whsec_)": "financial",
 	"Stripe Restricted API Key (rk_)":        "financial",
 	"Square Application Secret":              "financial",
@@ -839,8 +836,7 @@ var patternCategory = map[string]string{
 	"Razorpay Key ID":                        "financial",
 	"Razorpay Key Secret":                    "financial",
 	"ACH Routing+Account Numbers Together":   "financial",
-	"SWIFT/BIC code with bank+account":       "financial",
-
+	
 	// Batch 16: Healthcare
 	"FHIR R4 Patient Resource ID":              "healthcare",
 	"FHIR Bearer Access Token":                 "healthcare",

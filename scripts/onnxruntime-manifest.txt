@@ -1,0 +1,17 @@
+# ShieldNet Secure Edge — pinned onnxruntime archive checksums.
+#
+# Sourced by scripts/fetch-onnxruntime.sh to verify upstream
+# Microsoft onnxruntime release tarballs/zips before installing them
+# into ~/.shieldnet/models/model/. Format is sha256sum(1) compatible
+# (`<sha>  <name>` per line) so `sha256sum -c` could verify these
+# alongside the script.
+#
+# Hashes were captured at upstream release time and verified against
+# https://github.com/microsoft/onnxruntime/releases/tag/v1.25.0 .
+# A version bump must update every line for that version.
+
+e0a8998e70416801f9a634a8ea1d369a255ff109741469f9d99cf369a46a1492  onnxruntime-linux-x64-1.25.0.tgz
+849c04634e76446bbe0a92f67955a9641415c37f11930804066057bf9eadbd03  onnxruntime-linux-aarch64-1.25.0.tgz
+0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5  onnxruntime-osx-x86_64-1.25.0.tgz
+65405dc8793c86cadb98b5e07f6d3bdde84f8300f1b030d4736b41c17610d6c1  onnxruntime-osx-arm64-1.25.0.tgz
+da753f762bf2400e7191ec594086b186a7051d5af8dc886f6e2020c2403df738  onnxruntime-win-x64-1.25.0.zip

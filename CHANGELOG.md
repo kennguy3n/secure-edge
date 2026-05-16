@@ -48,11 +48,23 @@ changes between feature releases — breaking entries are flagged explicitly.
     and the linear head separates the training corpus with 100%
     sign-accuracy on both classes (TP mean projection ≈ +0.47,
     TN mean projection ≈ -0.35, bias ≈ -0.058).
-  - `scripts/fetch-ml-model.sh` downloads the model from Hugging
-    Face into the expected path, computes SHA-256 hashes after
-    download (with an optional `-m` pin flag for deployment
-    automation), and never embeds a fabricated manifest. The
-    model itself is intentionally NOT bundled in agent release
+  - `scripts/fetch-ml-model.sh` + `scripts/fetch-onnxruntime.sh`
+    drive a pinned, reproducible install. The model script defaults
+    to the int8-quantised checkpoint (`onnx/model_qint8_avx512.onnx`,
+    118 MB) and enforces the SHA-256 pins committed to
+    `scripts/ml-model-manifest.txt`; the onnxruntime script pulls
+    the official Microsoft CPU release tarball for the current
+    OS/arch and enforces the pins committed to
+    `scripts/onnxruntime-manifest.txt`. Both are reproducible from
+    a clean clone — a tampered upstream artefact triggers a hard
+    failure on download.
+  - New top-level `INSTALL_ML.md` documents the end-to-end install
+    on Linux, macOS, and Windows, including the privacy invariants,
+    disk / memory footprint, and rollback procedure.
+  - New `agent/Makefile` targets: `install-onnx-runtime`, `install-ml`,
+    `build-onnx`, and a combined `install` that downloads both
+    artefacts and builds the onnx-tagged binary in one step.
+  - The model itself is intentionally NOT bundled in agent release
     artefacts to keep the binary small and the optional ML
     dependency clearly separable.
   - `config.Config` gains three opt-in fields: `dlp_ml_model_dir`,

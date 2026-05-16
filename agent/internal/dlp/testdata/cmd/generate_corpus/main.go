@@ -817,7 +817,7 @@ var patternCategory = map[string]string{
 
 	// Batch 17: Financial Services
 	"Plaid Client ID":                        "financial",
-		"Plaid Public Token":                     "financial",
+	"Plaid Public Token":                     "financial",
 	"Dwolla API Key":                         "financial",
 	"Dwolla API Secret":                      "financial",
 	"Wise (TransferWise) Personal API Token": "financial",
@@ -826,7 +826,7 @@ var patternCategory = map[string]string{
 	"Adyen Client Key":                       "financial",
 	"Adyen Webhook HMAC Key":                 "financial",
 	"Mollie API Key (live)":                  "financial",
-		"GoCardless Live Access Token":           "financial",
+	"GoCardless Live Access Token":           "financial",
 	"Stripe Webhook Signing Secret (whsec_)": "financial",
 	"Stripe Restricted API Key (rk_)":        "financial",
 	"Square Application Secret":              "financial",
@@ -836,7 +836,7 @@ var patternCategory = map[string]string{
 	"Razorpay Key ID":                        "financial",
 	"Razorpay Key Secret":                    "financial",
 	"ACH Routing+Account Numbers Together":   "financial",
-	
+
 	// Batch 16: Healthcare
 	"FHIR R4 Patient Resource ID":              "healthcare",
 	"FHIR Bearer Access Token":                 "healthcare",
@@ -894,9 +894,9 @@ var patternCategory = map[string]string{
 	"Norwegian Fodselsnummer":            "pii_eu",
 
 	// W4 Batch 2: Switzerland.
-	"Swiss AHV/AVS Number":                    "pii_switzerland",
-	"Swiss UID":                               "pii_switzerland",
-	"Swiss Passport Number":                   "pii_switzerland",
+	"Swiss AHV/AVS Number":                     "pii_switzerland",
+	"Swiss UID":                                "pii_switzerland",
+	"Swiss Passport Number":                    "pii_switzerland",
 	"Swiss New Old-Age Insurance Number (ZAS)": "pii_switzerland",
 
 	// W4 Batch 3: United Kingdom.
@@ -924,26 +924,26 @@ var patternCategory = map[string]string{
 	"Qatar TIN":                   "pii_gcc",
 
 	// W4 Batch 5: Southeast & East Asia.
-	"Singapore NRIC/FIN":                        "pii_sea",
-	"Malaysia MyKad":                            "pii_sea",
-	"Thailand National ID":                      "pii_sea",
-	"Philippines SSS Number":                    "pii_sea",
-	"Philippines TIN":                           "pii_sea",
-	"Philippines UMID":                          "pii_sea",
-	"Indonesia NIK":                             "pii_sea",
-	"Indonesia NPWP":                            "pii_sea",
-	"Vietnam CCCD":                              "pii_sea",
-	"Vietnam MST":                               "pii_sea",
-	"Japan My Number":                           "pii_sea",
-	"Japan Passport Number":                     "pii_sea",
-	"South Korea RRN":                           "pii_sea",
-	"South Korea Business Registration Number":  "pii_sea",
-	"Taiwan National ID":                        "pii_sea",
-	"China Resident ID":                         "pii_sea",
-	"China Passport Number":                     "pii_sea",
-	"India Aadhaar":                             "pii_sea",
-	"India PAN":                                 "pii_sea",
-	"Hong Kong HKID":                            "pii_sea",
+	"Singapore NRIC/FIN":                       "pii_sea",
+	"Malaysia MyKad":                           "pii_sea",
+	"Thailand National ID":                     "pii_sea",
+	"Philippines SSS Number":                   "pii_sea",
+	"Philippines TIN":                          "pii_sea",
+	"Philippines UMID":                         "pii_sea",
+	"Indonesia NIK":                            "pii_sea",
+	"Indonesia NPWP":                           "pii_sea",
+	"Vietnam CCCD":                             "pii_sea",
+	"Vietnam MST":                              "pii_sea",
+	"Japan My Number":                          "pii_sea",
+	"Japan Passport Number":                    "pii_sea",
+	"South Korea RRN":                          "pii_sea",
+	"South Korea Business Registration Number": "pii_sea",
+	"Taiwan National ID":                       "pii_sea",
+	"China Resident ID":                        "pii_sea",
+	"China Passport Number":                    "pii_sea",
+	"India Aadhaar":                            "pii_sea",
+	"India PAN":                                "pii_sea",
+	"Hong Kong HKID":                           "pii_sea",
 
 	// W4 Batch 6: HIPAA — supplemental PHI patterns. All map to the
 	// existing "phi" corpus directory (alongside the MRN/NPI/DEA/MBI

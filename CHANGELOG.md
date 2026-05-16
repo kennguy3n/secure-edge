@@ -22,7 +22,10 @@ changes between feature releases — breaking entries are flagged explicitly.
     NIF, SE Personnummer / Organisationsnummer, FI HETU, GR AFM, HU
     TAJ.
   - **Switzerland (`pii_switzerland`, 4):** AHV/AVS (756.xxxx.xxxx.xx),
-    Swiss IBAN (CH..), Swiss UID (CHE-xxx.xxx.xxx), Swiss Passport.
+    Swiss UID (CHE-xxx.xxx.xxx), Swiss Passport, Swiss New Old-Age
+    Insurance Number (ZAS). Swiss IBANs (`CH..`) are covered by the
+    `EU IBAN (SEPA)` pattern in `pii_eu`, which includes `CH` in its
+    country-code alternation.
   - **United Kingdom (`pii_uk`, 5):** NINO, NHS Number, UK Passport,
     UK Driver's Licence, UK UTR.
   - **GCC / Middle East (`pii_gcc`, 15):** UAE Emirates ID (784-...),

@@ -237,6 +237,16 @@ func (p *Pipeline) Cache() *ScanCache {
 	return p.cache
 }
 
+// Weights returns a snapshot of the currently active scoring
+// weights. Used by main.go to reapply MLBoost after a hot-reload
+// (POST /api/profile/import) and by /api/dlp/config GET to surface
+// the live MLBoost alongside the persisted database value.
+func (p *Pipeline) Weights() ScoreWeights {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.weights
+}
+
 // SetWeights atomically updates the scoring weights. The scan cache
 // is reset alongside the update so verdicts produced under the
 // previous weights cannot leak past the change — otherwise a PUT

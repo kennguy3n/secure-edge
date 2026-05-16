@@ -41,8 +41,8 @@ const tokenByteLength = 32
 // default itself — the staged-rollout posture from PR #18 stays:
 //   - api_token_path: ""           => feature disabled, no token file
 //   - api_token_path: <this path>  => generated + advertised on /hello
-//                                     and recognised by the tray with
-//                                     zero further configuration.
+//     and recognised by the tray with
+//     zero further configuration.
 func DefaultAPITokenPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {

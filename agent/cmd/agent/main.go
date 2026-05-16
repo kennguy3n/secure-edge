@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	"github.com/kennguy3n/secure-edge/agent/internal/api"
 	"github.com/kennguy3n/secure-edge/agent/internal/config"
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 	"github.com/kennguy3n/secure-edge/agent/internal/dns"
 	"github.com/kennguy3n/secure-edge/agent/internal/heartbeat"
 	"github.com/kennguy3n/secure-edge/agent/internal/policy"
@@ -149,6 +151,13 @@ func runNativeMessaging(configPath string) error {
 	pipeline := dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 	applyDLPRuntimeConfig(pipeline, cfg)
 	pipeline.Rebuild(patterns, exclusions)
+	if mlLayer := attachMLLayer(pipeline, cfg); mlLayer != nil {
+		defer func() {
+			if err := mlLayer.Close(); err != nil {
+				log.Printf("dlp ml: close: %v", err)
+			}
+		}()
+	}
 
 	// A2: when the agent has an api_token_path configured, the NM
 	// host loads (or generates) the same token the daemon uses and
@@ -173,6 +182,81 @@ func runNativeMessaging(configPath string) error {
 			BridgeMACRequired: cfg.BridgeMACRequired,
 		},
 		os.Stdin, os.Stdout)
+}
+
+// attachMLLayer best-effort wires the optional ML-augmented
+// detection layer (W3) into the pipeline. The caller is responsible
+// for calling Close() on the returned layer at process shutdown
+// (when non-nil). When cfg.DLPMLBoost is zero the function is a
+// no-op even if model artefacts are present — ML is opt-in.
+//
+// Failures are intentionally swallowed: a missing model directory,
+// unreadable centroids file, or onnxruntime init error all degrade
+// the layer to a no-op and leave the deterministic pipeline
+// untouched. This matches the design intent that ML is *additive*.
+// The function logs a single human-readable summary line so the
+// systemd / launchd / Windows-service unit logs document which path
+// took effect.
+func attachMLLayer(p *dlp.Pipeline, cfg config.Config) *ml.Layer {
+	if p == nil {
+		return nil
+	}
+	if cfg.DLPMLBoost <= 0 {
+		// ML augmentation is opt-in. With MLBoost==0 the
+		// disambiguator nudge is clamped to zero anyway, so even
+		// loading the model would be pure overhead. Honour the
+		// configured zero by skipping the load entirely.
+		return nil
+	}
+	base := cfg.DLPMLModelDir
+	if base == "" {
+		base = ml.DefaultBaseDir()
+	}
+	if base == "" {
+		log.Printf("dlp ml: model dir unresolved (HOME unset?); skipping")
+		return nil
+	}
+	art, err := ml.LoadArtefacts(base)
+	if err != nil {
+		log.Printf("dlp ml: load artefacts from %s: %v", base, err)
+		return nil
+	}
+	var emb ml.Embedder
+	if art != nil && art.ModelDir != "" {
+		if e, eErr := ml.NewEmbedderFromDir(art.ModelDir, ml.DefaultEmbedderOptions()); eErr == nil {
+			emb = e
+		} else {
+			log.Printf("dlp ml: embedder init failed: %v (falling back to NullEmbedder)", eErr)
+		}
+	}
+	if emb == nil {
+		emb = ml.NewNullEmbedder()
+	}
+	layer, err := ml.NewLayer(emb, art, cfg.DLPMLPreFilterThreshold)
+	if err != nil {
+		log.Printf("dlp ml: build layer: %v", err)
+		return nil
+	}
+	p.SetMLLayer(layer)
+	// Bump MLBoost on the pipeline's weights so ScoreMatch will
+	// actually consult the disambiguator. The store-backed
+	// /api/dlp/config setter resets weights when the operator
+	// PUTs new values; SetMLLayer remains in effect across those
+	// resets, but MLBoost has to be reapplied. The applyLiveDLP
+	// helper does that on PUT by copying the live config from
+	// disk — see the ML-aware update in handlers.go.
+	w := p.Weights()
+	w.MLBoost = cfg.DLPMLBoost
+	p.SetWeights(w)
+	log.Printf(
+		"dlp ml: layer ready=%t boost=%d threshold=%.3f base=%s build_tag_onnx=%t",
+		layer.Ready(),
+		cfg.DLPMLBoost,
+		cfg.DLPMLPreFilterThreshold,
+		base,
+		ml.BuildTagONNX,
+	)
+	return layer
 }
 
 // applyDLPRuntimeConfig copies the Phase 6 runtime tunables from the
@@ -387,6 +471,18 @@ func run(configPath string) error {
 		pipeline = dlp.NewPipeline(weights, dlp.NewThresholdEngine(thresholds))
 		applyDLPRuntimeConfig(pipeline, cfg)
 		pipeline.Rebuild(patterns, exclusions)
+		// Best-effort attach the optional ML-augmented detection
+		// layer. No-op when dlp_ml_boost <= 0, when the model
+		// artefacts are missing, or when the embedder fails to
+		// initialise. The deterministic pipeline is unaffected
+		// by any of those degraded paths.
+		if mlLayer := attachMLLayer(pipeline, cfg); mlLayer != nil {
+			defer func() {
+				if err := mlLayer.Close(); err != nil {
+					log.Printf("dlp ml: close: %v", err)
+				}
+			}()
+		}
 		apiServer.SetDLP(pipeline)
 
 		// Wire the local MITM proxy. The controller is constructed

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 )
 
 // slowDLP is a DLPScanner that blocks for the specified duration so
@@ -33,7 +34,9 @@ func (s *slowDLP) Scan(ctx context.Context, _ string) dlp.ScanResult {
 }
 func (s *slowDLP) Threshold() *dlp.ThresholdEngine { return s.thr }
 func (s *slowDLP) SetWeights(w dlp.ScoreWeights)   { s.weights = w }
+func (s *slowDLP) Weights() dlp.ScoreWeights       { return s.weights }
 func (s *slowDLP) Patterns() []*dlp.Pattern        { return nil }
+func (s *slowDLP) MLLayer() *ml.Layer              { return nil }
 
 // TestGracefulShutdown_WaitsForInFlightScan starts a real *http.Server
 // against the API handler, fires a long-running scan, then calls

@@ -138,6 +138,72 @@ A pattern with `require_hotword: true` is suppressed entirely when no hotword
 is present, regardless of score — useful for patterns like "Generic API Key"
 that would otherwise match any 20+ char alphanumeric string.
 
+#### Optional ML-augmented detection (`agent/internal/dlp/ml/`)
+
+The DLP pipeline supports an **optional** ML layer that adds two
+narrowly-scoped signals on top of the deterministic pipeline. The layer is
+strictly additive — when no model is loaded, when the ONNX runtime is not
+available, or when `ScoreWeights.MLBoost` is `0`, every entry point is a
+no-op and the pipeline behaves exactly as documented above.
+
+| Signal              | When it fires                                                 | What it can do                                                                                                                                  |
+|---------------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Pre-filter**      | After AC scan, before regex validation                        | Skip the remaining regex + scoring steps when (a) the embedder thinks the content is much closer to the TN centroid than the TP centroid and (b) no Critical / High AC candidate is in flight. Latency win on benign noise. |
+| **Disambiguator**   | Inside `ScoreMatch`, on every borderline match                | Nudge the deterministic score by ±`MLBoost` *only* when it lands within `mlBorderlineWidth` of the per-severity block threshold. High-confidence blocks and high-confidence non-blocks are immune. |
+
+Properties that make the layer reviewable line-by-line:
+
+- **Pre-filter recall guard** — a Critical or High severity AC candidate
+  always proceeds through regex + scoring + threshold, regardless of the
+  embedder's verdict. The pre-filter is a *latency* shortcut for low-severity
+  noise, never a recall hazard for high-severity secrets.
+- **Disambiguator borderline gate** — the ML signal is consulted only for
+  scores within `mlBorderlineWidth` (== 1) of the per-severity threshold,
+  and is clamped to `±MLBoost`. A confident deterministic decision cannot be
+  overridden by the ML layer in either direction.
+- **Privacy invariant** — the embedder runs in-process. No embedding vector,
+  no model output, and no scanned content leaves the process. The `ml`
+  package does not open network sockets and does not log scan content.
+- **Graceful degradation** — when the model file, tokenizer, or ONNX runtime
+  is missing, the pipeline drops back to the fully-deterministic path
+  silently. The `Null` embedder is the default and produces no signal.
+- **Build-tag isolation** — the ONNX-backed embedder lives behind
+  `//go:build onnx`. The default agent build, and CI, link only the
+  `Null` embedder and the small classifier-head + cosine-similarity
+  primitives — no CGO is required for the default build. The
+  onnx-tagged build does require `CGO_ENABLED=1` and a system C
+  toolchain (the `onnxruntime_go` bindings use cgo for the dlopen /
+  ABI shim), but `libonnxruntime` itself is still loaded dynamically
+  via dlopen() so the resulting binary is portable across machines
+  with the pinned shared library present.
+
+The default model is `paraphrase-multilingual-MiniLM-L12-v2` quantised to
+int8 (~45 MB), distilled from XLM-RoBERTa, covering 50+ languages including
+the W4 jurisdictions (CJK, Arabic, Thai, Hindi, European locales).
+Inference budget: pre-filter ≤ 5 ms, disambiguator ≤ 10 ms, total ML
+overhead ≤ 15 ms per scan on commodity CPU. The pipeline embeds the
+content once at the top of the ML block and feeds the same vector to
+both stages via the `*Vec` cache-companions on `Layer`, so the
+per-stage budgets above are *additive in CPU*, not *additive in
+embed latency* — when both stages fire on the same scan they share
+a single ~5 ms Embed call. Embed failures fall through to the
+single-step `PreFilter` / `DisambiguatorScore` entry points (which
+embed independently and short-circuit on errors), so the
+optimisation is a pure latency win and never changes the verdict.
+
+Model artefacts (centroids, disambiguator weights, ONNX model + tokenizer)
+load from `~/.shieldnet/models/` by default. The agent runs end-to-end with
+the model absent (NullEmbedder fallback) so the model file is *not* bundled
+in the agent binary release artefacts; `scripts/fetch-ml-model.sh` downloads
+it on demand with a SHA-256 verification path, and the per-OS ONNX C++
+shared-library bundling in `release.yml` lands as a separate follow-up
+commit. Operators wire the layer in by setting `dlp_ml_boost` in
+`config.yaml` to a non-zero integer in the inclusive range `[1, 3]`; the
+agent logs a one-line summary on startup describing whether the layer ended
+up `ready=true`, and `GET /api/dlp/config` exposes an `ml` sub-object with
+`{boost, ready, build_tag_onnx}` so the Electron tray and the browser
+extension can observe the same state without reading the daemon's logs.
+
 **Performance budget (per scan):**
 
 | Step                              | Time    | Memory                              |

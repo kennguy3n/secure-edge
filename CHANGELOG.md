@@ -10,6 +10,109 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP optional ML-augmented detection layer (Workstream 3).**
+  Adds `agent/internal/dlp/ml/` — a strictly-additive ML layer that
+  bolts onto the deterministic DLP pipeline. Two integration points:
+  (1) a *pre-filter* that may skip regex validation when the embedder
+  thinks content is benign **and** no Critical / High AC candidate is
+  in flight, and (2) a *disambiguator* that nudges borderline scores
+  (within `mlBorderlineWidth == 1` of the per-severity block
+  threshold) by `±MLBoost`. High-confidence deterministic decisions
+  are immune to the ML signal in both directions, so the
+  deterministic pipeline retains veto power.
+
+  Implementation:
+
+  - Real `ONNXEmbedder` backed by `github.com/yalue/onnxruntime_go`
+    + `github.com/sugarme/tokenizer` (SentencePiece + HuggingFace
+    fast tokenizer JSON) lives behind the `onnx` build tag. The
+    default build and CI use the in-tree `NullEmbedder` and remain
+    CGO-free. The onnx-tagged build requires CGO at compile time
+    (the onnxruntime_go bindings use cgo for the dlopen / ABI shim);
+    at runtime, onnxruntime itself is still loaded dynamically via
+    dlopen, so the binary is portable across machines as long as the
+    pinned `libonnxruntime` is reachable.
+  - Default model is `paraphrase-multilingual-MiniLM-L12-v2`
+    (multilingual, 50+ languages, 384-dim sentence embeddings,
+    ~5–8 ms inference on commodity CPU). Artefacts load from
+    `~/.shieldnet/models/model/` and are absent by default — the
+    pipeline silently falls back to the fully-deterministic path
+    when any artefact is missing.
+  - `agent/internal/dlp/cmd/build_ml_artefacts` is an offline
+    corpus tool that reads the existing TP / TN JSONL corpus,
+    computes per-class L2-normalised centroids, fits a frozen
+    Fisher / LDA-1d linear head from those centroids
+    (`w = L2-normalise(TP - TN)`, `bias` centred at the midpoint
+    of the per-class mean projections), and writes the
+    `centroids.json` / `disambiguator.json` artefacts the layer
+    consumes at runtime. The committed artefacts were produced
+    from 500 TP / 500 TN samples; the cosine gap between the
+    two class centroids is ≈0.50 (meaningful pre-filter signal),
+    and the linear head separates the training corpus with 100%
+    sign-accuracy on both classes (TP mean projection ≈ +0.47,
+    TN mean projection ≈ -0.35, bias ≈ -0.058).
+  - `scripts/fetch-ml-model.sh` + `scripts/fetch-onnxruntime.sh`
+    drive a pinned, reproducible install. The model script defaults
+    to the int8-quantised checkpoint (`onnx/model_qint8_avx512.onnx`,
+    118 MB) and enforces the SHA-256 pins committed to
+    `scripts/ml-model-manifest.txt`; the onnxruntime script pulls
+    the official Microsoft CPU release tarball for the current
+    OS/arch and enforces the pins committed to
+    `scripts/onnxruntime-manifest.txt`. Both are reproducible from
+    a clean clone — a tampered upstream artefact triggers a hard
+    failure on download.
+  - New top-level `INSTALL_ML.md` documents the end-to-end install
+    on Linux, macOS, and Windows, including the privacy invariants,
+    disk / memory footprint, and rollback procedure.
+  - New `agent/Makefile` targets: `install-onnx-runtime`, `install-ml`,
+    `build-onnx`, and a combined `install` that downloads both
+    artefacts and builds the onnx-tagged binary in one step.
+  - The model itself is intentionally NOT bundled in agent release
+    artefacts to keep the binary small and the optional ML
+    dependency clearly separable.
+  - `release.yml` now produces a `secure-edge-agent-onnx-<os>-<arch>`
+    bundle alongside the default CGO-free binary. Each bundle ships
+    the onnx-tagged agent binary and the matching SHA-pinned
+    `libonnxruntime.{so,dylib}` / `onnxruntime.dll` from the
+    Microsoft 1.25.0 release, packaged together so a download +
+    extract yields a working ML-augmented agent without LD_LIBRARY
+    path or registry surgery. The build uses native runners
+    (ubuntu-latest, macos-13, macos-latest, windows-latest) plus a
+    gcc-aarch64-linux-gnu cross for linux/arm64, all gated on the
+    pinned SHA-256 manifest matching the upstream tarball.
+  - `config.Config` gains three opt-in fields: `dlp_ml_model_dir`,
+    `dlp_ml_boost`, `dlp_ml_prefilter_threshold`. The agent's
+    startup path constructs the Layer when `dlp_ml_boost > 0` and
+    logs a single summary line describing whether the layer ended
+    up ready.
+  - `GET /api/dlp/config` now embeds an `ml` sub-object with
+    `{boost, ready, build_tag_onnx}` so the Electron tray and the
+    browser extension can observe whether the ML layer is live.
+    `PUT /api/dlp/config` preserves `MLBoost` across writes so a
+    tray slider change does NOT silently disable the ML
+    augmentation until the next process restart.
+  - Per-OS ONNX C++ shared-library bundling in `release.yml` and
+    binary release-asset distribution of the model itself remain
+    explicitly deferred to follow-up commits. The trained linear-
+    head deferral is **closed**: the committed `disambiguator.json`
+    is now a real LDA-1d head produced by `build_ml_artefacts`.
+
+  Verification:
+
+  - `make test`, `go vet`, and `go test -race -count=1 ./...` are
+    green with and without `-tags=onnx`.
+  - `TestDLPAccuracyLarge` / `TestDLPAccuracyRegression` are green
+    with the layer absent — the W4 baseline is fully preserved
+    bit-for-bit.
+  - `go test -tags=onnx ./internal/dlp/ml/...` is green; with
+    `SHIELDNET_ONNXRUNTIME_LIB` and `SHIELDNET_TEST_ONNX_MODEL_DIR`
+    pointed at a real install, four integration tests prove the
+    embedder produces L2-normalised 384-dim vectors, stable
+    embeddings across repeated calls, discriminative cosine
+    distances on semantically related vs. unrelated inputs, and
+    graceful fallback when only one of the two artefacts is on
+    disk.
+
 - **DLP global-PII coverage expanded from 718 to 812 rules (Workstream 4).**
   Adds 94 jurisdiction-specific personal-data detectors across 7 themed
   batches covering GDPR (EU), Switzerland, the UK, the GCC / Middle

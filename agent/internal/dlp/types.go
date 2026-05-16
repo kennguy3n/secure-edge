@@ -148,7 +148,33 @@ type ScoreWeights struct {
 	EntropyPenalty   int
 	ExclusionPenalty int
 	MultiMatchBoost  int
+
+	// MLBoost is the maximum absolute score adjustment the ML
+	// disambiguator may contribute to a borderline match. The
+	// scorer clamps the nudge to ±MLBoost. Zero or negative
+	// disables ML scoring for this Pipeline — both Pipeline.Scan
+	// (which skips the embedder call) and ScoreMatch (which
+	// skips the nudge entirely) honour that contract; the
+	// DefaultMLBoost constant is the suggested live value, NOT a
+	// silent fallback for an explicit zero. Default is 0 — ML
+	// augmentation is opt-in.
+	MLBoost int
 }
+
+// DefaultMLBoost is the suggested operator-facing value for
+// ScoreWeights.MLBoost when ML augmentation is turned on. Picked
+// small (== 1) so the ML signal can only flip a match within one
+// point of the severity threshold; bigger nudges would let the
+// ML layer override the deterministic pipeline on near-confident
+// decisions.
+//
+// It is NOT used as a silent fallback for MLBoost <= 0: both
+// Pipeline.Scan and ScoreMatch honour an explicit zero / negative
+// MLBoost as "ML scoring disabled" per the ScoreWeights doc, and
+// reading DefaultMLBoost in that path would silently re-enable the
+// nudge. The constant is referenced from comments and tests as a
+// recommended value, never as a runtime default.
+const DefaultMLBoost = 1
 
 // DefaultScoreWeights mirrors the defaults seeded into dlp_config.
 func DefaultScoreWeights() ScoreWeights {
@@ -158,6 +184,10 @@ func DefaultScoreWeights() ScoreWeights {
 		EntropyPenalty:   -2,
 		ExclusionPenalty: -3,
 		MultiMatchBoost:  1,
+		// MLBoost defaults to 0 — ML is opt-in. The pipeline
+		// only sets MLBoost > 0 when the ml.Layer is Ready and
+		// the operator has explicitly enabled ML augmentation.
+		MLBoost: 0,
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
 	"github.com/kennguy3n/secure-edge/agent/internal/store"
@@ -515,10 +516,51 @@ func (s *Server) handleDLPScan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-// dlpConfigResponse is the wire shape of GET /api/dlp/config and the
-// expected body of PUT /api/dlp/config. We just reflect the SQLite
-// dlp_config columns so callers can round-trip the value.
+// dlpConfigResponse is the wire shape of PUT /api/dlp/config and the
+// persisted-side of GET /api/dlp/config. We reflect the SQLite
+// dlp_config columns so callers can round-trip the value. The GET
+// response additionally carries an `ml` sub-object describing the
+// live ML layer's state (see dlpConfigGetResponse below); the PUT
+// body intentionally does NOT accept `ml` because the ML layer is
+// process-local and configured at startup from YAML, not stored
+// in SQLite.
 type dlpConfigResponse = store.DLPConfig
+
+// dlpMLStatus is the wire shape of the `ml` sub-object returned by
+// GET /api/dlp/config. The fields are read-only and reflect the
+// in-process Layer's state. Operators flip dlp_ml_boost in the
+// YAML config and restart the agent to change these values; they
+// are *not* settable through this endpoint by design (a runtime
+// surface for flipping ML on/off would require a SQLite migration
+// for the persistence side and a thread-safe rebuild of the
+// embedder + centroids, neither of which is in scope for the W3
+// first cut).
+type dlpMLStatus struct {
+	// Boost is the live ScoreWeights.MLBoost, which the pipeline's
+	// ScoreMatch consults to cap the disambiguator nudge at
+	// ±Boost. Zero means the deterministic pipeline is in full
+	// control regardless of the loaded model.
+	Boost int `json:"boost"`
+	// Ready reports whether the in-process Layer would actually
+	// contribute a signal: embedder loaded AND at least one of
+	// pre-filter / disambiguator is configured. False means the
+	// layer is a no-op at every call site.
+	Ready bool `json:"ready"`
+	// BuildTagONNX reports whether the binary was built with
+	// -tags=onnx. False means the embedder is the NullEmbedder
+	// (zero-cost no-op); true means the binary can use a real
+	// ONNX session if a model directory is reachable.
+	BuildTagONNX bool `json:"build_tag_onnx"`
+}
+
+// dlpConfigGetResponse is the wire shape of GET /api/dlp/config.
+// Embedding store.DLPConfig keeps every persisted field at the top
+// level for backwards compatibility with the Electron tray's old
+// reader; the new `ml` field is purely additive.
+type dlpConfigGetResponse struct {
+	store.DLPConfig
+	ML dlpMLStatus `json:"ml"`
+}
 
 func (s *Server) handleDLPConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -531,13 +573,34 @@ func (s *Server) handleDLPConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// dlpMLStatusFromScanner reads the live MLBoost from the pipeline's
+// scoring weights and the Ready / build-tag state from the attached
+// Layer. Returns a zero-valued struct when DLP is not wired so the
+// JSON shape stays consistent across deployment modes. Takes a
+// DLPScanner so handler tests can drop in a stub without pulling
+// in a real *dlp.Pipeline.
+func dlpMLStatusFromScanner(p DLPScanner) dlpMLStatus {
+	if p == nil {
+		return dlpMLStatus{}
+	}
+	out := dlpMLStatus{Boost: p.Weights().MLBoost}
+	if layer := p.MLLayer(); layer != nil {
+		out.Ready = layer.Ready()
+	}
+	out.BuildTagONNX = ml.BuildTagONNX
+	return out
+}
+
 func (s *Server) handleDLPConfigGet(w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.Store.GetDLPConfig(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "dlp config unavailable")
 		return
 	}
-	writeJSON(w, http.StatusOK, cfg)
+	writeJSON(w, http.StatusOK, dlpConfigGetResponse{
+		DLPConfig: cfg,
+		ML:        dlpMLStatusFromScanner(s.DLP),
+	})
 }
 
 func (s *Server) handleDLPConfigPut(w http.ResponseWriter, r *http.Request) {
@@ -591,12 +654,21 @@ func (s *Server) applyLiveDLP(c profile.DLPConfigSnapshot) {
 		Medium:   c.ThresholdMedium,
 		Low:      c.ThresholdLow,
 	})
+	// MLBoost is process-local and configured at startup from
+	// YAML (cfg.DLPMLBoost), not stored in SQLite. Preserve the
+	// current pipeline weights' MLBoost across PUT /api/dlp/config
+	// so a config write does NOT silently disable the ML layer.
+	// Without this carry-over, applyLiveDLP would construct a
+	// fresh ScoreWeights with MLBoost == 0 and the disambiguator
+	// nudge would zero out on every PUT.
+	current := s.DLP.Weights()
 	s.DLP.SetWeights(dlp.ScoreWeights{
 		HotwordBoost:     c.HotwordBoost,
 		EntropyBoost:     c.EntropyBoost,
 		EntropyPenalty:   c.EntropyPenalty,
 		ExclusionPenalty: c.ExclusionPenalty,
 		MultiMatchBoost:  c.MultiMatchBoost,
+		MLBoost:          current.MLBoost,
 	})
 }
 

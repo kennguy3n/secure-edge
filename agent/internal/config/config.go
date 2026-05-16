@@ -123,6 +123,33 @@ type Config struct {
 	// scanning. Empty by default — all categories are active.
 	DLPDisabledCategories []string `yaml:"dlp_disabled_categories"`
 
+	// DLPMLModelDir is the directory under which the optional ML
+	// layer reads its on-disk artefacts (centroids.json,
+	// disambiguator.json) and, on -tags=onnx builds, the model/
+	// subdirectory containing the ONNX checkpoint and tokenizer.
+	// When blank (the default), the agent falls back to
+	// ml.DefaultBaseDir() — currently ~/.shieldnet/models on POSIX
+	// systems. Missing files degrade the ML layer to a no-op; the
+	// deterministic pipeline is unaffected.
+	DLPMLModelDir string `yaml:"dlp_ml_model_dir"`
+
+	// DLPMLBoost is the maximum absolute score adjustment the ML
+	// disambiguator may contribute to a borderline match. Defaults
+	// to 0 — ML augmentation is opt-in even with a model loaded.
+	// The scorer clamps the per-match nudge to ±DLPMLBoost, and
+	// the borderline gate (mlBorderlineWidth == 1) means confident
+	// blocks and confident non-blocks are immune to the nudge in
+	// both directions. Reasonable values are 1 or 2; values above
+	// 3 would let the ML layer override the deterministic pipeline
+	// on near-confident decisions, which we do not want.
+	DLPMLBoost int `yaml:"dlp_ml_boost"`
+
+	// DLPMLPreFilterThreshold overrides the cosine margin the ML
+	// pre-filter requires before it returns VerdictLikelyBenign.
+	// Zero or negative keeps the package default
+	// (ml.DefaultPreFilterThreshold).
+	DLPMLPreFilterThreshold float32 `yaml:"dlp_ml_prefilter_threshold"`
+
 	// AgentUpdateManifestURL is the HTTPS URL of the release
 	// manifest used by /api/agent/update-check. Leave blank to
 	// disable agent self-update entirely (endpoints return 503).
@@ -239,17 +266,17 @@ type Config struct {
 // Default returns a Config populated with the documented defaults.
 func Default() Config {
 	return Config{
-		UpstreamDNS:        "8.8.8.8:53",
-		DNSListen:          "127.0.0.1:53",
-		APIListen:          "127.0.0.1:8080",
-		RulePaths:          nil,
-		DBPath:             "secure-edge.db",
-		StatsFlushInterval: 60 * time.Second,
-		RuleUpdateURL:      "",
-		RuleUpdateInterval: 6 * time.Hour,
-		ProxyListen:        "127.0.0.1:8443",
-		ProxyEnabled:       false,
-		HeartbeatInterval:  time.Hour,
+		UpstreamDNS:           "8.8.8.8:53",
+		DNSListen:             "127.0.0.1:53",
+		APIListen:             "127.0.0.1:8080",
+		RulePaths:             nil,
+		DBPath:                "secure-edge.db",
+		StatsFlushInterval:    60 * time.Second,
+		RuleUpdateURL:         "",
+		RuleUpdateInterval:    6 * time.Hour,
+		ProxyListen:           "127.0.0.1:8443",
+		ProxyEnabled:          false,
+		HeartbeatInterval:     time.Hour,
 		LargeContentThreshold: 50 * 1024,
 		DLPCacheTTLSeconds:    5,
 		DLPCacheCapacity:      1024,
@@ -532,6 +559,21 @@ func merge(defaults, override Config) Config {
 	if len(override.DLPDisabledCategories) > 0 {
 		out.DLPDisabledCategories = override.DLPDisabledCategories
 	}
+	if override.DLPMLModelDir != "" {
+		out.DLPMLModelDir = override.DLPMLModelDir
+	}
+	// DLPMLBoost defaults to 0 and 0 == "disabled", so we copy
+	// any non-zero override straight in. Validation rejects
+	// negative or excessively large values at Load() time.
+	if override.DLPMLBoost != 0 {
+		out.DLPMLBoost = override.DLPMLBoost
+	}
+	// DLPMLPreFilterThreshold mirrors the same convention as the
+	// other float thresholds in this file: 0 means "use the
+	// package default", anything positive overrides it.
+	if override.DLPMLPreFilterThreshold > 0 {
+		out.DLPMLPreFilterThreshold = override.DLPMLPreFilterThreshold
+	}
 	if override.AgentUpdateManifestURL != "" {
 		out.AgentUpdateManifestURL = override.AgentUpdateManifestURL
 	}
@@ -627,6 +669,19 @@ func (c Config) validate() error {
 	}
 	if c.DLPRateLimitPerSec < 0 {
 		return errors.New("dlp_rate_limit_per_sec must not be negative")
+	}
+	if c.DLPMLBoost < 0 {
+		return errors.New("dlp_ml_boost must not be negative")
+	}
+	if c.DLPMLBoost > 3 {
+		// Cap at 3 to enforce the documented contract that the ML
+		// layer cannot override the deterministic pipeline on
+		// near-confident decisions. The borderline gate is ±1, so
+		// nudges above 3 would mean a single embedder call can move
+		// a match by more than the entire borderline window —
+		// effectively a recall regression. If you genuinely want a
+		// wider envelope, change mlBorderlineWidth first.
+		return errors.New("dlp_ml_boost must be between 0 and 3 inclusive")
 	}
 	switch c.EnforcementMode {
 	case "", "personal", "team", "managed":

@@ -1,0 +1,51 @@
+# ShieldNet Secure Edge — pinned ML model manifest (W3 / G3).
+#
+# This file pins the exact upstream artefacts the agent's optional
+# ML-augmented detection layer (W3) expects to find under
+# ~/.shieldnet/models/model/. It is sourced by
+# scripts/fetch-ml-model.sh on every default invocation.
+#
+# Source repo:
+#   huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+#
+# Why these specific values:
+#
+#   - MODEL_REV is pinned to a specific git commit on Hugging Face so
+#     a future re-export by the upstream author does not silently
+#     change the bytes the agent downloads.
+#   - MODEL_ONNX_PATH points to the int8-quantised export
+#     (`model_qint8_avx512.onnx`, 118 MB). The qint8 ONNX bytes
+#     are byte-identical across the avx512 / avx512_vnni / arm64
+#     filenames in the upstream repo; ONNX Runtime selects the
+#     right CPU kernel at execution time. The non-quantised FP32
+#     model is 470 MB and is not the default.
+#   - Each *_SHA value is the upstream lfs hash for the file, also
+#     confirmed against the HTTP `x-linked-etag` response header.
+#     fetch-ml-model.sh enforces these on download; a mismatch is a
+#     hard failure and the partial file is removed.
+#   - The manifest is plain-text and committed to the repo so any
+#     reviewer (or downstream operator) can diff a tampering attempt
+#     against git history.
+#
+# How to verify upstream:
+#
+#   curl -sI \
+#     "https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2/resolve/${MODEL_REV}/${MODEL_ONNX_PATH}" \
+#     | grep -i 'x-linked-etag'
+#
+# (and similarly for tokenizer.json / sentencepiece.bpe.model)
+
+MODEL_REPO="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_REV="e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+
+# Default int8-quantised checkpoint.
+MODEL_ONNX_PATH="onnx/model_qint8_avx512.onnx"
+MODEL_ONNX_SHA="783fea82d71a58179b830a4dbd2d58447e640609e98eedf9ffa12622d375a672"
+MODEL_ONNX_SIZE="118412398"
+
+# HuggingFace fast tokenizer (XLM-RoBERTa vocab) and underlying
+# SentencePiece model.
+TOKENIZER_SHA="2c3387be76557bd40970cec13153b3bbf80407865484b209e655e5e4729076b8"
+TOKENIZER_SIZE="9081518"
+SPM_SHA="cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+SPM_SIZE="5069051"

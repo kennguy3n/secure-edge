@@ -161,8 +161,8 @@ func ServeNativeMessagingWithOptions(ctx context.Context, scanner DLPScanner, st
 
 		var req NativeMessageRequest
 		resp := NativeMessageResponse{}
-		respKind := ""     // mirror request kind into the response MAC input
-		skipMAC := false   // set when the response should NOT carry a MAC (parse-error / hello reply / no secret)
+		respKind := ""   // mirror request kind into the response MAC input
+		skipMAC := false // set when the response should NOT carry a MAC (parse-error / hello reply / no secret)
 		if jerr := json.Unmarshal(raw, &req); jerr != nil {
 			// Best-effort error reply when we can't even parse the
 			// envelope. id is left at zero — the extension treats

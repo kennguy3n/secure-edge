@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
@@ -330,7 +331,9 @@ func (f *fakeDLP) Scan(_ context.Context, _ string) dlp.ScanResult {
 }
 func (f *fakeDLP) Threshold() *dlp.ThresholdEngine { return f.thr }
 func (f *fakeDLP) SetWeights(w dlp.ScoreWeights)   { f.weights = w }
+func (f *fakeDLP) Weights() dlp.ScoreWeights       { return f.weights }
 func (f *fakeDLP) Patterns() []*dlp.Pattern        { return nil }
+func (f *fakeDLP) MLLayer() *ml.Layer              { return nil }
 
 func TestDLPScan_WithoutPipelineReturns503(t *testing.T) {
 	srv, _, _ := newTestServer(t)
@@ -437,6 +440,80 @@ func TestDLPConfig_PutPropagatesWeightsToPipeline(t *testing.T) {
 	if fake.weights != want {
 		t.Fatalf("live pipeline weights = %+v, want %+v", fake.weights, want)
 	}
+}
+
+// TestDLPConfig_PutPreservesMLBoost is the regression around the
+// "MLBoost carry-over" logic in applyLiveDLP. MLBoost is process-
+// local (set at startup from YAML) and intentionally not stored in
+// SQLite. A PUT /api/dlp/config that does NOT mention MLBoost must
+// not zero it out — otherwise every tray/extension config write
+// would silently disable the ML disambiguator until the next
+// process restart.
+func TestDLPConfig_PutPreservesMLBoost(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	fake := &fakeDLP{
+		thr: dlp.NewThresholdEngine(dlp.DefaultThresholds()),
+		// Simulate a startup-time MLBoost set by attachMLLayer.
+		weights: dlp.ScoreWeights{MLBoost: 2},
+	}
+	srv.SetDLP(fake)
+
+	cfg := store.DLPConfig{
+		ThresholdCritical: 1, ThresholdHigh: 2, ThresholdMedium: 3, ThresholdLow: 4,
+		HotwordBoost: 1, EntropyBoost: 1, EntropyPenalty: -1,
+		ExclusionPenalty: -1, MultiMatchBoost: 1,
+	}
+	body, _ := json.Marshal(cfg)
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodPut, "/api/dlp/config", bytes.NewBuffer(body))
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT got %d body=%q", rec.Code, rec.Body.String())
+	}
+	if fake.weights.MLBoost != 2 {
+		t.Fatalf("MLBoost = %d after PUT; expected preserved value 2", fake.weights.MLBoost)
+	}
+}
+
+// TestDLPConfig_GetIncludesMLStatus verifies the GET response
+// carries the new `ml` sub-object so the Electron tray and
+// /api/dlp/config consumers can observe the live layer state. The
+// fake scanner reports MLBoost=0 / no layer, which is the default
+// "ML disabled" posture every install starts in.
+func TestDLPConfig_GetIncludesMLStatus(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	srv.SetDLP(&fakeDLP{
+		thr:     dlp.NewThresholdEngine(dlp.DefaultThresholds()),
+		weights: dlp.ScoreWeights{MLBoost: 0},
+	})
+
+	rec := httptest.NewRecorder()
+	req := newLocalRequest(http.MethodGet, "/api/dlp/config", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/dlp/config got %d", rec.Code)
+	}
+	var got struct {
+		ML struct {
+			Boost        int  `json:"boost"`
+			Ready        bool `json:"ready"`
+			BuildTagONNX bool `json:"build_tag_onnx"`
+		} `json:"ml"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v body=%q", err, rec.Body.String())
+	}
+	if got.ML.Boost != 0 {
+		t.Fatalf("ml.boost = %d, want 0", got.ML.Boost)
+	}
+	if got.ML.Ready {
+		t.Fatalf("ml.ready = true, want false (no layer attached)")
+	}
+	// build_tag_onnx mirrors ml.BuildTagONNX. We don't assert a
+	// specific bool — the default test build is !onnx so it should
+	// be false, but the assertion is loose to keep this test the
+	// same across build flavours.
+	_ = got.ML.BuildTagONNX
 }
 
 // stubUpdater is a minimal RuleUpdater for handler tests.
@@ -2250,5 +2327,3 @@ func TestLongIOHandlers_DropWriteDeadline(t *testing.T) {
 		})
 	}
 }
-
-

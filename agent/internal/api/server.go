@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kennguy3n/secure-edge/agent/internal/dlp"
+	"github.com/kennguy3n/secure-edge/agent/internal/dlp/ml"
 	"github.com/kennguy3n/secure-edge/agent/internal/profile"
 	"github.com/kennguy3n/secure-edge/agent/internal/rules"
 	"github.com/kennguy3n/secure-edge/agent/internal/stats"
@@ -135,7 +136,9 @@ type DLPScanner interface {
 	Scan(ctx context.Context, content string) dlp.ScanResult
 	Threshold() *dlp.ThresholdEngine
 	SetWeights(w dlp.ScoreWeights)
+	Weights() dlp.ScoreWeights
 	Patterns() []*dlp.Pattern
+	MLLayer() *ml.Layer
 }
 
 // RuleUpdater is the subset of rules.Updater the API needs. Wired in
@@ -504,7 +507,6 @@ func (s *Server) RiskyFileExtensions() ([]string, bool) {
 	copy(cp, s.riskyFileExtensions)
 	return cp, true
 }
-
 
 // Handler returns the http.Handler wired with all routes and CORS.
 func (s *Server) Handler() http.Handler {

@@ -13,6 +13,8 @@
 
 package dlp
 
+import "math"
+
 // multiMatchCap is the maximum number of "extra" matches that
 // contribute multi_match_boost to the score. Without a cap a single
 // blob full of emails would drown out higher-severity hits.
@@ -112,7 +114,15 @@ func ScoreMatch(in ScoreInput) int {
 			if boost <= 0 {
 				boost = DefaultMLBoost
 			}
-			nudge := int(in.MLScore * float32(boost))
+			// math.Round is load-bearing: Go's int() conversion
+			// truncates toward zero, so int(0.95) == 0 and the
+			// disambiguator nudge would be a no-op for any
+			// realistic non-saturated MLScore at MLBoost == 1.
+			// Round-half-away-from-zero is the right rule here:
+			// a disambiguator score of ±0.5+ should produce a
+			// ±1 nudge so the borderline gate can actually flip
+			// matches across the threshold.
+			nudge := int(math.Round(float64(in.MLScore) * float64(boost)))
 			if nudge > boost {
 				nudge = boost
 			} else if nudge < -boost {

@@ -135,7 +135,7 @@ proxy controller is not configured.
 ## Extension transport
 
 The extension prefers Native Messaging and falls back to HTTP; see
-[ARCHITECTURE.md](./ARCHITECTURE.md#companion-extension) for transport
+[ARCHITECTURE.md](./ARCHITECTURE.md#companion-extension-extension) for transport
 details and enforcement caveats.
 
 ## Enterprise features

@@ -163,7 +163,7 @@ fetched from `profile_url` on agent start, and reloadable via
 
 Field shapes are pinned by `profile.Profile` in
 [`agent/internal/profile/profile.go`](../agent/internal/profile/profile.go);
-see [ARCHITECTURE.md § Enterprise profiles](../ARCHITECTURE.md#enterprise-profiles)
+see [ARCHITECTURE.md § Enterprise profiles](../ARCHITECTURE.md#enterprise-profiles-agentinternalprofile)
 for the schema diagram.
 
 Validation runs on every load. A malformed profile falls back to the

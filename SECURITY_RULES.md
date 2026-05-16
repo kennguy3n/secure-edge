@@ -8,8 +8,8 @@ and authoring workflow, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
 
 The bulk of the per-section tables below predates the W1 pattern
-expansion (376 → 720) and the subsequent W4 global-PII expansion
-(720 → 812 across GDPR / Switzerland / UK / GCC / SEA / HIPAA /
+expansion (376 → 718) and the subsequent W4 global-PII expansion
+(718 → 812 across GDPR / Switzerland / UK / GCC / SEA / HIPAA /
 CCPA). They are kept as a curated overview of the foundational
 patterns. The full and current list of every pattern, with its
 severity, prefix, hotword settings, regex, and category, is the
@@ -19,7 +19,7 @@ foundational set, not the W1- or W4-expanded set.
 
 ### W4 — Global PII coverage (added)
 
-The W4 expansion adds 92 region-specific personal-data patterns
+The W4 expansion adds 94 region-specific personal-data patterns
 covering jurisdictions where GDPR, HIPAA, CCPA, GCC privacy laws,
 the UK Data Protection Act, and the Swiss FADP / nFADP require
 specific identifier classes to be treated as personal data. The

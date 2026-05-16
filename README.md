@@ -334,7 +334,7 @@ live in `*_bench_test.go` files; see [BENCHMARKS.md](./BENCHMARKS.md).
 | `pii_ccpa`           | 5        | California Driver's Licence / State ID / Medi-Cal Beneficiary ID / Vehicle Plate / CDTFA Sales Tax Permit                                 |
 | `payments`           | 5        | Stripe, Square, PayPal, Braintree                                                                                                         |
 | `pii`                | 4        | US SSN, credit cards, emails, phones                                                                                                      |
-| `pii_switzerland`    | 4        | Swiss AHV / AVS, Swiss IBAN, Swiss UID (CHE-…), Swiss Passport                                                                            |
+| `pii_switzerland`    | 4        | Swiss AHV / AVS, Swiss UID (CHE-…), Swiss Passport, Swiss New Old-Age Insurance Number (ZAS). Swiss IBANs (`CH..`) are matched by the `EU IBAN (SEPA)` pattern in `pii_eu`. |
 | `iac`                | 3        | Atlas, Spacelift, Env0                                                                                                                    |
 
 See [SECURITY_RULES.md](./SECURITY_RULES.md) for the per-pattern table

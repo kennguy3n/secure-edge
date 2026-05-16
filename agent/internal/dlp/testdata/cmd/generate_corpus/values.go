@@ -2344,7 +2344,10 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 		return "Routing Number: " + randFromAlphabet(r, digits, 9) + "\nAccount Number: " + randFromAlphabet(r, digits, 12)
 	}
 	// W4 Batch 1: GDPR / EU national identifiers.
-	euCountries := []string{"AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"}
+	// GB is a SEPA member post-Brexit and appears in the EU IBAN
+	// (SEPA) regex alternation; include it here so the generator
+	// actually exercises that branch in the synthetic corpus.
+	euCountries := []string{"AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"}
 	valueGenerators["EU IBAN (SEPA)"] = func(r *rand.Rand) string {
 		c := pick(r, euCountries)
 		// IBAN body length varies per country; emit a 14–22 char body to keep things distinctive.

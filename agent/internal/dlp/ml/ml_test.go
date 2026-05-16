@@ -142,6 +142,42 @@ func TestPreFilter_UnknownOnEmbedderError(t *testing.T) {
 	}
 }
 
+func TestPreFilter_DefensiveCopyOfCentroids(t *testing.T) {
+	// NewPreFilter must take a defensive copy of the caller's
+	// centroid slices: a post-construction mutation of the
+	// caller-owned TP / TN backing arrays must not change the
+	// PreFilter's classification. Regression test for the
+	// post-Devin-Review fix.
+	emb := &stubEmbedder{
+		dim:   3,
+		ready: true,
+		vectors: map[byte][]float32{
+			't': {1, 0, 0},
+			'b': {0, 1, 0},
+		},
+	}
+	tp := []float32{1, 0, 0}
+	tn := []float32{0, 1, 0}
+	pf, err := NewPreFilter(emb, Centroids{TP: tp, TN: tn}, 0.1)
+	if err != nil {
+		t.Fatalf("NewPreFilter: %v", err)
+	}
+	// Pre-mutation: benign content lands on the TN centroid.
+	if v := pf.Classify(context.Background(), "benign"); v != VerdictLikelyBenign {
+		t.Fatalf("pre-mutation verdict = %v, want VerdictLikelyBenign", v)
+	}
+	// Mutate the caller-owned slices to garbage.
+	tp[0], tp[1], tp[2] = 99, 99, 99
+	tn[0], tn[1], tn[2] = 99, 99, 99
+	// Post-mutation: verdict must still be VerdictLikelyBenign
+	// because the PreFilter owns an independent copy of the
+	// vectors. If the slices were shared, the cosine math above
+	// would silently change and this assertion would fail.
+	if v := pf.Classify(context.Background(), "benign"); v != VerdictLikelyBenign {
+		t.Errorf("post-mutation verdict = %v, want VerdictLikelyBenign (defensive copy missing?)", v)
+	}
+}
+
 func TestPreFilter_NilReceiver(t *testing.T) {
 	var pf *PreFilter
 	if v := pf.Classify(context.Background(), "x"); v != VerdictUnknown {

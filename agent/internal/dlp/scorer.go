@@ -104,16 +104,24 @@ func ScoreMatch(in ScoreInput) int {
 	// The nudge magnitude is capped at MLBoost (default 1) so the
 	// ML layer can flip a borderline match across the line in either
 	// direction but cannot drag a clearly-above match below it.
-	if in.MLScore != 0 && in.SeverityThreshold > 0 {
+	//
+	// Note: when in.Weights.MLBoost <= 0, the disambiguator nudge
+	// is skipped entirely. The ScoreWeights doc on MLBoost
+	// (types.go) is the contract — "Zero or negative disables ML
+	// scoring for this Pipeline." Pipeline.Scan already gates the
+	// MLScore on weights.MLBoost > 0, so this function-local
+	// guard is defensive coverage for direct ScoreMatch callers
+	// (tests, future call sites). DefaultMLBoost is *not* used as
+	// a fallback here — that would silently re-enable the nudge
+	// for callers who set MLBoost == 0 intending the documented
+	// "disabled" behaviour.
+	if in.MLScore != 0 && in.SeverityThreshold > 0 && in.Weights.MLBoost > 0 {
 		distance := score - in.SeverityThreshold
 		if distance < 0 {
 			distance = -distance
 		}
 		if distance <= mlBorderlineWidth {
 			boost := in.Weights.MLBoost
-			if boost <= 0 {
-				boost = DefaultMLBoost
-			}
 			// math.Round is load-bearing: Go's int() conversion
 			// truncates toward zero, so int(0.95) == 0 and the
 			// disambiguator nudge would be a no-op for any

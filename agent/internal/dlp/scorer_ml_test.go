@@ -108,20 +108,40 @@ func TestScoreMatch_MLScoreClampedByMLBoost(t *testing.T) {
 	}
 }
 
-func TestScoreMatch_MLScoreFallsBackToDefaultBoost(t *testing.T) {
-	// MLBoost left at zero (the default) — ScoreMatch should fall
-	// back to DefaultMLBoost so the ML signal still has the
-	// minimum-trust effect of ±1. Realistic MLScore == 0.6 to
-	// guard against int() truncation regressions: 0.6 rounds to 1.
+func TestScoreMatch_ZeroMLBoostDisablesNudge(t *testing.T) {
+	// MLBoost == 0 (the default) — the ScoreWeights doc says
+	// "Zero or negative disables ML scoring for this Pipeline."
+	// ScoreMatch must honour that contract directly: a non-zero
+	// MLScore + a valid SeverityThreshold + a borderline score
+	// must NOT produce a nudge when MLBoost is zero. Previously
+	// ScoreMatch fell back to DefaultMLBoost here, which silently
+	// re-enabled the nudge for direct ScoreMatch callers and
+	// contradicted the doc; this regression test locks the
+	// post-Devin-Review fix in place.
 	w := DefaultScoreWeights()
+	// DefaultScoreWeights().MLBoost is intentionally 0 — assert
+	// it so the test breaks loudly if the default ever drifts.
+	if w.MLBoost != 0 {
+		t.Fatalf("DefaultScoreWeights().MLBoost = %d; this test relies on the documented zero default", w.MLBoost)
+	}
 	in := ScoreInput{
 		Pattern:           Pattern{ScoreWeight: 2},
 		Weights:           w,
 		MLScore:           0.6,
 		SeverityThreshold: 3,
 	}
-	if got := ScoreMatch(in); got != 3 {
-		t.Errorf("ScoreMatch fallback to DefaultMLBoost = %d, want 3 (lifted by +1)", got)
+	if got := ScoreMatch(in); got != 2 {
+		t.Errorf("ScoreMatch(MLBoost=0, MLScore=0.6) = %d, want 2 (no nudge — ML disabled)", got)
+	}
+
+	// Negative MLBoost takes the same path. The Config layer
+	// validates 0..3, but a direct-constructed ScoreWeights with
+	// MLBoost == -1 must also leave the deterministic score
+	// untouched rather than fall back to DefaultMLBoost.
+	w.MLBoost = -1
+	in.Weights = w
+	if got := ScoreMatch(in); got != 2 {
+		t.Errorf("ScoreMatch(MLBoost=-1, MLScore=0.6) = %d, want 2 (no nudge — ML disabled)", got)
 	}
 }
 
@@ -214,8 +234,8 @@ func TestScoreMatch_MLScoreClampedAtMLBoost2(t *testing.T) {
 		want    int
 	}{
 		{"0.3_rounds_to_+1", 0.3, 4},
-		{"0.7_rounds_to_+1", 0.7, 4},  // 0.7 * 2 = 1.4 → 1
-		{"0.8_rounds_to_+2", 0.8, 5},  // 0.8 * 2 = 1.6 → 2
+		{"0.7_rounds_to_+1", 0.7, 4},   // 0.7 * 2 = 1.4 → 1
+		{"0.8_rounds_to_+2", 0.8, 5},   // 0.8 * 2 = 1.6 → 2
 		{"0.95_clamps_to_+2", 0.95, 5}, // 0.95 * 2 = 1.9 → 2 (clamp ceiling)
 		{"-0.3_rounds_to_-1", -0.3, 2},
 		{"-0.7_rounds_to_-1", -0.7, 2},

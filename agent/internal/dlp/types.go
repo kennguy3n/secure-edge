@@ -152,10 +152,12 @@ type ScoreWeights struct {
 	// MLBoost is the maximum absolute score adjustment the ML
 	// disambiguator may contribute to a borderline match. The
 	// scorer clamps the nudge to ±MLBoost. Zero or negative
-	// disables ML scoring for this Pipeline (ScoreMatch falls back
-	// to DefaultMLBoost only when MLBoost is omitted from a
-	// constructed ScoreWeights). Default is 0 — ML augmentation
-	// is opt-in.
+	// disables ML scoring for this Pipeline — both Pipeline.Scan
+	// (which skips the embedder call) and ScoreMatch (which
+	// skips the nudge entirely) honour that contract; the
+	// DefaultMLBoost constant is the suggested live value, NOT a
+	// silent fallback for an explicit zero. Default is 0 — ML
+	// augmentation is opt-in.
 	MLBoost int
 }
 

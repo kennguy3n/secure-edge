@@ -231,3 +231,47 @@ func TestPipeline_ML_EmbedderErrorsDoNotBreakPipeline(t *testing.T) {
 		t.Fatalf("deterministic path broken under ML layer: %+v", got)
 	}
 }
+
+// embedCounter wraps fakeEmbedder so a test can count Embed() calls.
+// Used by TestPipeline_ML_EmptyCandidatesSkipsEmbedder to prove the
+// no-candidate fast path never calls the embedder.
+type embedCounter struct {
+	*fakeEmbedder
+	n int
+}
+
+func (e *embedCounter) Embed(ctx context.Context, content string) ([]float32, error) {
+	e.n++
+	return e.fakeEmbedder.Embed(ctx, content)
+}
+
+func TestPipeline_ML_EmptyCandidatesSkipsEmbedder(t *testing.T) {
+	// Regression test for the post-Devin-Review optimisation in
+	// Pipeline.Scan: when filterCandidates drops every candidate
+	// (or the AC scan finds none in the first place), the
+	// pipeline must short-circuit to ScanResult{} *without*
+	// invoking the ML embedder. Each Embed() call costs ~5-8 ms
+	// on the production MiniLM-L12 build, so the latency win is
+	// real even though the verdict is unchanged.
+	p := testPipeline(t)
+	emb := &embedCounter{fakeEmbedder: &fakeEmbedder{dim: 3, ready: true}}
+	art := &ml.Artefacts{
+		Centroids: &ml.Centroids{TP: []float32{1, 0, 0}, TN: []float32{0, 1, 0}},
+	}
+	l, err := ml.NewLayer(emb, art, 0.1)
+	if err != nil {
+		t.Fatalf("ml.NewLayer: %v", err)
+	}
+	p.SetMLLayer(l)
+
+	// Pure prose with no AC trigger words — filterCandidates
+	// will drop every candidate (and the AC scan itself is
+	// likely to find none). The embedder must never be touched.
+	got := p.Scan(context.Background(), "the weekly engineering metrics meeting went well")
+	if got.Blocked {
+		t.Fatalf("benign prose blocked: %+v", got)
+	}
+	if emb.n != 0 {
+		t.Errorf("embedder called %d time(s) for no-candidate scan; want 0", emb.n)
+	}
+}

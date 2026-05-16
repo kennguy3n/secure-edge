@@ -85,7 +85,16 @@ func NewPreFilter(emb Embedder, c Centroids, threshold float32) (*PreFilter, err
 	if threshold <= 0 {
 		threshold = DefaultPreFilterThreshold
 	}
-	return &PreFilter{emb: emb, tp: c.TP, tn: c.TN, threshold: threshold}, nil
+	// Defensive copy. Callers retain ownership of the supplied
+	// Centroids slices; the PreFilter must remain immune to any
+	// post-construction mutation of those slices (e.g. a reload
+	// path that reuses the same backing array). The copies are
+	// ~3 KB per slice for the 384-dim MiniLM-L12 model, so the
+	// allocation is negligible compared with the in-process
+	// model footprint.
+	tp := append([]float32(nil), c.TP...)
+	tn := append([]float32(nil), c.TN...)
+	return &PreFilter{emb: emb, tp: tp, tn: tn, threshold: threshold}, nil
 }
 
 // Classify computes the embedding for content and returns the

@@ -340,6 +340,19 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	// classifier verdict that does not match contentType.
 	candidates = filterCandidates(candidates, len(content), largeThreshold, disabledCats, contentType)
 
+	// When filterCandidates drops every candidate, the
+	// deterministic pipeline already produces ScanResult{} —
+	// running the ML pre-filter just to return the same answer
+	// would waste an embedder call (~5-8 ms on the production
+	// MiniLM-L12 build). Short-circuit before reaching the ML
+	// block so the no-candidate fast path stays fast.
+	if len(candidates) == 0 {
+		if cache != nil {
+			cache.Put(content, ScanResult{})
+		}
+		return ScanResult{}
+	}
+
 	// Optional ML pre-filter (W3). Runs after the AC scan so we
 	// know the candidate severity distribution, and only short-
 	// circuits when ALL of the following hold:

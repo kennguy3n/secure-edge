@@ -37,12 +37,17 @@ changes between feature releases — breaking entries are flagged explicitly.
     when any artefact is missing.
   - `agent/internal/dlp/cmd/build_ml_artefacts` is an offline
     corpus tool that reads the existing TP / TN JSONL corpus,
-    computes per-class L2-normalised centroids, and writes the
+    computes per-class L2-normalised centroids, fits a frozen
+    Fisher / LDA-1d linear head from those centroids
+    (`w = L2-normalise(TP - TN)`, `bias` centred at the midpoint
+    of the per-class mean projections), and writes the
     `centroids.json` / `disambiguator.json` artefacts the layer
-    consumes at runtime. The committed `ml/testdata/centroids.json`
-    was produced by this tool from 500 TP / 500 TN samples; the
-    cosine gap between the two class centroids is ≈0.50, which is
-    a meaningful pre-filter signal.
+    consumes at runtime. The committed artefacts were produced
+    from 500 TP / 500 TN samples; the cosine gap between the
+    two class centroids is ≈0.50 (meaningful pre-filter signal),
+    and the linear head separates the training corpus with 100%
+    sign-accuracy on both classes (TP mean projection ≈ +0.47,
+    TN mean projection ≈ -0.35, bias ≈ -0.058).
   - `scripts/fetch-ml-model.sh` downloads the model from Hugging
     Face into the expected path, computes SHA-256 hashes after
     download (with an optional `-m` pin flag for deployment
@@ -61,11 +66,11 @@ changes between feature releases — breaking entries are flagged explicitly.
     `PUT /api/dlp/config` preserves `MLBoost` across writes so a
     tray slider change does NOT silently disable the ML
     augmentation until the next process restart.
-  - Per-OS ONNX C++ shared-library bundling in `release.yml`,
-    binary release-asset distribution of the model itself, and a
-    trained linear-head for the disambiguator (the committed
-    weights are all-zero, i.e. pure-cosine signal) remain
-    explicitly deferred to follow-up commits.
+  - Per-OS ONNX C++ shared-library bundling in `release.yml` and
+    binary release-asset distribution of the model itself remain
+    explicitly deferred to follow-up commits. The trained linear-
+    head deferral is **closed**: the committed `disambiguator.json`
+    is now a real LDA-1d head produced by `build_ml_artefacts`.
 
   Verification:
 

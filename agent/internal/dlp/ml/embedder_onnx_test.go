@@ -240,17 +240,67 @@ func TestLayer_RealModel_WithCommittedArtefacts(t *testing.T) {
 		t.Fatalf("PreFilter returned unexpected verdict %d (want VerdictUnknown or VerdictLikelyBenign)", v)
 	}
 
-	// Sanity: disambiguator returns a finite float32. The
-	// committed disambiguator.json is all-zero weights, so the
-	// expected score is exactly 0. This is the *test* that the
-	// "zero weights == zero signal" invariant the W3 design
-	// relies on actually holds at runtime.
-	score := layer.DisambiguatorScore(ctx, "Internal status update on the weekly engineering metrics meeting.")
-	if math.IsNaN(float64(score)) || math.IsInf(float64(score), 0) {
-		t.Fatalf("DisambiguatorScore returned non-finite %v", score)
-	}
-	if score != 0 {
-		t.Fatalf("DisambiguatorScore = %v with all-zero weights; want 0", score)
+	// Disambiguator contract: the committed disambiguator.json is
+	// now a real trained linear head (LDA-1d fit over the W4
+	// corpus by build_ml_artefacts). The head's documented
+	// contract is "positive scores for TP-like content (real
+	// secrets / PII), negative scores for TN-like content (benign
+	// prose / code)". This test verifies that contract end-to-end
+	// against the real ONNX model + the committed weights.
+	//
+	// Probes are shaped like the W4 corpus the head was fit on,
+	// because that distribution is what the disambiguator is
+	// expected to discriminate. The corpus TP samples are
+	// short *config* snippets (env / JSON / YAML) with embedded
+	// credentials; TN samples are short prose snippets, meeting
+	// notes, and code comments. Single-sentence prose probes
+	// (e.g. "AWS key X was rotated") fall outside the corpus
+	// shape and give weak/ambiguous scores — the W3 borderline
+	// gate handles that by deferring to the deterministic score,
+	// not by relying on the disambiguator. We therefore probe
+	// with the same content shape the head was trained on.
+	//
+	//   benignProse  — paragraph of policy text, no creds. Expect < 0.
+	//   benignCode   — short JS snippet with no creds.      Expect < 0.
+	//   tpConfig     — .env-style config with an embedded
+	//                  email + value. Expect > 0.
+	//   tpJSON       — JSON config with credentials field.  Expect > 0.
+	//
+	// The actual ML signal is meant for *borderline* matches:
+	// content that already passed the deterministic scoring
+	// threshold by a small margin. For high-confidence matches
+	// the disambiguator is bypassed entirely (see Pipeline.Scan).
+	// If a future model rebuild flips the sign on these probes
+	// against the committed corpus shape, the test catches it.
+	benignProse := "The security policy says: never paste credentials into chat. Use the secret manager."
+	benignCode := "// example service implementation\nfunction matches(input) { return hash(input) === SAMPLE_HASH; }"
+	tpConfig := "# production environment\nNODE_ENV=production\nLOG_LEVEL=info\n# user credential for production deployment\nnyussk.dbb3b@n9f0fo.io\ndu7hbz.qgj68@xt2dls.io"
+	tpJSON := `{
+  "env": "production",
+  "subscriber": "production",
+  "credential": "ztmnru.gmhmz@gki9u5.io"
+}`
+
+	for _, c := range []struct {
+		name     string
+		input    string
+		wantSign int // +1 = expect > 0, -1 = expect < 0
+	}{
+		{"benign_prose", benignProse, -1},
+		{"benign_code", benignCode, -1},
+		{"tp_config", tpConfig, +1},
+		{"tp_json", tpJSON, +1},
+	} {
+		score := layer.DisambiguatorScore(ctx, c.input)
+		if math.IsNaN(float64(score)) || math.IsInf(float64(score), 0) {
+			t.Fatalf("[%s] DisambiguatorScore returned non-finite %v", c.name, score)
+		}
+		if c.wantSign > 0 && score <= 0 {
+			t.Errorf("[%s] DisambiguatorScore = %v; want > 0 (TP-like content should score positive)", c.name, score)
+		}
+		if c.wantSign < 0 && score >= 0 {
+			t.Errorf("[%s] DisambiguatorScore = %v; want < 0 (benign content should score negative)", c.name, score)
+		}
 	}
 }
 

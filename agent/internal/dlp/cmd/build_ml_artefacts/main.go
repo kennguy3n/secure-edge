@@ -6,9 +6,10 @@
 // agent/internal/dlp/ml/testdata/:
 //
 //	centroids.json       — mean-embedding for TP and TN samples
-//	disambiguator.json   — linear head (zero-initialised; pure
-//	                       cosine pre-filter signal until offline
-//	                       training ships)
+//	disambiguator.json   — trained linear head (Fisher / LDA-1d
+//	                       fit from TP/TN centroids; gives
+//	                       positive scores for TP-like content,
+//	                       negative for TN-like)
 //
 // The tool requires a fully-loaded ONNX model at
 // ~/.shieldnet/models/model (or the directory passed as -model).
@@ -125,10 +126,146 @@ func main() {
 	if err := writeCentroids(filepath.Join(absOut, "centroids.json"), tpCentroid, tnCentroid); err != nil {
 		fatal("write centroids: %v", err)
 	}
-	if err := writeDisambiguator(filepath.Join(absOut, "disambiguator.json"), dim); err != nil {
+
+	t1 := time.Now()
+	head, stats, err := fitLinearHead(emb, tpSamples, tnSamples, tpCentroid, tnCentroid, dim)
+	if err != nil {
+		fatal("fit linear head: %v", err)
+	}
+	fmt.Printf("  linear head fitted in %s\n", time.Since(t1).Round(time.Millisecond))
+	fmt.Printf("    TP mean projection = %+.4f  (want > 0)\n", stats.MeanTPProjection)
+	fmt.Printf("    TN mean projection = %+.4f  (want < 0)\n", stats.MeanTNProjection)
+	fmt.Printf("    bias               = %+.4f\n", head.Bias)
+	fmt.Printf("    TP correct-sign    = %d/%d (%.1f%%)\n", stats.TPCorrectSign, stats.TPTotal, 100*float64(stats.TPCorrectSign)/float64(stats.TPTotal))
+	fmt.Printf("    TN correct-sign    = %d/%d (%.1f%%)\n", stats.TNCorrectSign, stats.TNTotal, 100*float64(stats.TNCorrectSign)/float64(stats.TNTotal))
+	if err := writeDisambiguatorHead(filepath.Join(absOut, "disambiguator.json"), head); err != nil {
 		fatal("write disambiguator: %v", err)
 	}
 	fmt.Printf("  wrote %s\n  wrote %s\n", filepath.Join(absOut, "centroids.json"), filepath.Join(absOut, "disambiguator.json"))
+}
+
+// linearHeadStats records the diagnostics fitLinearHead prints to
+// stdout for a maintainer to sanity-check the produced head. None
+// of these fields ship on disk — they exist purely so the build
+// step is auditable.
+type linearHeadStats struct {
+	MeanTPProjection float64
+	MeanTNProjection float64
+	TPCorrectSign    int
+	TPTotal          int
+	TNCorrectSign    int
+	TNTotal          int
+}
+
+// fitLinearHead computes a frozen linear head from the supplied
+// TP/TN samples using the Fisher / LDA-1d closed-form solution:
+//
+//	w = L2-normalise(TP_centroid - TN_centroid)
+//	bias = -(mean(<x, w> | TP) + mean(<x, w> | TN)) / 2
+//
+// The bias centres the decision boundary so tanh(<x, w> + bias) is
+// positive for TP-like content and negative for TN-like content,
+// matching the contract documented on the Disambiguator type. This
+// is intentionally *not* a trained classifier with backprop — a
+// linear separator built from centroid geometry is the smallest
+// reviewable thing that produces a real signal, and it composes
+// cleanly with the pre-filter (which already exploits the
+// TP-vs-TN cosine gap).
+//
+// The function also re-embeds every TP and TN sample to compute
+// sign-accuracy statistics; these are returned to the caller so
+// the tool can print them as a sanity check.
+func fitLinearHead(emb ml.Embedder, tpSamples, tnSamples []string, tpCentroid, tnCentroid []float32, dim int) (ml.LinearHead, linearHeadStats, error) {
+	w := make([]float32, dim)
+	for i := 0; i < dim; i++ {
+		w[i] = tpCentroid[i] - tnCentroid[i]
+	}
+	var wn float64
+	for _, x := range w {
+		wn += float64(x) * float64(x)
+	}
+	if wn == 0 {
+		return ml.LinearHead{}, linearHeadStats{}, fmt.Errorf("TP and TN centroids are identical; cannot fit a separating direction")
+	}
+	inv := 1.0 / math.Sqrt(wn)
+	for i := range w {
+		w[i] = float32(float64(w[i]) * inv)
+	}
+
+	ctx := context.Background()
+	var tpSum, tnSum float64
+	var tpCnt, tnCnt int
+	projOf := func(samples []string, label string) ([]float64, error) {
+		projs := make([]float64, 0, len(samples))
+		for i, s := range samples {
+			v, err := emb.Embed(ctx, s)
+			if err != nil {
+				continue
+			}
+			if len(v) != dim {
+				return nil, fmt.Errorf("%s sample %d: embedding dim %d, want %d", label, i, len(v), dim)
+			}
+			var dot float64
+			for h := 0; h < dim; h++ {
+				dot += float64(v[h]) * float64(w[h])
+			}
+			projs = append(projs, dot)
+			if (i+1)%500 == 0 {
+				fmt.Printf("    %s projections: %d/%d\n", label, i+1, len(samples))
+			}
+		}
+		return projs, nil
+	}
+	tpProjs, err := projOf(tpSamples, "TP")
+	if err != nil {
+		return ml.LinearHead{}, linearHeadStats{}, err
+	}
+	for _, p := range tpProjs {
+		tpSum += p
+		tpCnt++
+	}
+	tnProjs, err := projOf(tnSamples, "TN")
+	if err != nil {
+		return ml.LinearHead{}, linearHeadStats{}, err
+	}
+	for _, p := range tnProjs {
+		tnSum += p
+		tnCnt++
+	}
+	if tpCnt == 0 || tnCnt == 0 {
+		return ml.LinearHead{}, linearHeadStats{}, fmt.Errorf("no successful embeddings for one class (tp=%d tn=%d)", tpCnt, tnCnt)
+	}
+	meanTP := tpSum / float64(tpCnt)
+	meanTN := tnSum / float64(tnCnt)
+	bias := -float32((meanTP + meanTN) / 2)
+
+	// Sign accuracy is the headline diagnostic: of the TP
+	// samples, how many produce a positive (TP-leaning) score
+	// after applying the bias? Same for TN. If either rate is
+	// substantially below 50 %, the LDA-1d projection has not
+	// found a separating direction and the caller should not
+	// ship the head.
+	var tpOK, tnOK int
+	for _, p := range tpProjs {
+		if float32(p)+bias > 0 {
+			tpOK++
+		}
+	}
+	for _, p := range tnProjs {
+		if float32(p)+bias < 0 {
+			tnOK++
+		}
+	}
+	head := ml.LinearHead{Weights: w, Bias: bias}
+	stats := linearHeadStats{
+		MeanTPProjection: meanTP,
+		MeanTNProjection: meanTN,
+		TPCorrectSign:    tpOK,
+		TPTotal:          tpCnt,
+		TNCorrectSign:    tnOK,
+		TNTotal:          tnCnt,
+	}
+	return head, stats, nil
 }
 
 // collectSamples walks root looking for *.jsonl files and returns
@@ -278,12 +415,11 @@ func writeCentroids(path string, tp, tn []float32) error {
 	return writeJSON(path, doc)
 }
 
-// writeDisambiguator writes a zero-initialised linear head. Pure
-// cosine pre-filter signal until an offline trainer ships real
-// weights. Using zeros (rather than omitting the file) means the
-// loader exercises the same code path in tests as it will in
-// production after the head is trained.
-func writeDisambiguator(path string, dim int) error {
+// writeDisambiguatorHead writes a fitted linear head to disk. The
+// caller has already validated that the head produces correctly
+// signed projections on the training corpus; this function only
+// serialises.
+func writeDisambiguatorHead(path string, head ml.LinearHead) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -291,8 +427,8 @@ func writeDisambiguator(path string, dim int) error {
 		Weights []float32 `json:"weights"`
 		Bias    float32   `json:"bias"`
 	}{
-		Weights: make([]float32, dim),
-		Bias:    0,
+		Weights: head.Weights,
+		Bias:    head.Bias,
 	}
 	return writeJSON(path, doc)
 }

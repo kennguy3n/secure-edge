@@ -187,10 +187,15 @@ rm -rf ~/.shieldnet/models/model
 # resolved state. The format is fixed in cmd/agent/main.go's
 # attachMLLayer and looks like:
 #
-#   dlp ml: layer ready=true  boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
-#   dlp ml: layer ready=false boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
+#   dlp ml: layer ready=true  boost=1 configured_boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
+#   dlp ml: layer ready=false boost=0 configured_boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
 #   dlp ml: embedder init failed: ... (falling back to NullEmbedder)
 #   dlp ml: model dir unresolved (HOME unset?); skipping
+#
+# `configured_boost` is what dlp_ml_boost is set to in config.yaml;
+# `boost` is what the pipeline is actually using right now. When
+# `ready=false` the agent forces `boost=0` so /api/dlp/config does
+# not report a non-zero boost on a layer that cannot consume it.
 #
 # After `make install` you want `ready=true` with `build_tag_onnx=true`.
 cd agent

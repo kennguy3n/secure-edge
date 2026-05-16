@@ -250,12 +250,26 @@ func attachMLLayer(p *dlp.Pipeline, cfg config.Config) *ml.Layer {
 	// resets, but MLBoost has to be reapplied. The applyLiveDLP
 	// helper does that on PUT by copying the live config from
 	// disk — see the ML-aware update in handlers.go.
+	//
+	// When the layer is not Ready (e.g. embedder init failed and
+	// the fallback NullEmbedder is in place), keep MLBoost at
+	// zero. Both ML entry points already short-circuit on Ready,
+	// so a non-zero MLBoost here would be operationally inert —
+	// but it would show up as {"boost": N, "ready": false} in
+	// GET /api/dlp/config and look like the ML layer was
+	// half-active. Aligning the reported boost with the actual
+	// runtime state keeps the operator-facing contract honest.
+	effectiveBoost := 0
+	if layer.Ready() {
+		effectiveBoost = cfg.DLPMLBoost
+	}
 	w := p.Weights()
-	w.MLBoost = cfg.DLPMLBoost
+	w.MLBoost = effectiveBoost
 	p.SetWeights(w)
 	log.Printf(
-		"dlp ml: layer ready=%t boost=%d threshold=%.3f base=%s build_tag_onnx=%t",
+		"dlp ml: layer ready=%t boost=%d configured_boost=%d threshold=%.3f base=%s build_tag_onnx=%t",
 		layer.Ready(),
+		effectiveBoost,
 		cfg.DLPMLBoost,
 		cfg.DLPMLPreFilterThreshold,
 		base,

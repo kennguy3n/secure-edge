@@ -161,11 +161,19 @@ type ScoreWeights struct {
 	MLBoost int
 }
 
-// DefaultMLBoost is the fallback cap on the ML borderline nudge
-// when the ScoreWeights value has MLBoost <= 0. Picked small
-// (== 1) so the ML signal can only flip a match within one point
-// of the severity threshold; bigger nudges would let the ML layer
-// override the deterministic pipeline on near-confident decisions.
+// DefaultMLBoost is the suggested operator-facing value for
+// ScoreWeights.MLBoost when ML augmentation is turned on. Picked
+// small (== 1) so the ML signal can only flip a match within one
+// point of the severity threshold; bigger nudges would let the
+// ML layer override the deterministic pipeline on near-confident
+// decisions.
+//
+// It is NOT used as a silent fallback for MLBoost <= 0: both
+// Pipeline.Scan and ScoreMatch honour an explicit zero / negative
+// MLBoost as "ML scoring disabled" per the ScoreWeights doc, and
+// reading DefaultMLBoost in that path would silently re-enable the
+// nudge. The constant is referenced from comments and tests as a
+// recommended value, never as a runtime default.
 const DefaultMLBoost = 1
 
 // DefaultScoreWeights mirrors the defaults seeded into dlp_config.

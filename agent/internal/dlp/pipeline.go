@@ -368,7 +368,15 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	// regardless of what the ML pre-filter says. The pre-filter is
 	// a *latency* shortcut for low-severity noise, never a recall
 	// hazard for high-severity secrets.
-	if mlLayer != nil && mlLayer.Ready() && !candidatesIncludeHighSeverity(candidates) {
+	//
+	// Gating on weights.MLBoost > 0 mirrors the disambiguator
+	// branch below. ScoreWeights.MLBoost is the documented kill
+	// switch ("Zero or negative disables ML scoring for this
+	// Pipeline"); enforcing it at both ML entry points means a
+	// future caller cannot install a Ready layer + MLBoost=0 and
+	// have the pre-filter surprise them by silently skipping
+	// medium/low-severity patterns.
+	if mlLayer != nil && mlLayer.Ready() && weights.MLBoost > 0 && !candidatesIncludeHighSeverity(candidates) {
 		if mlLayer.PreFilter(ctx, content) == ml.VerdictLikelyBenign {
 			if cache != nil {
 				cache.Put(content, ScanResult{})

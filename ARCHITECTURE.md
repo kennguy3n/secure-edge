@@ -170,7 +170,12 @@ Properties that make the layer reviewable line-by-line:
 - **Build-tag isolation** — the ONNX-backed embedder lives behind
   `//go:build onnx`. The default agent build, and CI, link only the
   `Null` embedder and the small classifier-head + cosine-similarity
-  primitives. No CGO is required for the default build.
+  primitives — no CGO is required for the default build. The
+  onnx-tagged build does require `CGO_ENABLED=1` and a system C
+  toolchain (the `onnxruntime_go` bindings use cgo for the dlopen /
+  ABI shim), but `libonnxruntime` itself is still loaded dynamically
+  via dlopen() so the resulting binary is portable across machines
+  with the pinned shared library present.
 
 The default model is `paraphrase-multilingual-MiniLM-L12-v2` quantised to
 int8 (~45 MB), distilled from XLM-RoBERTa, covering 50+ languages including

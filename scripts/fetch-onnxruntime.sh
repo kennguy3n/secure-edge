@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fetch-onnxruntime.sh — download the official Microsoft onnxruntime
-# CPU shared library that the agent's `-tags=onnx` build links
-# against at runtime via purego/dlopen.
+# CPU shared library that the agent's `-tags=onnx` build dlopen()'s
+# at startup via the onnxruntime_go cgo shim.
 #
 # The library is dropped into the same directory as the model files
 # so the agent's `resolveSharedLibrary` helper picks it up without

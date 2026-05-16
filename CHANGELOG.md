@@ -27,8 +27,11 @@ changes between feature releases — breaking entries are flagged explicitly.
     + `github.com/sugarme/tokenizer` (SentencePiece + HuggingFace
     fast tokenizer JSON) lives behind the `onnx` build tag. The
     default build and CI use the in-tree `NullEmbedder` and remain
-    CGO-free; `purego`/`dlopen` removes the CGO requirement even on
-    the onnx-tagged build.
+    CGO-free. The onnx-tagged build requires CGO at compile time
+    (the onnxruntime_go bindings use cgo for the dlopen / ABI shim);
+    at runtime, onnxruntime itself is still loaded dynamically via
+    dlopen, so the binary is portable across machines as long as the
+    pinned `libonnxruntime` is reachable.
   - Default model is `paraphrase-multilingual-MiniLM-L12-v2`
     (multilingual, 50+ languages, 384-dim sentence embeddings,
     ~5–8 ms inference on commodity CPU). Artefacts load from
@@ -67,6 +70,16 @@ changes between feature releases — breaking entries are flagged explicitly.
   - The model itself is intentionally NOT bundled in agent release
     artefacts to keep the binary small and the optional ML
     dependency clearly separable.
+  - `release.yml` now produces a `secure-edge-agent-onnx-<os>-<arch>`
+    bundle alongside the default CGO-free binary. Each bundle ships
+    the onnx-tagged agent binary and the matching SHA-pinned
+    `libonnxruntime.{so,dylib}` / `onnxruntime.dll` from the
+    Microsoft 1.25.0 release, packaged together so a download +
+    extract yields a working ML-augmented agent without LD_LIBRARY
+    path or registry surgery. The build uses native runners
+    (ubuntu-latest, macos-13, macos-latest, windows-latest) plus a
+    gcc-aarch64-linux-gnu cross for linux/arm64, all gated on the
+    pinned SHA-256 manifest matching the upstream tarball.
   - `config.Config` gains three opt-in fields: `dlp_ml_model_dir`,
     `dlp_ml_boost`, `dlp_ml_prefilter_threshold`. The agent's
     startup path constructs the Layer when `dlp_ml_boost > 0` and

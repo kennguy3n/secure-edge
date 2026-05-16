@@ -10,14 +10,16 @@ SHIELDNET_MODELS_DIR ?= $(HOME)/.shieldnet/models
 build:
 	go build -o $(AGENT_BINARY) ./cmd/agent
 
-# build-onnx produces an agent binary linked against onnxruntime via
-# the onnx build tag. The binary still loads onnxruntime at runtime
-# via dlopen/purego (no CGO required), so it runs on any matching
-# OS/arch — but the runtime lib must be reachable at start time
-# (under $(SHIELDNET_MODELS_DIR)/model or via SHIELDNET_ONNXRUNTIME_LIB).
+# build-onnx produces an agent binary that activates the optional
+# ONNX-backed embedder. Requires CGO_ENABLED=1 and a system C
+# toolchain — onnxruntime_go uses cgo for the dlopen / ABI shim. The
+# runtime library itself is still loaded dynamically via dlopen at
+# start time, so the binary is portable across machines as long as
+# $(SHIELDNET_MODELS_DIR)/model/libonnxruntime.{so,dylib} (or
+# $SHIELDNET_ONNXRUNTIME_LIB) is reachable.
 .PHONY: build-onnx
 build-onnx:
-	go build -tags=onnx -o $(AGENT_BINARY) ./cmd/agent
+	CGO_ENABLED=1 go build -tags=onnx -o $(AGENT_BINARY) ./cmd/agent
 
 .PHONY: test
 test:

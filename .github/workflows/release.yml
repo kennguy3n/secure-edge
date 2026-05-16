@@ -53,6 +53,165 @@ jobs:
           path: agent/dist/secure-edge-agent-*
           if-no-files-found: error
 
+  build-agent-onnx:
+    # Optional ML-augmented build (W3). Produces
+    # `secure-edge-agent-onnx-<os>-<arch>` binaries with -tags=onnx,
+    # bundled together with the per-OS onnxruntime CPU shared library
+    # from the official Microsoft release. Each archive is
+    # SHA-pinned (the onnxruntime tarball against
+    # scripts/onnxruntime-manifest.txt) so a tampered upstream cannot
+    # silently land in a release.
+    #
+    # CGO is REQUIRED — github.com/yalue/onnxruntime_go uses cgo to
+    # dlopen() the onnxruntime shared library at startup. We use the
+    # native runner for each target OS so the system C toolchain is
+    # already correct; Linux arm64 cross-compiles from x64 via
+    # gcc-aarch64-linux-gnu.
+    name: Agent w/ ONNX (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+            ort_archive: onnxruntime-linux-x64-1.25.0.tgz
+            ort_libpath: onnxruntime-linux-x64-1.25.0/lib/libonnxruntime.so.1.25.0
+            ort_libname: libonnxruntime.so
+            cc: gcc
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-latest
+            ort_archive: onnxruntime-linux-aarch64-1.25.0.tgz
+            ort_libpath: onnxruntime-linux-aarch64-1.25.0/lib/libonnxruntime.so.1.25.0
+            ort_libname: libonnxruntime.so
+            cc: aarch64-linux-gnu-gcc
+            cross_apt: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          - goos: darwin
+            goarch: amd64
+            runner: macos-13
+            ort_archive: onnxruntime-osx-x86_64-1.25.0.tgz
+            ort_libpath: onnxruntime-osx-x86_64-1.25.0/lib/libonnxruntime.1.25.0.dylib
+            ort_libname: libonnxruntime.dylib
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+            ort_archive: onnxruntime-osx-arm64-1.25.0.tgz
+            ort_libpath: onnxruntime-osx-arm64-1.25.0/lib/libonnxruntime.1.25.0.dylib
+            ort_libname: libonnxruntime.dylib
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            runner: windows-latest
+            ort_archive: onnxruntime-win-x64-1.25.0.zip
+            ort_libpath: onnxruntime-win-x64-1.25.0/lib/onnxruntime.dll
+            ort_libname: onnxruntime.dll
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Install cross C toolchain (Linux arm64)
+        if: matrix.cross_apt != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.cross_apt }}
+
+      - name: Verify pinned SHA-256 for onnxruntime archive
+        shell: bash
+        run: |
+          archive="${{ matrix.ort_archive }}"
+          want="$(awk -v a="$archive" '$2==a {print $1; exit}' scripts/onnxruntime-manifest.txt)"
+          if [ -z "$want" ]; then
+            echo "::error::no pin for $archive in scripts/onnxruntime-manifest.txt"
+            exit 1
+          fi
+          echo "ORT_EXPECTED_SHA=$want" >> "$GITHUB_ENV"
+
+      - name: Download + verify onnxruntime (Linux / macOS)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ort
+          archive="${{ matrix.ort_archive }}"
+          curl -fL --show-error --silent \
+            "https://github.com/microsoft/onnxruntime/releases/download/v1.25.0/${archive}" \
+            -o "ort/${archive}"
+          got="$(shasum -a 256 "ort/${archive}" 2>/dev/null | awk '{print $1}' || sha256sum "ort/${archive}" | awk '{print $1}')"
+          if [ "$got" != "$ORT_EXPECTED_SHA" ]; then
+            echo "::error::SHA-256 mismatch for $archive: expected $ORT_EXPECTED_SHA got $got"
+            exit 1
+          fi
+          echo "  pin matches: $got"
+          tar -xzf "ort/${archive}" -C ort
+          install -m 0755 "ort/${{ matrix.ort_libpath }}" "ort/${{ matrix.ort_libname }}"
+
+      - name: Download + verify onnxruntime (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $archive = '${{ matrix.ort_archive }}'
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v1.25.0/$archive"
+          New-Item -ItemType Directory -Force -Path ort | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile "ort/$archive"
+          $got = (Get-FileHash -Algorithm SHA256 "ort/$archive").Hash.ToLower()
+          if ($got -ne $env:ORT_EXPECTED_SHA) {
+            Write-Error "SHA-256 mismatch for $archive: expected $env:ORT_EXPECTED_SHA got $got"
+            exit 1
+          }
+          Write-Host "  pin matches: $got"
+          Expand-Archive -LiteralPath "ort/$archive" -DestinationPath ort -Force
+          Copy-Item -Force "ort/${{ matrix.ort_libpath }}" "ort/${{ matrix.ort_libname }}"
+
+      - name: Build agent (onnx)
+        working-directory: agent
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '1'
+          CC: ${{ matrix.cc }}
+        run: |
+          mkdir -p dist
+          out="dist/secure-edge-agent-onnx-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          go build -tags=onnx -trimpath \
+            -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o "$out" ./cmd/agent
+          ls -la "$out"
+
+      - name: Assemble bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="secure-edge-agent-onnx-${{ matrix.goos }}-${{ matrix.goarch }}"
+          stage="stage/${base}"
+          mkdir -p "$stage"
+          cp "agent/dist/${base}${{ matrix.ext }}" "$stage/secure-edge-agent${{ matrix.ext }}"
+          cp "ort/${{ matrix.ort_libname }}" "$stage/${{ matrix.ort_libname }}"
+          cp INSTALL_ML.md "$stage/INSTALL_ML.md"
+          cp scripts/ml-model-manifest.txt "$stage/ml-model-manifest.txt"
+          cp scripts/onnxruntime-manifest.txt "$stage/onnxruntime-manifest.txt"
+          mkdir -p dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            (cd stage && 7z a "../dist/${base}.zip" "${base}")
+          else
+            (cd stage && tar -czf "../dist/${base}.tar.gz" "${base}")
+          fi
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-onnx-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/secure-edge-agent-onnx-*
+          if-no-files-found: error
+
   build-electron:
     name: Electron (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -254,7 +413,7 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-agent, build-electron, build-extension, build-extension-safari, build-installers]
+    needs: [build-agent, build-agent-onnx, build-electron, build-extension, build-extension-safari, build-installers]
     runs-on: ubuntu-latest
     # id-token + attestations are required for cosign keyless signing and
     # actions/attest-build-provenance. contents:write was already implied
@@ -277,10 +436,16 @@ jobs:
       - name: flatten artefacts
         run: |
           mkdir -p release
+          # `secure-edge-agent-*` matches both the default CGO-free
+          # binaries from build-agent and the onnx-tagged bundles
+          # from build-agent-onnx (`secure-edge-agent-onnx-<os>-<arch>.tar.gz` /
+          # `.zip`), which is the desired outcome — both are
+          # release-grade artefacts and need to land in SHA256SUMS +
+          # cosign coverage.
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
             -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
             -o -name '*.zip' -o -name '*.xpi' -o -name 'secure-edge-agent-*' \
-            -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
+            -o -name '*.tar.gz' -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
           ls -la release/
 
       # ----------------------------------------------------------------
@@ -413,6 +578,7 @@ jobs:
             release/*.AppImage
             release/*.exe
             release/*.zip
+            release/*.tar.gz
             release/*.xpi
             release/*.cdx.json
 

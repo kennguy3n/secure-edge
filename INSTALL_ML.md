@@ -35,8 +35,14 @@ That's it. The `install` target runs three steps:
    the same directory.
 3. **`build-onnx`** — builds `secure-edge-agent` with `-tags=onnx`,
    so it uses the real `ONNXEmbedder` instead of `NullEmbedder` at
-   runtime. The binary stays CGO-free; `purego` + `dlopen` is what
-   reaches the onnxruntime library at startup.
+   runtime. This build requires `CGO_ENABLED=1` and a system C
+   toolchain (`gcc` on Linux, Xcode CLT on macOS, MSVC build tools
+   or MinGW on Windows) — `onnxruntime_go` uses cgo for the dlopen /
+   ABI shim. The default `make build` is unchanged and stays
+   CGO-free; only the `-tags=onnx` path needs the C toolchain.
+   At runtime, `libonnxruntime` is still loaded dynamically via
+   dlopen, so the binary is portable across machines as long as the
+   pinned shared library is reachable.
 
 After the install completes, edit your `config.yaml` and set:
 

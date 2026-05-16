@@ -29,8 +29,11 @@
 //
 // Privacy invariant: the embedder runs in-process. No tokens, no
 // hidden states, no normalised vectors leave this file. The
-// onnxruntime_go library wraps onnxruntime via purego/dlopen so
-// the agent does not require CGO; cf. agent/go.mod.
+// onnxruntime_go library wraps onnxruntime via cgo (for the dlopen /
+// ABI shim) plus runtime dlopen() of the shared library itself, so
+// the binary needs CGO_ENABLED=1 at build time but the onnxruntime
+// shared library is still loaded dynamically at startup. cf.
+// agent/go.mod.
 
 package ml
 

@@ -385,6 +385,165 @@ func TestLayer_WiresPreFilterAndDisambiguatorWhenArtefactsPresent(t *testing.T) 
 	}
 }
 
+// TestPreFilter_ClassifyVec_MatchesClassify verifies the cache-companion
+// of Classify returns the same verdict as Classify when given the
+// embedder's own output. This is the contract the pipeline relies
+// on when it embeds once and feeds the vector to PreFilterVec.
+func TestPreFilter_ClassifyVec_MatchesClassify(t *testing.T) {
+	emb := &stubEmbedder{
+		dim:   3,
+		ready: true,
+		vectors: map[byte][]float32{
+			'b': {0, 1, 0}, // == TN centroid
+			't': {1, 0, 0}, // == TP centroid
+			'm': {0.5, 0.5, 0},
+		},
+	}
+	pf, err := NewPreFilter(emb, Centroids{TP: []float32{1, 0, 0}, TN: []float32{0, 1, 0}}, 0.1)
+	if err != nil {
+		t.Fatalf("NewPreFilter: %v", err)
+	}
+	ctx := context.Background()
+	for _, input := range []string{"benign", "tp content", "midpoint"} {
+		vec, err := emb.Embed(ctx, input)
+		if err != nil {
+			t.Fatalf("Embed(%q): %v", input, err)
+		}
+		gotClassify := pf.Classify(ctx, input)
+		gotVec := pf.ClassifyVec(vec)
+		if gotClassify != gotVec {
+			t.Errorf("%q: Classify=%v, ClassifyVec=%v (must agree)", input, gotClassify, gotVec)
+		}
+	}
+}
+
+// TestPreFilter_ClassifyVec_RejectsBadVec confirms a nil PreFilter,
+// a nil vector, and a wrong-length vector all produce VerdictUnknown
+// rather than panicking. The pipeline does not validate vector
+// length before calling, so this method must be defensive.
+func TestPreFilter_ClassifyVec_RejectsBadVec(t *testing.T) {
+	emb := &stubEmbedder{dim: 3, ready: true}
+	pf, err := NewPreFilter(emb, Centroids{TP: []float32{1, 0, 0}, TN: []float32{0, 1, 0}}, 0.1)
+	if err != nil {
+		t.Fatalf("NewPreFilter: %v", err)
+	}
+	cases := []struct {
+		name string
+		pf   *PreFilter
+		vec  []float32
+	}{
+		{"nil PreFilter", nil, []float32{1, 0, 0}},
+		{"nil vec", pf, nil},
+		{"wrong length", pf, []float32{1, 0}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pf.ClassifyVec(tc.vec); got != VerdictUnknown {
+				t.Errorf("ClassifyVec = %v, want VerdictUnknown", got)
+			}
+		})
+	}
+}
+
+// TestLayer_Embed_NullEmbedderReturnsUnavailable confirms the Layer.Embed
+// surface mirrors NullEmbedder.Embed: a not-ready embedder produces
+// ErrEmbedderUnavailable so the pipeline can fall through to the
+// legacy per-call methods.
+func TestLayer_Embed_NullEmbedderReturnsUnavailable(t *testing.T) {
+	l, err := NewLayer(NullEmbedder{}, &Artefacts{}, 0)
+	if err != nil {
+		t.Fatalf("NewLayer: %v", err)
+	}
+	v, err := l.Embed(context.Background(), "anything")
+	if v != nil {
+		t.Errorf("Embed returned non-nil vector on NullEmbedder: %v", v)
+	}
+	if !errors.Is(err, ErrEmbedderUnavailable) {
+		t.Errorf("Embed err = %v, want ErrEmbedderUnavailable", err)
+	}
+}
+
+// TestLayer_Embed_NilSafe documents that Embed on a nil Layer
+// returns ErrEmbedderUnavailable rather than panicking. The
+// pipeline's mlActive guard already nil-checks the layer, but the
+// defensive null path is part of the Layer contract.
+func TestLayer_Embed_NilSafe(t *testing.T) {
+	var l *Layer
+	v, err := l.Embed(context.Background(), "x")
+	if v != nil {
+		t.Errorf("nil Layer.Embed returned %v, want nil", v)
+	}
+	if !errors.Is(err, ErrEmbedderUnavailable) {
+		t.Errorf("nil Layer.Embed err = %v, want ErrEmbedderUnavailable", err)
+	}
+}
+
+// TestLayer_VecMethods_MatchContentMethods is the cache-companion
+// equivalent of TestLayer_WiresPreFilterAndDisambiguatorWhenArtefactsPresent.
+// It calls PreFilter/DisambiguatorScore and PreFilterVec/DisambiguatorScoreVec
+// on the same inputs and confirms both return paths produce
+// identical results. This is the contract the pipeline relies on
+// to swap one Embed call for two cosines + one dot product.
+func TestLayer_VecMethods_MatchContentMethods(t *testing.T) {
+	emb := &stubEmbedder{
+		dim:   3,
+		ready: true,
+		vectors: map[byte][]float32{
+			'b': {0, 1, 0},
+			't': {1, 0, 0},
+		},
+	}
+	art := &Artefacts{
+		Centroids: &Centroids{TP: []float32{1, 0, 0}, TN: []float32{0, 1, 0}},
+		Linear:    &LinearHead{Weights: []float32{1, 0, 0}, Bias: 0},
+	}
+	l, err := NewLayer(emb, art, 0.1)
+	if err != nil {
+		t.Fatalf("NewLayer: %v", err)
+	}
+	ctx := context.Background()
+	for _, input := range []string{"benign", "true-positive"} {
+		vec, err := l.Embed(ctx, input)
+		if err != nil {
+			t.Fatalf("Layer.Embed(%q): %v", input, err)
+		}
+		if got, want := l.PreFilter(ctx, input), l.PreFilterVec(vec); got != want {
+			t.Errorf("%q: PreFilter=%v, PreFilterVec=%v (must agree)", input, got, want)
+		}
+		// Float32 equality is safe here because both paths run
+		// through the same ScoreVec implementation; the *Vec
+		// variant just skips the redundant Embed call.
+		if got, want := l.DisambiguatorScore(ctx, input), l.DisambiguatorScoreVec(vec); got != want {
+			t.Errorf("%q: DisambiguatorScore=%v, DisambiguatorScoreVec=%v (must agree)", input, got, want)
+		}
+	}
+}
+
+// TestLayer_VecMethods_NilSafe confirms the cache-companion
+// methods return the same "no signal" values as their content
+// counterparts when the Layer or its components are missing.
+func TestLayer_VecMethods_NilSafe(t *testing.T) {
+	var l *Layer
+	if v := l.PreFilterVec([]float32{1, 0, 0}); v != VerdictUnknown {
+		t.Errorf("nil Layer.PreFilterVec = %v, want VerdictUnknown", v)
+	}
+	if s := l.DisambiguatorScoreVec([]float32{1, 0, 0}); s != 0 {
+		t.Errorf("nil Layer.DisambiguatorScoreVec = %v, want 0", s)
+	}
+	// Layer with NullEmbedder => both *Vec methods produce
+	// no-signal because preFilter / disamb are unwired.
+	l2, err := NewLayer(NullEmbedder{}, &Artefacts{}, 0)
+	if err != nil {
+		t.Fatalf("NewLayer: %v", err)
+	}
+	if v := l2.PreFilterVec([]float32{1, 0, 0}); v != VerdictUnknown {
+		t.Errorf("not-ready Layer.PreFilterVec = %v, want VerdictUnknown", v)
+	}
+	if s := l2.DisambiguatorScoreVec([]float32{1, 0, 0}); s != 0 {
+		t.Errorf("not-ready Layer.DisambiguatorScoreVec = %v, want 0", s)
+	}
+}
+
 func TestCosine_KnownValues(t *testing.T) {
 	cases := []struct {
 		a, b []float32

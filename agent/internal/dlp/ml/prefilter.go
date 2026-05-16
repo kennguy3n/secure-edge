@@ -101,12 +101,36 @@ func NewPreFilter(emb Embedder, c Centroids, threshold float32) (*PreFilter, err
 // pre-filter verdict. Returns VerdictUnknown on any embedder error
 // (including ErrEmbedderUnavailable) so callers can keep their
 // single-line "fast path? then return" wiring simple.
+//
+// Callers that have already embedded the same content (e.g. the
+// DLP pipeline's embed-once optimisation between the pre-filter
+// and the disambiguator) should call ClassifyVec directly to
+// avoid a redundant Embed call.
 func (p *PreFilter) Classify(ctx context.Context, content string) Verdict {
 	if p == nil {
 		return VerdictUnknown
 	}
 	vec, err := p.emb.Embed(ctx, content)
-	if err != nil || len(vec) != len(p.tp) {
+	if err != nil {
+		return VerdictUnknown
+	}
+	return p.ClassifyVec(vec)
+}
+
+// ClassifyVec returns the pre-filter verdict for a pre-computed
+// embedding vector. Returns VerdictUnknown when the supplied
+// vector's length does not match the centroid length — the same
+// "no signal" fall-through Classify uses on embedder errors. The
+// vector must come from the same Embedder that built the
+// centroids; mixing embedding spaces produces meaningless cosine
+// distances.
+//
+// ClassifyVec is the cache-companion to Classify: it lets the DLP
+// pipeline embed once and feed the same vector to both the pre-
+// filter and the disambiguator, halving the ML-active scan
+// latency on the production MiniLM-L12 build.
+func (p *PreFilter) ClassifyVec(vec []float32) Verdict {
+	if p == nil || len(vec) != len(p.tp) {
 		return VerdictUnknown
 	}
 	tpSim := cosine(vec, p.tp)

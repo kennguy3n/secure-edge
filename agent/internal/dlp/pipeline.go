@@ -353,6 +353,26 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 		return ScanResult{}
 	}
 
+	// W3 embed-once optimisation. When the ML layer is active
+	// (Ready + MLBoost > 0) both the pre-filter (this block) and
+	// the disambiguator (a few lines further down) embed the same
+	// content string — historically that was two independent
+	// Embed calls per scan, costing ~10-16 ms on the production
+	// MiniLM-L12 build. Computing the vector once here and feeding
+	// it to both stages via *Vec methods halves the ML-active
+	// latency budget. Embed failures fall through to the legacy
+	// per-call PreFilter / DisambiguatorScore methods (which
+	// embed independently and short-circuit on errors), so the
+	// optimisation is a pure latency win and never changes the
+	// pipeline's verdict.
+	mlActive := mlLayer != nil && mlLayer.Ready() && weights.MLBoost > 0
+	var mlVec []float32
+	if mlActive {
+		if v, err := mlLayer.Embed(ctx, content); err == nil && len(v) > 0 {
+			mlVec = v
+		}
+	}
+
 	// Optional ML pre-filter (W3). Runs after the AC scan so we
 	// know the candidate severity distribution, and only short-
 	// circuits when ALL of the following hold:
@@ -376,8 +396,14 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	// future caller cannot install a Ready layer + MLBoost=0 and
 	// have the pre-filter surprise them by silently skipping
 	// medium/low-severity patterns.
-	if mlLayer != nil && mlLayer.Ready() && weights.MLBoost > 0 && !candidatesIncludeHighSeverity(candidates) {
-		if mlLayer.PreFilter(ctx, content) == ml.VerdictLikelyBenign {
+	if mlActive && !candidatesIncludeHighSeverity(candidates) {
+		var verdict ml.Verdict
+		if mlVec != nil {
+			verdict = mlLayer.PreFilterVec(mlVec)
+		} else {
+			verdict = mlLayer.PreFilter(ctx, content)
+		}
+		if verdict == ml.VerdictLikelyBenign {
 			if cache != nil {
 				cache.Put(content, ScanResult{})
 			}
@@ -406,9 +432,20 @@ func (p *Pipeline) Scan(ctx context.Context, content string) ScanResult {
 	// pattern would blow the latency budget for content with many
 	// matches. Zero (and a no-op nudge in ScoreMatch) when the ML
 	// layer is disabled.
+	//
+	// Reuses the embedding vector cached at the top of the ML
+	// block when present; falls back to DisambiguatorScore (which
+	// re-embeds internally) when the cache is empty — e.g. the
+	// Embed call failed transiently. The mlActive guard is the
+	// same boolean computed for the pre-filter block; recomputing
+	// it here would be redundant.
 	var mlScore float32
-	if mlLayer != nil && mlLayer.Ready() && weights.MLBoost > 0 {
-		mlScore = mlLayer.DisambiguatorScore(ctx, content)
+	if mlActive {
+		if mlVec != nil {
+			mlScore = mlLayer.DisambiguatorScoreVec(mlVec)
+		} else {
+			mlScore = mlLayer.DisambiguatorScore(ctx, content)
+		}
 	}
 
 	// For large payloads we evaluate the per-pattern groups in

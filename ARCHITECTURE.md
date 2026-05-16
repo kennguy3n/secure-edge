@@ -181,7 +181,15 @@ The default model is `paraphrase-multilingual-MiniLM-L12-v2` quantised to
 int8 (~45 MB), distilled from XLM-RoBERTa, covering 50+ languages including
 the W4 jurisdictions (CJK, Arabic, Thai, Hindi, European locales).
 Inference budget: pre-filter ≤ 5 ms, disambiguator ≤ 10 ms, total ML
-overhead ≤ 15 ms per scan on commodity CPU.
+overhead ≤ 15 ms per scan on commodity CPU. The pipeline embeds the
+content once at the top of the ML block and feeds the same vector to
+both stages via the `*Vec` cache-companions on `Layer`, so the
+per-stage budgets above are *additive in CPU*, not *additive in
+embed latency* — when both stages fire on the same scan they share
+a single ~5 ms Embed call. Embed failures fall through to the
+single-step `PreFilter` / `DisambiguatorScore` entry points (which
+embed independently and short-circuit on errors), so the
+optimisation is a pure latency win and never changes the verdict.
 
 Model artefacts (centroids, disambiguator weights, ONNX model + tokenizer)
 load from `~/.shieldnet/models/` by default. The agent runs end-to-end with

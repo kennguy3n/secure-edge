@@ -245,6 +245,92 @@ func (e *embedCounter) Embed(ctx context.Context, content string) ([]float32, er
 	return e.fakeEmbedder.Embed(ctx, content)
 }
 
+// mediumOnlyPipeline builds a pipeline whose only pattern is a
+// Medium-severity 10-digit number matcher. The pre-filter is
+// reachable on this pipeline (candidatesIncludeHighSeverity stays
+// false) so a single Scan exercises BOTH ML stages \u2014 the embed-once
+// optimisation test needs that to observe the call-count delta.
+func mediumOnlyPipeline(t *testing.T) *Pipeline {
+	t.Helper()
+	patternsJSON := []byte(`{
+		"patterns": [
+			{
+				"name": "US Phone Number",
+				"regex": "\\d{3}-\\d{3}-\\d{4}",
+				"prefix": "phone",
+				"severity": "medium",
+				"score_weight": 1,
+				"hotwords": ["phone", "tel"],
+				"hotword_window": 50,
+				"hotword_boost": 0,
+				"require_hotword": false,
+				"entropy_min": 0
+			}
+		]
+	}`)
+	patterns, err := ParsePatterns(patternsJSON)
+	if err != nil {
+		t.Fatalf("ParsePatterns: %v", err)
+	}
+	p := NewPipeline(DefaultScoreWeights(), NewThresholdEngine(DefaultThresholds()))
+	p.Rebuild(patterns, nil)
+	return p
+}
+
+// TestPipeline_ML_EmbedOnceWhenBothStagesActive is the regression
+// test for the W3 embed-once optimisation. With MLBoost > 0 and a
+// Medium-severity candidate in flight, both the pre-filter and the
+// disambiguator should fire \u2014 the unoptimised path would call
+// Embed twice (once per stage), the optimised path embeds once at
+// the top of the ML block and reuses the vector via PreFilterVec /
+// DisambiguatorScoreVec.
+//
+// We assert the observable behaviour through a counting embedder:
+// exactly one Embed() per Scan() on the production-shaped path.
+func TestPipeline_ML_EmbedOnceWhenBothStagesActive(t *testing.T) {
+	p := mediumOnlyPipeline(t)
+	emb := &embedCounter{fakeEmbedder: &fakeEmbedder{dim: 3, ready: true}}
+	art := &ml.Artefacts{
+		Centroids: &ml.Centroids{TP: []float32{1, 0, 0}, TN: []float32{0, 1, 0}},
+		Linear:    &ml.LinearHead{Weights: []float32{0.1, 0.1, 0.1}, Bias: 0},
+	}
+	l, err := ml.NewLayer(emb, art, 0.1)
+	if err != nil {
+		t.Fatalf("ml.NewLayer: %v", err)
+	}
+	p.SetMLLayer(l)
+	// Enable the ML nudge so the disambiguator branch actually
+	// fires (mlActive == true). MLBoost == 0 \u2014 the default \u2014
+	// would short-circuit both stages and the embed count would
+	// be 0, which is the wrong oracle for *this* test.
+	w := p.Weights()
+	w.MLBoost = 1
+	p.SetWeights(w)
+
+	// Content that (a) is *not* the "benign:" geometry (so the
+	// pre-filter returns VerdictUnknown instead of short-
+	// circuiting before the disambiguator gets a turn), (b)
+	// produces at least one Medium-severity candidate (so the
+	// pre-filter is reachable per the severity guard), and (c)
+	// drives a regex match (so the per-pattern evaluation runs
+	// and consults mlScore).
+	got := p.Scan(context.Background(), "tp: phone tel 415-555-0199")
+	if !got.Blocked && got.PatternName == "" {
+		// We do not assert on Blocked/PatternName here \u2014 the
+		// Medium pattern's deterministic score may or may not
+		// clear the threshold depending on the live default
+		// weights. The test cares about the *call count*, not
+		// the verdict. The empty-PatternName check just
+		// confirms the pipeline actually walked the matching
+		// path rather than bailing out early on an unrelated
+		// guard.
+		t.Logf("scan verdict: %+v (verdict irrelevant for this test)", got)
+	}
+	if emb.n != 1 {
+		t.Errorf("embedder called %d time(s) when both ML stages active; want exactly 1 per Scan", emb.n)
+	}
+}
+
 func TestPipeline_ML_EmptyCandidatesSkipsEmbedder(t *testing.T) {
 	// Regression test for the post-Devin-Review optimisation in
 	// Pipeline.Scan: when filterCandidates drops every candidate

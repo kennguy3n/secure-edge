@@ -58,17 +58,25 @@ model — the deterministic pipeline runs exactly as it did pre-W3.
 ## What the install puts on disk
 
 ```
-~/.shieldnet/models/model/
-├── libonnxruntime.so                  # CPU shared library (Linux x64/arm64)
-│   (or libonnxruntime.dylib on macOS, onnxruntime.dll on Windows)
-├── model.onnx                         # 118 MB int8-quantised MiniLM-L12
-├── tokenizer.json                     # HuggingFace fast tokenizer JSON
-└── sentencepiece.bpe.model            # SentencePiece BPE model
+~/.shieldnet/models/
+├── centroids.json                     # TP/TN mean embeddings (LDA-1d input)
+├── disambiguator.json                 # 384-d linear head, fit from corpus
+└── model/
+    ├── libonnxruntime.so              # CPU shared library (Linux x64/arm64)
+    │   (or libonnxruntime.dylib on macOS, onnxruntime.dll on Windows)
+    ├── model.onnx                     # 118 MB int8-quantised MiniLM-L12
+    ├── tokenizer.json                 # HuggingFace fast tokenizer JSON
+    └── sentencepiece.bpe.model        # SentencePiece BPE model
 ```
 
+`centroids.json` and `disambiguator.json` sit at the base level
+because `ml.LoadArtefacts(base)` reads them from `<base>/`, not
+`<base>/model/`. Without them the ONNX session still loads but
+`Layer.Ready()` stays `false` (no pre-filter, no disambiguator).
+
 Disk footprint: ~133 MB total (118 MB model + 9 MB tokenizer +
-5 MB SentencePiece + ~1 MB onnxruntime; the runtime is small because
-it's the CPU build, not GPU/CUDA).
+5 MB SentencePiece + ~1 MB onnxruntime + ~20 KB sidecars; the
+runtime is small because it's the CPU build, not GPU/CUDA).
 
 ## Memory footprint at runtime
 
@@ -89,7 +97,7 @@ it's the CPU build, not GPU/CUDA).
 - **Pinned downloads.** Both the model and the onnxruntime archive
   are SHA-256-pinned via committed manifest files. A tampered
   upstream artefact triggers a hard failure during install.
-- **Reversible.** `rm -rf ~/.shieldnet/models/model && go build
+- **Reversible.** `rm -rf ~/.shieldnet/models && go build
   ./cmd/agent` returns to the deterministic-only build.
 
 ## Manual install (Linux / macOS)
@@ -175,11 +183,16 @@ rm -rf ~/.shieldnet/models/model
 ## Verifying the install end-to-end
 
 ```bash
-# The agent will log a `dlp ml:` line at startup describing the path:
+# The agent emits one `dlp ml:` line at startup describing the
+# resolved state. The format is fixed in cmd/agent/main.go's
+# attachMLLayer and looks like:
 #
-#   - "dlp ml: layer ready (model=..., dim=384)"        — full ML active
-#   - "dlp ml: degraded (NullEmbedder)"                 — model missing
-#   - "dlp ml: model dir unresolved (HOME unset?)"      — env problem
+#   dlp ml: layer ready=true  boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
+#   dlp ml: layer ready=false boost=1 threshold=0.180 base=/.../models build_tag_onnx=true
+#   dlp ml: embedder init failed: ... (falling back to NullEmbedder)
+#   dlp ml: model dir unresolved (HOME unset?); skipping
+#
+# After `make install` you want `ready=true` with `build_tag_onnx=true`.
 cd agent
 ./secure-edge-agent --config /path/to/config.yaml 2>&1 | grep "dlp ml:"
 ```

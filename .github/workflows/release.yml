@@ -67,8 +67,20 @@ jobs:
     # native runner for each target OS so the system C toolchain is
     # already correct; Linux arm64 cross-compiles from x64 via
     # gcc-aarch64-linux-gnu.
+    #
+    # continue-on-error keeps the ONNX matrix a SOFT release
+    # dependency: a failure here (onnxruntime archive 404, runner
+    # image regression that drops MinGW, transient HuggingFace
+    # outage on a future model fetch, etc.) does NOT block the
+    # CGO-free agent + Electron + extension + installers from
+    # publishing. The release job still consumes whatever onnx
+    # bundles DID upload — partial onnx coverage is acceptable;
+    # zero core coverage is not. The CGO-free build remains a
+    # hard release blocker via the standard 'needs:' wiring on
+    # the release job.
     name: Agent w/ ONNX (${{ matrix.goos }}/${{ matrix.goarch }})
     runs-on: ${{ matrix.runner }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -350,11 +362,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      # Per-runner downloads of only the CGO-free agent binaries
+      # this installer actually consumes. The previous
+      # 'pattern: agent-*' glob also matched the build-agent-onnx
+      # bundles (agent-onnx-<os>-<arch>) and pulled the ~120 MB
+      # onnxruntime archive per runner for no reason — the .pkg /
+      # .deb / .rpm / .msi packaging scripts reference only the
+      # default CGO-free binary names. Enumerating by exact
+      # artifact name removes the cross-download and also makes
+      # the dependency explicit when reading the workflow.
+      - name: Download Linux amd64 agent
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/download-artifact@v4
         with:
-          pattern: agent-*
+          name: agent-linux-amd64
           path: agent-bins
-          merge-multiple: true
+
+      - name: Download macOS amd64 agent
+        if: matrix.os == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-darwin-amd64
+          path: agent-bins
+
+      - name: Download macOS arm64 agent
+        if: matrix.os == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-darwin-arm64
+          path: agent-bins
+
+      - name: Download Windows amd64 agent
+        if: matrix.os == 'windows-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-windows-amd64
+          path: agent-bins
 
       - name: macOS .pkg
         if: matrix.os == 'macos-latest'
@@ -442,6 +485,13 @@ jobs:
           # `.zip`), which is the desired outcome — both are
           # release-grade artefacts and need to land in SHA256SUMS +
           # cosign coverage.
+          #
+          # build-agent-onnx is `continue-on-error: true`, so some
+          # (or all) of its matrix entries may have failed without
+          # blocking the release. The flatten step copies whatever
+          # is present and accepts an empty onnx contribution (the
+          # CGO-free binaries always exist if the release ran); zero
+          # onnx tarballs is a degraded-but-valid release shape.
           find artefacts -type f \( -name '*.pkg' -o -name '*.msi' -o -name '*.deb' \
             -o -name '*.rpm' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.exe' \
             -o -name '*.zip' -o -name '*.xpi' -o -name 'secure-edge-agent-*' \

@@ -1167,12 +1167,21 @@ func loadProfileOnStartup(ctx context.Context, cfg config.Config, h *profile.Hol
 				Medium:   c.ThresholdMedium,
 				Low:      c.ThresholdLow,
 			})
+			// MLBoost is process-local, set from YAML by
+			// attachMLLayer before this sink fires. The
+			// profile snapshot does not carry it; preserve
+			// the live value so a startup profile does not
+			// silently zero out the disambiguator nudge.
+			// Mirrors the carry-over in applyLiveDLP at
+			// agent/internal/api/handlers.go:664-671.
+			current := pipeline.Weights()
 			pipeline.SetWeights(dlp.ScoreWeights{
 				HotwordBoost:     c.HotwordBoost,
 				EntropyBoost:     c.EntropyBoost,
 				EntropyPenalty:   c.EntropyPenalty,
 				ExclusionPenalty: c.ExclusionPenalty,
 				MultiMatchBoost:  c.MultiMatchBoost,
+				MLBoost:          current.MLBoost,
 			})
 		}
 	}

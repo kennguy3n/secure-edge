@@ -1,6 +1,6 @@
-# User Guide
+# Secure Edge User Guide
 
-This guide is for end-users of ShieldNet Secure Edge.
+This guide is for end-users of Secure Edge.
 
 ## 1. The tray icon
 
@@ -41,25 +41,11 @@ If you believe the block was wrong, you can **report a false positive** (see
 
 ## 3. What data the agent does / does not collect
 
-The agent **does** persist:
-
-- A small SQLite database (~4 KB) of policy configuration and **integer**
-  aggregate counters: `dns_queries_total`, `dns_blocks_total`,
-  `dlp_scans_total`, `dlp_blocks_total`, `tamper_detections_total`.
-- Rule files (domain lists, DLP patterns) — these are the rules themselves,
-  not access logs.
-
-The agent **does not** persist:
-
-- Domain names you visited
-- URLs, IPs, ports
-- Content you typed or pasted
-- DLP scan content or matched-pattern names
-- Timestamps of per-event activity
-
-The [`store/privacy_test.go`](../agent/internal/store/privacy_test.go) test
-sweeps every text column in the SQLite database and asserts that none of those
-values reach disk. The same test runs in CI on every PR.
+Secure Edge stores only policy settings and five anonymous counters
+(`dns_queries_total`, `dns_blocks_total`, `dlp_scans_total`,
+`dlp_blocks_total`, `tamper_detections_total`). It never stores
+domains, URLs, or anything you type. For the technical guarantee, see
+the [README](../README.md#privacy-invariant).
 
 ## 4. Reporting a false positive
 
@@ -92,8 +78,9 @@ If the browser extension is installed:
 - Tier-3/Tier-4 domains never resolve (DNS NXDOMAIN), so the extension never
   sees them.
 
-The extension speaks to the agent over native messaging on `127.0.0.1`. It
-does not call out to any external service. Source code lives in
+The extension speaks to the agent over Native Messaging (stdin/stdout)
+or the HTTP fallback on `127.0.0.1:8080`. It does not call out to any
+external service. Source code lives in
 [`extension/`](../extension/) — TypeScript with content scripts, background
 worker, and unit tests.
 

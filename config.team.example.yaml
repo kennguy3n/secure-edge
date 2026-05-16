@@ -1,37 +1,14 @@
 # Secure Edge — TEAM preset (incremental rollout, intermediate posture).
 #
-# This file is one of three reference configs that ship alongside the
-# packaged `config.yaml`. It sits between config.personal.example.yaml
-# (fall-open, no secrets pinned) and config.managed.example.yaml
-# (fail-closed, every signed surface required).
-#
-# The team preset is the right intermediate step when an operator is
-# rolling out Secure Edge to a small group of users — long enough to
-# stand up the per-install API token plumbing (so the local agent's
-# state-changing endpoints stop accepting any-extension-origin
-# requests), but not yet ready to flip the Native Messaging HMAC,
-# Ed25519 profile signing, or the fail-closed enforcement posture.
-#
 # Use this preset when:
+#   - Bearer-token API auth and extension-ID pinning are deployable.
+#   - You want a warn toast on agent-unavailable rather than silent fall-open.
+#   - Ed25519 profile / manifest signing keys are not yet rolled to every
+#     endpoint, so unsigned bundles are still accepted with a warn-once log.
 #
-#   - Every endpoint can be expected to read a per-install API token
-#     from a known on-disk path (`api_token_path`).
-#   - You want a warning toast on agent-unavailable instead of silent
-#     fall-open, so users know when a scan was skipped.
-#   - You have not yet generated org-level Ed25519 keys for
-#     `profile_public_key` / `rule_update_public_key`, OR you have
-#     them but you have not finished rolling the matching signed
-#     bundle to every endpoint (so unsigned profiles are still
-#     accepted with a warn-once log line — see §3.1 / §4 of
-#     docs/admin-guide.md for the staged-rollout posture).
-#   - The HMAC-producing extension build has not yet reached every
-#     endpoint (so `bridge_mac_required: false` keeps the agent
-#     lenient with a one-time stderr warning per connection — see
-#     §2.1 of docs/admin-guide.md for the rollout sequence).
-#
-# Once the warnings above stop appearing across your fleet and the
-# signed bundle has propagated, graduate the deployment to
-# config.managed.example.yaml.
+# See docs/admin-guide.md §2.1 for the personal → team → managed
+# graduation path; graduate to config.managed.example.yaml once the
+# signed bundle has propagated.
 
 # DNS resolver
 upstream_dns: "8.8.8.8:53"

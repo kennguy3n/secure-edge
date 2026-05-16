@@ -1,8 +1,8 @@
-# Security policy
+# Secure Edge — Security Policy
 
 ## Reporting a vulnerability
 
-If you discover a security vulnerability in ShieldNet Secure Edge, please
+If you discover a security vulnerability in Secure Edge, please
 report it privately so we can investigate and ship a fix before any
 public disclosure.
 
@@ -23,7 +23,7 @@ prioritised accordingly.
 
 ## Supported versions
 
-Until ShieldNet Secure Edge reaches 1.0.0, only the latest minor release is
+Until Secure Edge reaches 1.0.0, only the latest minor release is
 supported with security fixes. Older 0.x releases will not receive
 back-ported patches.
 
@@ -34,7 +34,7 @@ back-ported patches.
 
 ## Threat model
 
-ShieldNet Secure Edge runs entirely on the user's device. The security
+Secure Edge runs entirely on the user's device. The security
 guarantees that we consider in-scope for this policy are:
 
 1. **Privacy invariants** — the DLP pipeline must never persist

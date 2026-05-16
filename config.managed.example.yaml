@@ -1,36 +1,13 @@
 # Secure Edge — MANAGED preset (fail-closed, every signed surface required).
 #
-# This file is one of three reference configs that ship alongside the
-# packaged `config.yaml`. It is the hardened end-state for an MDM-
-# deployed fleet — every Phase 7 control surface enabled, every
-# signed artefact verified, and a fail-closed posture on agent-
-# unavailable gestures. Pair it with the per-platform MDM walkthrough
-# in §10 of docs/admin-guide.md.
+# Use this preset when:
+#   - You have an MDM rollout and an org Ed25519 signing host.
+#   - Every endpoint is running an HMAC-producing extension build.
+#   - You have validated the fail-closed posture on a pilot endpoint.
 #
-# DO NOT deploy this preset until:
-#
-#   - You have a per-install API token plumbing path (the agent
-#     persists `crypto/rand` 32 bytes to `api_token_path` on first
-#     run; the Electron tray and browser extension read the same
-#     file). Test on a single endpoint first.
-#   - Every endpoint is running an extension build that produces
-#     Native Messaging HMACs (Phase 7 / C1). If you flip
-#     `bridge_mac_required: true` before the rollout is complete,
-#     the pre-C1 endpoints' scans will fall through to the HTTP
-#     fallback every time.
-#   - You have generated two Ed25519 keypairs on a dedicated signing
-#     host (one for enterprise profiles, one for the rule manifest;
-#     see §3.1 / §4 of docs/admin-guide.md) and have signed every
-#     artefact in the deployment bundle (§10.1) under them. An
-#     unsigned profile or manifest will be rejected outright once
-#     the matching public key below is configured.
-#   - You have validated `enforcement_mode: managed` on a single
-#     pilot endpoint and confirmed that the agent-unavailable
-#     fail-closed toast surfaces cleanly and that no user workflow
-#     trips it during normal use.
-#
-# The values below are templates — replace every `<placeholder>`
-# with the value from your signing host before pushing the preset.
+# Replace every `<placeholder>` with the value from your signing host.
+# See docs/admin-guide.md §2.1 and §10 (MDM walkthrough) for the
+# full graduation path and per-platform deployment recipes.
 
 # DNS resolver
 upstream_dns: "8.8.8.8:53"

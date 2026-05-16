@@ -1,4 +1,4 @@
-# DLP Pattern Authoring Guide
+# Secure Edge DLP Pattern Authoring Guide
 
 This guide explains how to write a DLP pattern that lands in
 [`rules/dlp_patterns.json`](../rules/dlp_patterns.json) and exclusions that

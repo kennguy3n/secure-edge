@@ -1,4 +1,4 @@
-# Rule Contribution Guide
+# Secure Edge Rule Contribution Guide
 
 This guide explains how to add domains to the shipped ruleset. For DLP
 pattern changes see

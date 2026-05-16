@@ -1,28 +1,12 @@
 # Secure Edge — PERSONAL preset (fall-open, individual developer use).
 #
-# This file is one of three reference configs that ship alongside the
-# packaged `config.yaml`. It mirrors the out-of-the-box defaults: no
-# per-install API token, no Native Messaging HMAC pinning, no profile
-# signature pinning, and the fall-open ("personal") enforcement-mode
-# posture in which a missing agent verdict silently allows the
-# paste / form / drop / fetch through.
-#
 # Use this preset when:
-#
-#   - You are installing the agent on a single workstation.
+#   - Installing on a single workstation or developer laptop.
 #   - You want DLP coaching without a hard-fail posture.
-#   - You have no managed deployment infrastructure (MDM, signing
-#     host, on-disk secret distribution) to wire the harder knobs in
-#     §3 / §10 of docs/admin-guide.md against.
+#   - You do not have MDM / signing-host infrastructure yet.
 #
-# When in doubt this is the right starting point. You can always move
-# to config.team.example.yaml or config.managed.example.yaml later
-# without rebuilding — every knob below is also reachable via
-# config.yaml in place.
-#
-# IMPORTANT: the values below intentionally match the packaged
-# `config.yaml` defaults. Keep them in sync if you edit one — both
-# files are followed by docs/admin-guide.md §2 as authoritative.
+# See docs/admin-guide.md §2.1 for the personal → team → managed
+# graduation path. Mirrors the packaged `config.yaml` defaults.
 
 # DNS resolver
 upstream_dns: "8.8.8.8:53"

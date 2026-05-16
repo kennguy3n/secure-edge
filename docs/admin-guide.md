@@ -1,8 +1,10 @@
-# Admin Guide
+# Secure Edge Admin Guide
 
-This guide is for administrators who deploy ShieldNet Secure Edge across
+This guide is for administrators who deploy Secure Edge across
 an organisation. End-user documentation lives in
-[user-guide.md](./user-guide.md).
+[user-guide.md](./user-guide.md). The [README](../README.md#privacy-invariant)
+states the privacy invariant that constrains every section below — no
+domains, URLs, or scanned content ever reach disk.
 
 ## 1. Installation
 
@@ -59,7 +61,9 @@ Log verbosity is controlled by the `LOG_LEVEL` environment variable
 (`debug` / `info` / `warn`), not a YAML key — see §9 Troubleshooting.
 
 Full reference is in
-[`agent/internal/config/config.go`](../agent/internal/config/config.go).
+[`agent/internal/config/config.go`](../agent/internal/config/config.go). The
+README's [Quick start](../README.md#quick-start) section has a minimal
+working example.
 
 ### 2.1 Reference presets
 
@@ -139,18 +143,28 @@ thresholds for an enrolled fleet. It is loaded from `profile_path`,
 fetched from `profile_url` on agent start, and reloadable via
 `POST /api/profile/import` (either `{"url": …}` or `{"profile": {…}}`).
 
-```yaml
-profile_id: acme-prod-2026q2
-profile_version: 7
-overrides:
-  category_policies:
-    "AI Chat (Unsanctioned)": deny
-    "Code Hosting": allow_with_dlp
-  thresholds:
-    critical: 1
-    high: 2
-  managed: true   # hides local toggles in the tray UI
+```json
+{
+  "name": "acme-prod-2026q2",
+  "version": 7,
+  "managed": true,
+  "categories": {
+    "AI Chat (Unsanctioned)": "deny",
+    "Code Hosting": "allow_with_dlp"
+  },
+  "dlp": {
+    "threshold_critical": 1,
+    "threshold_high": 2
+  },
+  "rule_update_url": "https://rules.example.com/manifest.json",
+  "signature": "<base64 Ed25519 over CanonicalForSigning>"
+}
 ```
+
+Field shapes are pinned by `profile.Profile` in
+[`agent/internal/profile/profile.go`](../agent/internal/profile/profile.go);
+see [ARCHITECTURE.md § Enterprise profiles](../ARCHITECTURE.md#enterprise-profiles)
+for the schema diagram.
 
 Validation runs on every load. A malformed profile falls back to the
 last good profile and logs a single line; no profile body is ever

@@ -1,21 +1,44 @@
-# ShieldNet Secure Edge — Security Rules Reference
+# Secure Edge — Security Rules Reference
 
-A complete reference of every DLP pattern shipped in
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) (**812** patterns
-across **22** JSON categories). Sub-sections below group patterns by
-family for readability rather than by JSON category. For the schema
-and authoring workflow, see
+This document is a curated overview of the foundational DLP patterns.
+The authoritative and complete list is
+[`rules/dlp_patterns.json`](./rules/dlp_patterns.json). For the W4
+global-PII expansion, see the [W4 section](#w4--global-pii-coverage-added)
+below. For the schema and authoring workflow, see
 [`docs/dlp-pattern-authoring-guide.md`](./docs/dlp-pattern-authoring-guide.md).
 
-The bulk of the per-section tables below predates the W1 pattern
-expansion (376 → 718) and the subsequent W4 global-PII expansion
-(718 → 812 across GDPR / Switzerland / UK / GCC / SEA / HIPAA /
-CCPA). They are kept as a curated overview of the foundational
-patterns. The full and current list of every pattern, with its
-severity, prefix, hotword settings, regex, and category, is the
-[`rules/dlp_patterns.json`](./rules/dlp_patterns.json) file itself.
-Counts in the section headers below therefore reflect the
-foundational set, not the W1- or W4-expanded set.
+## Coverage summary
+
+812 patterns across 22 categories (counted from `rules/dlp_patterns.json`):
+
+| Category             | Patterns | Examples                                                                                                                                  |
+|----------------------|---------:|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `cloud`              | 462      | AWS, GCP, Azure, IBM, Alibaba, Oracle, DigitalOcean / Linode / Vultr / Hetzner / OVH / Scaleway / regional clouds, monitoring & VPN PATs  |
+| `code_secret`        | 60       | GitHub / GitLab / Bitbucket PATs, .pypirc tokens, Rails master.key, Laravel APP\_KEY, Terraform / Ansible / Chef / Puppet / Docker / K8s   |
+| `credential`         | 37       | shell `export` literals, JDBC URLs, env-file passwords, Salt / Helm / sealed-secret literals                                              |
+| `phi`                | 35       | FHIR / SMART-on-FHIR tokens, Epic / Cerner credentials, HL7 v2 PID/OBX/ORC, DICOM tags, NPI, DEA, MBI, MRN, ICD-10 / ICD-9 / CPT / HCPCS / LOINC / SNOMED / DSM-5, NDC, CLIA |
+| `database_registry`  | 34       | Postgres / MongoDB URIs, Docker / npm tokens, registry credentials                                                                        |
+| `pii_eu`             | 30       | GDPR — IBAN, DE Personalausweis / Steueridentifikationsnummer, FR INSEE/NIR / SIREN / SIRET, IT Codice Fiscale, ES DNI/NIE, NL BSN, BE Rijksregister, PL PESEL, PT NIF, SE Personnummer, FI HETU, GR AFM, HU TAJ, EU VAT |
+| `financial`          | 20       | Stripe (whsec\_, rk\_), Plaid, Dwolla, Adyen, Wise, GoCardless, PayPal, Square, Coinbase, Razorpay                                          |
+| `pii_sea`            | 20       | Singapore NRIC/FIN, Malaysia MyKad, Thai NID, Philippines SSS/TIN/UMID, Indonesia NIK/NPWP, Vietnam CCCD/MST, Japan My Number / Passport, Korea RRN / Biz Reg, Taiwan NID, China Resident ID / Passport, India Aadhaar / PAN, Hong Kong HKID |
+| `mobile_desktop`     | 17       | Apple App Store Connect, Google Play, code-signing, iOS Info.plist, Android local.properties                                              |
+| `pii_gcc`            | 15       | UAE Emirates ID / TRN / IBAN, Saudi National ID (Iqama) / IBAN, Qatar QID, Bahrain CPR, Kuwait Civil ID, Oman Civil Number, GCC VAT IDs   |
+| `ai_ml`              | 13       | OpenAI, Anthropic, Google AI, Replicate, HuggingFace                                                                                      |
+| `package_manager`    | 12       | npm, PyPI, Maven, NuGet, RubyGems                                                                                                         |
+| `ci_cd`              | 8        | CircleCI, TeamCity, Bitrise, Buildkite                                                                                                    |
+| `messaging`          | 8        | Slack, Twilio, SendGrid, Discord, Mailgun, Zoom JWT, Microsoft Teams, Vonage, MessageBird                                                 |
+| `auth`               | 8        | OIDC ID tokens, OAuth refresh tokens, JWT secrets, SAML assertions, Auth0, Okta, Stripe Connect, Twilio Authy                             |
+| `infra_secret`       | 7        | Terraform, Vault, Pulumi                                                                                                                  |
+| `pii_uk`             | 5        | UK NINO, NHS Number, UK Passport, UK Driver's Licence, UK UTR                                                                             |
+| `pii_ccpa`           | 5        | California Driver's Licence / State ID / Medi-Cal Beneficiary ID / Vehicle Plate / CDTFA Sales Tax Permit                                 |
+| `payments`           | 5        | Stripe, Square, PayPal, Braintree                                                                                                         |
+| `pii`                | 4        | US SSN, credit cards, emails, phones                                                                                                      |
+| `pii_switzerland`    | 4        | Swiss AHV / AVS, Swiss UID (CHE-…), Swiss Passport, Swiss New Old-Age Insurance Number (ZAS). Swiss IBANs (`CH..`) are matched by the `EU IBAN (SEPA)` pattern in `pii_eu`. |
+| `iac`                | 3        | Atlas, Spacelift, Env0                                                                                                                    |
+
+Sub-sections below group patterns by family for readability rather
+than by JSON category. Counts in the per-family section headers
+reflect the foundational set, not the W1- or W4-expanded set.
 
 ### W4 — Global PII coverage (added)
 
@@ -344,31 +367,7 @@ Columns:
 
 ## Coverage notes
 
-Patterns whose ambient shape overlaps with benign text use
-`require_hotword: true` to keep the false-positive rate within budget.
-Accuracy is enforced at three layers:
-
-- **Smoke** —
-  [`accuracy_smoke_test.go`](./agent/internal/dlp/accuracy_smoke_test.go)
-  (25 TP + 25 TN; **FP < 10 %**, **FN < 5 %**); runs on every
-  `go test ./...` and in CI.
-- **Large** —
-  [`accuracy_large_test.go`](./agent/internal/dlp/accuracy_large_test.go)
-  loads the full 5,000+-sample corpus under
-  [`testdata/corpus/`](./agent/internal/dlp/testdata/corpus/) behind
-  the `large` build tag (`go test -tags=large ./internal/dlp/`).
-  Budgets: **overall FP < 5 %**, **overall FN < 3 %**, **per-category
-  FN < 10 %**. Writes `testdata/corpus/last_run_report.json` for
-  CI archival.
-- **Regression** —
-  [`accuracy_regression_test.go`](./agent/internal/dlp/accuracy_regression_test.go)
-  (also `-tags=large`) diffs each run against
-  `testdata/corpus/baseline_report.json` and fails the build when any
-  category's recall drops by more than **2 pp** or the overall FP
-  rate rises by more than **1 pp**. Re-seed the baseline after an
-  intentional rule update:
-  `go test -tags=large -run TestDLPAccuracyRegression ./internal/dlp/ -args -update-baseline`.
-
-Corpus layout and contribution rules (synthetic samples only — never
-real secrets) live in
-[`agent/internal/dlp/testdata/corpus/README.md`](./agent/internal/dlp/testdata/corpus/README.md).
+Accuracy is enforced by three CI-gated test layers (smoke, large,
+regression). See
+[ARCHITECTURE.md § DLP pipeline](./ARCHITECTURE.md#dlp-pipeline) for
+budgets, corpus sizes, and source files.

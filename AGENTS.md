@@ -1,4 +1,4 @@
-# Instructions for ShieldNet Secure Edge
+# Secure Edge — AI Usage Policy
 
 > [!IMPORTANT]
 > This project does **not** accept pull requests that are fully or
@@ -7,7 +7,7 @@
 >
 > Read more: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-ShieldNet Secure Edge is a privacy-first local security agent. The
+Secure Edge is a privacy-first local security agent. The
 agent makes load-bearing security and privacy decisions about every
 DNS query, paste, form submission, and outbound request on the user's
 device. The cost of a subtle bug in this code path is high — at best a
@@ -195,3 +195,5 @@ maintainer exception on behalf of anyone else.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design
 - [SECURITY.md](SECURITY.md) — vulnerability disclosure
 - [SECURITY_RULES.md](SECURITY_RULES.md) — rule-set policy
+- [docs/admin-guide.md](docs/admin-guide.md) — operator deployment guide
+- [docs/user-guide.md](docs/user-guide.md) — end-user reference

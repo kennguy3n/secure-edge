@@ -138,7 +138,7 @@ A pattern with `require_hotword: true` is suppressed entirely when no hotword
 is present, regardless of score — useful for patterns like "Generic API Key"
 that would otherwise match any 20+ char alphanumeric string.
 
-#### Optional ML-augmented detection (`agent/internal/dlp/ml/`, draft)
+#### Optional ML-augmented detection (`agent/internal/dlp/ml/`)
 
 The DLP pipeline supports an **optional** ML layer that adds two
 narrowly-scoped signals on top of the deterministic pipeline. The layer is
@@ -179,9 +179,17 @@ Inference budget: pre-filter ≤ 5 ms, disambiguator ≤ 10 ms, total ML
 overhead ≤ 15 ms per scan on commodity CPU.
 
 Model artefacts (centroids, disambiguator weights, ONNX model + tokenizer)
-load from `~/.shieldnet/models/` by default. The release pipeline (separate
-follow-up commit) bundles the per-OS ONNX C++ shared library; the model file
-itself ships as a separate release asset.
+load from `~/.shieldnet/models/` by default. The agent runs end-to-end with
+the model absent (NullEmbedder fallback) so the model file is *not* bundled
+in the agent binary release artefacts; `scripts/fetch-ml-model.sh` downloads
+it on demand with a SHA-256 verification path, and the per-OS ONNX C++
+shared-library bundling in `release.yml` lands as a separate follow-up
+commit. Operators wire the layer in by setting `dlp_ml_boost` in
+`config.yaml` to a non-zero integer in the inclusive range `[1, 3]`; the
+agent logs a one-line summary on startup describing whether the layer ended
+up `ready=true`, and `GET /api/dlp/config` exposes an `ml` sub-object with
+`{boost, ready, build_tag_onnx}` so the Electron tray and the browser
+extension can observe the same state without reading the daemon's logs.
 
 **Performance budget (per scan):**
 

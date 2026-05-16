@@ -10,7 +10,7 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
-- **DLP optional ML-augmented detection layer (Workstream 3, draft).**
+- **DLP optional ML-augmented detection layer (Workstream 3).**
   Adds `agent/internal/dlp/ml/` — a strictly-additive ML layer that
   bolts onto the deterministic DLP pipeline. Two integration points:
   (1) a *pre-filter* that may skip regex validation when the embedder
@@ -19,20 +19,69 @@ changes between feature releases — breaking entries are flagged explicitly.
   (within `mlBorderlineWidth == 1` of the per-severity block
   threshold) by `±MLBoost`. High-confidence deterministic decisions
   are immune to the ML signal in both directions, so the
-  deterministic pipeline retains veto power. Default model is
-  `paraphrase-multilingual-MiniLM-L12-v2` int8 (~45 MB, 50+
-  languages); the ONNX-backed embedder lives behind the `onnx`
-  build tag so the default build and CI use only the in-tree
-  `NullEmbedder` and remain CGO-free. Model artefacts (centroids,
-  disambiguator weights, ONNX model) load from
-  `~/.shieldnet/models/` and are absent by default — the pipeline
-  silently falls back to the fully-deterministic path when any
-  artefact is missing. Per-OS ONNX C++ shared-library bundling in
-  `release.yml`, the model-distribution channel, and the
-  corpus-building tools for centroids / linear-head weights ship as
-  separate follow-up commits. The accuracy regression
-  (`TestDLPAccuracyLarge`, `TestDLPAccuracyRegression`) is green
-  with the layer absent — the W4 baseline is fully preserved.
+  deterministic pipeline retains veto power.
+
+  Implementation:
+
+  - Real `ONNXEmbedder` backed by `github.com/yalue/onnxruntime_go`
+    + `github.com/sugarme/tokenizer` (SentencePiece + HuggingFace
+    fast tokenizer JSON) lives behind the `onnx` build tag. The
+    default build and CI use the in-tree `NullEmbedder` and remain
+    CGO-free; `purego`/`dlopen` removes the CGO requirement even on
+    the onnx-tagged build.
+  - Default model is `paraphrase-multilingual-MiniLM-L12-v2`
+    (multilingual, 50+ languages, 384-dim sentence embeddings,
+    ~5–8 ms inference on commodity CPU). Artefacts load from
+    `~/.shieldnet/models/model/` and are absent by default — the
+    pipeline silently falls back to the fully-deterministic path
+    when any artefact is missing.
+  - `agent/internal/dlp/cmd/build_ml_artefacts` is an offline
+    corpus tool that reads the existing TP / TN JSONL corpus,
+    computes per-class L2-normalised centroids, and writes the
+    `centroids.json` / `disambiguator.json` artefacts the layer
+    consumes at runtime. The committed `ml/testdata/centroids.json`
+    was produced by this tool from 500 TP / 500 TN samples; the
+    cosine gap between the two class centroids is ≈0.50, which is
+    a meaningful pre-filter signal.
+  - `scripts/fetch-ml-model.sh` downloads the model from Hugging
+    Face into the expected path, computes SHA-256 hashes after
+    download (with an optional `-m` pin flag for deployment
+    automation), and never embeds a fabricated manifest. The
+    model itself is intentionally NOT bundled in agent release
+    artefacts to keep the binary small and the optional ML
+    dependency clearly separable.
+  - `config.Config` gains three opt-in fields: `dlp_ml_model_dir`,
+    `dlp_ml_boost`, `dlp_ml_prefilter_threshold`. The agent's
+    startup path constructs the Layer when `dlp_ml_boost > 0` and
+    logs a single summary line describing whether the layer ended
+    up ready.
+  - `GET /api/dlp/config` now embeds an `ml` sub-object with
+    `{boost, ready, build_tag_onnx}` so the Electron tray and the
+    browser extension can observe whether the ML layer is live.
+    `PUT /api/dlp/config` preserves `MLBoost` across writes so a
+    tray slider change does NOT silently disable the ML
+    augmentation until the next process restart.
+  - Per-OS ONNX C++ shared-library bundling in `release.yml`,
+    binary release-asset distribution of the model itself, and a
+    trained linear-head for the disambiguator (the committed
+    weights are all-zero, i.e. pure-cosine signal) remain
+    explicitly deferred to follow-up commits.
+
+  Verification:
+
+  - `make test`, `go vet`, and `go test -race -count=1 ./...` are
+    green with and without `-tags=onnx`.
+  - `TestDLPAccuracyLarge` / `TestDLPAccuracyRegression` are green
+    with the layer absent — the W4 baseline is fully preserved
+    bit-for-bit.
+  - `go test -tags=onnx ./internal/dlp/ml/...` is green; with
+    `SHIELDNET_ONNXRUNTIME_LIB` and `SHIELDNET_TEST_ONNX_MODEL_DIR`
+    pointed at a real install, four integration tests prove the
+    embedder produces L2-normalised 384-dim vectors, stable
+    embeddings across repeated calls, discriminative cosine
+    distances on semantically related vs. unrelated inputs, and
+    graceful fallback when only one of the two artefacts is on
+    disk.
 
 - **DLP global-PII coverage expanded from 718 to 812 rules (Workstream 4).**
   Adds 94 jurisdiction-specific personal-data detectors across 7 themed

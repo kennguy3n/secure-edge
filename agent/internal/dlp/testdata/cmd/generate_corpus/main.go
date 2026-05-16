@@ -859,8 +859,6 @@ var patternCategory = map[string]string{
 	"Lab Result with Patient Name":             "healthcare",
 	"Discharge Summary Header":                 "healthcare",
 
-	// Batch 7: Container / Orchestration
-
 	// W4 Batch 1: GDPR / EU national identifiers.
 	"EU IBAN (SEPA)":                     "pii_eu",
 	"EU VAT Number":                      "pii_eu",

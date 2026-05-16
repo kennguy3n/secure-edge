@@ -369,5 +369,5 @@ Columns:
 
 Accuracy is enforced by three CI-gated test layers (smoke, large,
 regression). See
-[ARCHITECTURE.md § DLP pipeline](./ARCHITECTURE.md#dlp-pipeline-agentinternaldlp) for
+[ARCHITECTURE.md § DLP accuracy methodology](./ARCHITECTURE.md#dlp-accuracy-methodology) for
 budgets, corpus sizes, and source files.

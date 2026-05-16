@@ -146,18 +146,18 @@ fetched from `profile_url` on agent start, and reloadable via
 ```json
 {
   "name": "acme-prod-2026q2",
-  "version": 7,
+  "version": "7",
   "managed": true,
   "categories": {
     "AI Chat (Unsanctioned)": "deny",
     "Code Hosting": "allow_with_dlp"
   },
-  "dlp": {
+  "dlp_thresholds": {
     "threshold_critical": 1,
     "threshold_high": 2
   },
   "rule_update_url": "https://rules.example.com/manifest.json",
-  "signature": "<base64 Ed25519 over CanonicalForSigning>"
+  "signature": "<hex Ed25519 over CanonicalForSigning>"
 }
 ```
 

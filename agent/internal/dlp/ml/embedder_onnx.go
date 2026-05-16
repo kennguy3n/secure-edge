@@ -163,8 +163,17 @@ func NewEmbedderFromDir(modelDir string, opts EmbedderOption) (Embedder, error) 
 	if !fileExists(modelPath) || !fileExists(tokenizerPath) {
 		return NullEmbedder{}, nil
 	}
+	// Field-wise default fill so a caller that opts in to a non-default
+	// Threads value (or any future EmbedderOption field) keeps it even
+	// when they leave MaxSeqLen at zero. Replacing the whole struct
+	// would clobber the caller's Threads and lie about "zero means
+	// default" at the field level.
+	def := DefaultEmbedderOptions()
 	if opts.MaxSeqLen <= 0 {
-		opts = DefaultEmbedderOptions()
+		opts.MaxSeqLen = def.MaxSeqLen
+	}
+	if opts.Threads <= 0 {
+		opts.Threads = def.Threads
 	}
 
 	if err := initONNX(modelDir); err != nil {
@@ -343,12 +352,14 @@ func (e *ONNXEmbedder) Embed(ctx context.Context, content string) ([]float32, er
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if e == nil || e.session == nil {
+	if e == nil {
 		return nil, ErrEmbedderUnavailable
 	}
 
 	// Tokenise. AddSpecialTokens=true so the XLM-R CLS / SEP
-	// tokens are inserted; the model is trained with them.
+	// tokens are inserted; the model is trained with them. The
+	// tokenizer is concurrent-safe and not affected by Close(),
+	// so we do not need the lock for this step.
 	encInput := tokenizer.NewSingleEncodeInput(tokenizer.NewInputSequence(content))
 	enc, err := e.tk.Encode(encInput, true)
 	if err != nil {
@@ -386,8 +397,17 @@ func (e *ONNXEmbedder) Embed(ctx context.Context, content string) ([]float32, er
 		inputTensors = append(inputTensors, typeIdsTensor)
 	}
 
+	// Hold e.mu for the nil check + session.Run to close the race
+	// between Embed and Close. Without this, Close could destroy the
+	// session (and nil it out) between an unlocked nil check and the
+	// Run call, crashing the agent on the next dlopen-allocated
+	// pointer.
 	outputs := make([]ort.Value, 1)
 	e.mu.Lock()
+	if e.session == nil {
+		e.mu.Unlock()
+		return nil, ErrEmbedderUnavailable
+	}
 	runErr := e.session.Run(inputTensors, outputs)
 	e.mu.Unlock()
 	if runErr != nil {
@@ -440,9 +460,16 @@ func (e *ONNXEmbedder) Dim() int {
 	return e.hidden
 }
 
-// Ready implements Embedder.
+// Ready implements Embedder. Read of e.session is held under e.mu
+// to avoid the same Embed/Close race; readers that already hold
+// e.mu must not call this.
 func (e *ONNXEmbedder) Ready() bool {
-	return e != nil && e.session != nil && e.tk != nil
+	if e == nil {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.session != nil && e.tk != nil
 }
 
 // Close implements Embedder. Safe to call multiple times.

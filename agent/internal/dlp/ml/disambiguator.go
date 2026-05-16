@@ -62,7 +62,12 @@ func NewDisambiguator(emb Embedder, head LinearHead) (*Disambiguator, error) {
 	if len(head.Weights) == 0 || len(head.Weights) != emb.Dim() {
 		return nil, ErrNoDisambiguatorWeights
 	}
-	return &Disambiguator{emb: emb, w: head.Weights, bias: head.Bias}, nil
+	// Defensive copy of the weight vector so callers cannot
+	// silently re-write the linear head after construction. Matches
+	// PreFilter's centroid copying — both surfaces accept loader-
+	// owned slices and freeze them at construction.
+	w := append([]float32(nil), head.Weights...)
+	return &Disambiguator{emb: emb, w: w, bias: head.Bias}, nil
 }
 
 // Score returns a scalar in [-1, 1] for content. The embedder is

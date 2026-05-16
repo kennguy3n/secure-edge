@@ -234,6 +234,11 @@ func attachMLLayer(p *dlp.Pipeline, cfg config.Config) *ml.Layer {
 	}
 	layer, err := ml.NewLayer(emb, art, cfg.DLPMLPreFilterThreshold)
 	if err != nil {
+		// NewEmbedderFromDir may have returned a real ONNX session
+		// (with cgo-owned tensors + intra-op thread pool) that
+		// NewLayer rejected because of an artefact mismatch. The
+		// session would otherwise leak — close it before bailing.
+		_ = emb.Close()
 		log.Printf("dlp ml: build layer: %v", err)
 		return nil
 	}

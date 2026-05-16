@@ -1274,9 +1274,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["SparkPost EU API Key"] = func(r *rand.Rand) string {
 		return "SPARKPOST_EU_API_KEY=" + randHex(r, 40)
 	}
-	valueGenerators["Amazon SES SMTP Username"] = func(r *rand.Rand) string {
-		return "AKIA" + randUpperAlnum(r, 16)
-	}
 	valueGenerators["Amazon SES SMTP Password"] = func(r *rand.Rand) string {
 		return "AWS_SES_SMTP_PASSWORD=" + randFromAlphabet(r, alnum+"+/=", 48)
 	}
@@ -2289,9 +2286,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["Plaid Client ID"] = func(r *rand.Rand) string {
 		return "PLAID_CLIENT_ID=" + randHex(r, 24)
 	}
-	valueGenerators["Plaid Production Secret"] = func(r *rand.Rand) string {
-		return "PLAID_SECRET=" + randHex(r, 30)
-	}
 	valueGenerators["Plaid Public Token"] = func(r *rand.Rand) string {
 		return "public-production-" + randHex(r, 8) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 4) + "-" + randHex(r, 12)
 	}
@@ -2318,9 +2312,6 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	}
 	valueGenerators["Mollie API Key (live)"] = func(r *rand.Rand) string {
 		return "MOLLIE_API_KEY=live_" + randAlnum(r, 35) + "\n# mollie checkout"
-	}
-	valueGenerators["Mollie API Key (test)"] = func(r *rand.Rand) string {
-		return "MOLLIE_TEST_KEY=test_" + randAlnum(r, 35) + "\n# mollie test mode"
 	}
 	valueGenerators["GoCardless Live Access Token"] = func(r *rand.Rand) string {
 		return "GOCARDLESS_ACCESS_TOKEN=live_" + randFromAlphabet(r, alnum+"_-", 50) + "\n# gocardless direct debit"
@@ -2352,7 +2343,382 @@ token = "` + randFromAlphabet(r, alnum+"_-", 48) + `"`
 	valueGenerators["ACH Routing+Account Numbers Together"] = func(r *rand.Rand) string {
 		return "Routing Number: " + randFromAlphabet(r, digits, 9) + "\nAccount Number: " + randFromAlphabet(r, digits, 12)
 	}
-	valueGenerators["SWIFT/BIC code with bank+account"] = func(r *rand.Rand) string {
-		return "SWIFT/BIC: " + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upper, 2) + randFromAlphabet(r, upper+digits, 2) + "\nIBAN: GB29NWBK60161331926819"
+	// W4 Batch 1: GDPR / EU national identifiers.
+	euCountries := []string{"AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"}
+	valueGenerators["EU IBAN (SEPA)"] = func(r *rand.Rand) string {
+		c := pick(r, euCountries)
+		// IBAN body length varies per country; emit a 14–22 char body to keep things distinctive.
+		return "IBAN: " + c + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upAlnum, 4) + randFromAlphabet(r, digits, 14)
+	}
+	valueGenerators["EU VAT Number"] = func(r *rand.Rand) string {
+		c := pick(r, []string{"DE", "FR", "IT", "ES", "NL", "BE", "AT", "PL", "PT", "SE", "FI", "EL", "IE", "DK", "CZ", "HU", "RO"})
+		return "VAT-ID (intracom): " + c + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["German Personalausweis"] = func(r *rand.Rand) string {
+		// First 9 chars from the restricted alphabet, last char is a digit.
+		alph := "CFGHJKLMNPRTVWXYZ0123456789"
+		return "Personalausweis-Nr: " + randFromAlphabet(r, alph, 9) + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["German Steueridentifikationsnummer"] = func(r *rand.Rand) string {
+		return "Steueridentifikationsnummer: " + randFromAlphabet(r, digits, 11)
+	}
+	valueGenerators["German Sozialversicherungsnummer"] = func(r *rand.Rand) string {
+		return "Sozialversicherungsnummer: " + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["French INSEE/NIR"] = func(r *rand.Rand) string {
+		sex := pick(r, []string{"1", "2"})
+		yr := fmt.Sprintf("%02d", r.Intn(100))
+		mo := fmt.Sprintf("%02d", 1+r.Intn(12))
+		// French départements 01–95 are numeric; 2A and 2B are the two
+		// Corsican départements (Haute-Corse / Corse-du-Sud). The regex
+		// allows the (?:[0-9]{2}|2A|2B) branch, so emit Corsica ~6% of
+		// the time so the alternation is exercised by the corpus.
+		var dep string
+		switch r.Intn(16) {
+		case 0:
+			dep = "2A"
+		case 1:
+			dep = "2B"
+		default:
+			dep = fmt.Sprintf("%02d", 1+r.Intn(95))
+		}
+		return "Numéro de sécurité sociale: " + sex + yr + mo + dep + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["French CNI Number"] = func(r *rand.Rand) string {
+		return "Carte nationale d'identité — n°: " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["French SIRET"] = func(r *rand.Rand) string {
+		return "SIRET: " + randFromAlphabet(r, digits, 14)
+	}
+	valueGenerators["French SIREN"] = func(r *rand.Rand) string {
+		return "SIREN: " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Italian Codice Fiscale"] = func(r *rand.Rand) string {
+		// 6 letters + 2 digits + 1 letter + 2 digits + 1 letter + 3 digits + 1 letter.
+		return "Codice Fiscale: " + randFromAlphabet(r, upper, 6) + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["Italian Partita IVA"] = func(r *rand.Rand) string {
+		return "Partita IVA: " + randFromAlphabet(r, digits, 11)
+	}
+	valueGenerators["Spanish DNI"] = func(r *rand.Rand) string {
+		alph := "ABCDEFGHJKLMNPQRSTVWXYZ" // DNI letter alphabet excludes I, O, U.
+		return "Documento Nacional de Identidad (DNI): " + randFromAlphabet(r, digits, 8) + randFromAlphabet(r, alph, 1)
+	}
+	valueGenerators["Spanish NIE"] = func(r *rand.Rand) string {
+		alph := "ABCDEFGHJKLMNPQRSTVWXYZ"
+		return "Número de Identidad de Extranjero (NIE): " + pick(r, []string{"X", "Y", "Z"}) + randFromAlphabet(r, digits, 7) + randFromAlphabet(r, alph, 1)
+	}
+	valueGenerators["Spanish CIF"] = func(r *rand.Rand) string {
+		first := "ABCDEFGHJNPQRSUVW"
+		last := "ABCDEFGHJ0123456789"
+		return "Código de Identificación Fiscal (CIF): " + randFromAlphabet(r, first, 1) + randFromAlphabet(r, digits, 7) + randFromAlphabet(r, last, 1)
+	}
+	valueGenerators["Dutch BSN"] = func(r *rand.Rand) string {
+		return "BSN (burgerservicenummer): " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Belgian National Number"] = func(r *rand.Rand) string {
+		return "Rijksregisternummer: " + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 2) + "-" + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["Polish PESEL"] = func(r *rand.Rand) string {
+		return "Numer PESEL: " + randFromAlphabet(r, digits, 11)
+	}
+	valueGenerators["Polish NIP"] = func(r *rand.Rand) string {
+		return "Numer identyfikacji podatkowej (NIP) — podatek: " + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 2) + "-" + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["Portuguese NIF"] = func(r *rand.Rand) string {
+		return "Número de contribuinte (NIF) — finanças: " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Swedish Personnummer"] = func(r *rand.Rand) string {
+		yearPrefix := pick(r, []string{"19", "20"})
+		return "Personnummer: " + yearPrefix + randFromAlphabet(r, digits, 6) + "-" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Swedish Organisationsnummer"] = func(r *rand.Rand) string {
+		return "Organisationsnummer: " + randFromAlphabet(r, digits, 6) + "-" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Finnish HETU"] = func(r *rand.Rand) string {
+		sep := pick(r, []string{"-", "+", "A"})
+		ctrl := "0123456789ABCDEFHJKLMNPRSTUVWXY"
+		return "Henkilötunnus (syntymäaika): " + randFromAlphabet(r, digits, 6) + sep + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, ctrl, 1)
+	}
+	valueGenerators["Austrian SV-Nummer"] = func(r *rand.Rand) string {
+		return "SV-Nummer (Österreich): " + randFromAlphabet(r, digits, 4) + " " + randFromAlphabet(r, digits, 6)
+	}
+	valueGenerators["Greek AFM"] = func(r *rand.Rand) string {
+		return "ΑΦΜ — αριθμός φορολογικού μητρώου: " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Greek AMKA"] = func(r *rand.Rand) string {
+		return "ΑΜΚΑ — κοινωνικής ασφάλισης: " + randFromAlphabet(r, digits, 11)
+	}
+	valueGenerators["Czech Rodne Cislo"] = func(r *rand.Rand) string {
+		return "Rodné číslo: " + randFromAlphabet(r, digits, 6) + "/" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Hungarian TAJ"] = func(r *rand.Rand) string {
+		return "Tajszám (társadalombiztosítási azonosító): " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Romanian CNP"] = func(r *rand.Rand) string {
+		// CNP starts with 1–9, total 13 digits.
+		return "Cod numeric personal (CNP): " + randFromAlphabet(r, "123456789", 1) + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["Danish CPR"] = func(r *rand.Rand) string {
+		return "CPR-nummer: " + randFromAlphabet(r, digits, 6) + "-" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Norwegian Fodselsnummer"] = func(r *rand.Rand) string {
+		return "Fødselsnummer (skatteetaten): " + randFromAlphabet(r, digits, 11)
+	}
+
+	// W4 Batch 2: Switzerland.
+	valueGenerators["Swiss AHV/AVS Number"] = func(r *rand.Rand) string {
+		return "AHV/AVS-Nummer: 756." + randFromAlphabet(r, digits, 4) + "." + randFromAlphabet(r, digits, 4) + "." + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["Swiss UID"] = func(r *rand.Rand) string {
+		return "UID (Handelsregister): CHE-" + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Swiss Passport Number"] = func(r *rand.Rand) string {
+		return "Schweizer Pass — Passnummer: " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["Swiss New Old-Age Insurance Number (ZAS)"] = func(r *rand.Rand) string {
+		return "Zentrale Ausgleichsstelle — Versichertennummer: " + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3)
+	}
+
+	// W4 Batch 3: United Kingdom.
+	valueGenerators["UK National Insurance Number"] = func(r *rand.Rand) string {
+		prefixAlph := "ABCEGHJKLMNOPRSTWXYZ"
+		suffixAlph := "ABCDFM"
+		return "National Insurance number: " + randFromAlphabet(r, prefixAlph, 2) + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, suffixAlph, 1)
+	}
+	valueGenerators["UK NHS Number"] = func(r *rand.Rand) string {
+		return "NHS number (National Health Service): " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 3) + " " + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["UK Passport Number"] = func(r *rand.Rand) string {
+		return "UK passport number (British passport): " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["UK Driving Licence Number"] = func(r *rand.Rand) string {
+		// 5 letters or 9 + 6 digits + 2 letters or 9 + 1 digit + 2 letters.
+		surnameAlph := "ABCDEFGHIJKLMNOPQRSTUVWXYZ9"
+		return "DVLA Driving Licence number: " + randFromAlphabet(r, surnameAlph, 5) + randFromAlphabet(r, digits, 6) + randFromAlphabet(r, surnameAlph, 2) + randFromAlphabet(r, digits, 1) + randFromAlphabet(r, upper, 2)
+	}
+	valueGenerators["UK UTR"] = func(r *rand.Rand) string {
+		return "HMRC UTR (Unique Taxpayer Reference): " + randFromAlphabet(r, digits, 10)
+	}
+
+	// W4 Batch 4: GCC / Middle East.
+	valueGenerators["UAE Emirates ID"] = func(r *rand.Rand) string {
+		yr := fmt.Sprintf("%04d", 1950+r.Intn(75))
+		return "Emirates ID: 784-" + yr + "-" + randFromAlphabet(r, digits, 7) + "-" + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["Saudi National ID"] = func(r *rand.Rand) string {
+		// Saudi national IDs start with 1 (citizen) or 2 (resident / iqama).
+		return "Saudi National ID (Iqama): " + pick(r, []string{"1", "2"}) + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Qatar QID"] = func(r *rand.Rand) string {
+		return "Qatar ID (QID — Ministry of Interior Qatar): " + pick(r, []string{"2", "3"}) + randFromAlphabet(r, digits, 10)
+	}
+	valueGenerators["Bahrain CPR Number"] = func(r *rand.Rand) string {
+		return "Bahrain CPR (Information and eGovernment Authority): " + randFromAlphabet(r, digits, 9)
+	}
+	valueGenerators["Kuwait Civil ID"] = func(r *rand.Rand) string {
+		return "Kuwait Civil ID (PACI — Public Authority for Civil Information): " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["Oman Civil Number"] = func(r *rand.Rand) string {
+		return "Oman Civil Number (Royal Oman Police): " + randFromAlphabet(r, digits, 8)
+	}
+	valueGenerators["UAE Tax Registration Number"] = func(r *rand.Rand) string {
+		return "UAE Tax Registration Number (Federal Tax Authority — FTA): " + randFromAlphabet(r, digits, 15)
+	}
+	valueGenerators["Saudi VAT Number"] = func(r *rand.Rand) string {
+		return "Saudi VAT (ZATCA, Kingdom of Saudi Arabia VAT): 3" + randFromAlphabet(r, digits, 13) + "3"
+	}
+	valueGenerators["Saudi IBAN"] = func(r *rand.Rand) string {
+		return "Saudi IBAN (SAMA): SA" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upAlnum, 18)
+	}
+	valueGenerators["UAE IBAN"] = func(r *rand.Rand) string {
+		return "UAE IBAN (Central Bank of the UAE — CBUAE): AE" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, digits, 16)
+	}
+	valueGenerators["Kuwait IBAN"] = func(r *rand.Rand) string {
+		return "Kuwait IBAN (Central Bank of Kuwait — CBK): KW" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, digits, 22)
+	}
+	valueGenerators["Bahrain IBAN"] = func(r *rand.Rand) string {
+		return "Bahrain IBAN (Central Bank of Bahrain — CBB): BH" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upAlnum, 14)
+	}
+	valueGenerators["Qatar IBAN"] = func(r *rand.Rand) string {
+		return "Qatar IBAN (Qatar Central Bank — QCB): QA" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, upper, 4) + randFromAlphabet(r, upAlnum, 21)
+	}
+	valueGenerators["Oman IBAN"] = func(r *rand.Rand) string {
+		return "Oman IBAN (Central Bank of Oman): OM" + randFromAlphabet(r, digits, 2) + randFromAlphabet(r, digits, 3) + randFromAlphabet(r, upAlnum, 16)
+	}
+	valueGenerators["Qatar TIN"] = func(r *rand.Rand) string {
+		return "Qatar Tax Number (General Tax Authority Qatar): " + randFromAlphabet(r, digits, 10)
+	}
+
+	// W4 Batch 5: Southeast & East Asia.
+	valueGenerators["Singapore NRIC/FIN"] = func(r *rand.Rand) string {
+		return "Singapore NRIC (National Registration Identity Card): " + pick(r, []string{"S", "T", "F", "G", "M"}) + randFromAlphabet(r, digits, 7) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["Malaysia MyKad"] = func(r *rand.Rand) string {
+		yr := fmt.Sprintf("%02d", r.Intn(100))
+		mo := fmt.Sprintf("%02d", 1+r.Intn(12))
+		dy := fmt.Sprintf("%02d", 1+r.Intn(28))
+		return "MyKad (Malaysia IC / Kad Pengenalan): " + yr + mo + dy + "-" + randFromAlphabet(r, digits, 2) + "-" + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["Thailand National ID"] = func(r *rand.Rand) string {
+		return "Thai National ID (บัตรประจำตัวประชาชน): " + randFromAlphabet(r, digits, 13)
+	}
+	valueGenerators["Philippines SSS Number"] = func(r *rand.Rand) string {
+		return "Philippines SSS number (Social Security): " + randFromAlphabet(r, digits, 2) + "-" + randFromAlphabet(r, digits, 7) + "-" + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["Philippines TIN"] = func(r *rand.Rand) string {
+		return "BIR TIN (Bureau of Internal Revenue Philippines): " + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Philippines UMID"] = func(r *rand.Rand) string {
+		return "UMID (Unified Multi-Purpose ID — GSIS / PhilHealth): " + randFromAlphabet(r, digits, 4) + "-" + randFromAlphabet(r, digits, 7) + "-" + randFromAlphabet(r, digits, 1)
+	}
+	valueGenerators["Indonesia NIK"] = func(r *rand.Rand) string {
+		return "NIK — Nomor Induk Kependudukan (KTP, Dukcapil): " + randFromAlphabet(r, digits, 16)
+	}
+	valueGenerators["Indonesia NPWP"] = func(r *rand.Rand) string {
+		return "NPWP — Nomor Pokok Wajib Pajak Indonesia: " + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 1) + "-" + randFromAlphabet(r, digits, 3) + "." + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["Vietnam CCCD"] = func(r *rand.Rand) string {
+		return "CCCD — Căn cước công dân (Vietnam national ID): " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["Vietnam MST"] = func(r *rand.Rand) string {
+		return "Mã số thuế (Vietnam tax code — Tổng cục thuế): " + randFromAlphabet(r, digits, 10)
+	}
+	valueGenerators["Japan My Number"] = func(r *rand.Rand) string {
+		return "My Number (マイナンバー / 個人番号 Japan): " + randFromAlphabet(r, digits, 12)
+	}
+	valueGenerators["Japan Passport Number"] = func(r *rand.Rand) string {
+		return "Japan passport (Ministry of Foreign Affairs Japan): " + randFromAlphabet(r, upper, 2) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["South Korea RRN"] = func(r *rand.Rand) string {
+		return "주민등록번호 (Korea Resident Registration Number): " + randFromAlphabet(r, digits, 6) + "-" + pick(r, []string{"1", "2", "3", "4"}) + randFromAlphabet(r, digits, 6)
+	}
+	valueGenerators["South Korea Business Registration Number"] = func(r *rand.Rand) string {
+		return "사업자등록번호 (Korea Business Registration Number — Hometax / NTS): " + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 2) + "-" + randFromAlphabet(r, digits, 5)
+	}
+	valueGenerators["Taiwan National ID"] = func(r *rand.Rand) string {
+		return "Taiwan ID (身分證 — Ministry of the Interior Taiwan): " + randFromAlphabet(r, upper, 1) + pick(r, []string{"1", "2"}) + randFromAlphabet(r, digits, 8)
+	}
+	valueGenerators["China Resident ID"] = func(r *rand.Rand) string {
+		return "居民身份证 (PRC National ID — 公安部): " + randFromAlphabet(r, digits, 17) + pick(r, []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "X"})
+	}
+	valueGenerators["China Passport Number"] = func(r *rand.Rand) string {
+		// Avoid "Administration" — the substring "admin" triggers the generic
+		// dictionary exclusion (-3 score penalty), suppressing legitimate TPs.
+		return "China passport (中国护照 — PRC 国家移民管理局): " + pick(r, []string{"E", "G"}) + randFromAlphabet(r, digits, 8)
+	}
+	valueGenerators["India Aadhaar"] = func(r *rand.Rand) string {
+		return "Aadhaar number (UIDAI — Unique Identification Authority): " + randFromAlphabet(r, digits, 4) + " " + randFromAlphabet(r, digits, 4) + " " + randFromAlphabet(r, digits, 4)
+	}
+	valueGenerators["India PAN"] = func(r *rand.Rand) string {
+		return "PAN card (Permanent Account Number — Income Tax Department India): " + randFromAlphabet(r, upper, 5) + randFromAlphabet(r, digits, 4) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["Hong Kong HKID"] = func(r *rand.Rand) string {
+		var prefix string
+		if r.Intn(2) == 0 {
+			prefix = randFromAlphabet(r, upper, 1)
+		} else {
+			prefix = randFromAlphabet(r, upper, 2)
+		}
+		return "HKID (Hong Kong Identity Card 香港身份證 — Immigration Department): " + prefix + randFromAlphabet(r, digits, 6) + "(" + pick(r, []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A"}) + ")"
+	}
+
+	// W4 Batch 6: HIPAA — additional PHI patterns beyond the existing
+	// MRN/NPI/DEA/MBI/ICD-10/NDC/HL7 PID/ADT/FHIR coverage.
+	valueGenerators["US CLIA Number"] = func(r *rand.Rand) string {
+		return "CLIA number (Clinical Laboratory Improvement Amendments — CMS lab certification): " + randFromAlphabet(r, digits, 2) + "D" + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["US CPT Procedure Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 5)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, digits, 5)
+		}
+		return "CPT procedure codes (AMA Current Procedural Terminology billing): " + codes[0] + ", " + codes[1] + ", " + codes[2] + ", " + codes[3] + ", " + codes[4]
+	}
+	valueGenerators["US HCPCS Level II Code List"] = func(r *rand.Rand) string {
+		alpha := "ABCDEFGHJKLMNPQRSTUV"
+		codes := make([]string, 3)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, alpha, 1) + randFromAlphabet(r, digits, 4)
+		}
+		return "HCPCS Level II durable medical equipment / Healthcare Common Procedure Coding System codes: " + codes[0] + ", " + codes[1] + ", " + codes[2]
+	}
+	valueGenerators["LOINC Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 3)
+		for i := range codes {
+			n := 1 + r.Intn(5)
+			codes[i] = randFromAlphabet(r, digits, n) + "-" + randFromAlphabet(r, digits, 1)
+		}
+		return "LOINC codes (Regenstrief Logical Observation Identifiers Names and Codes): " + codes[0] + " " + codes[1] + " " + codes[2]
+	}
+	valueGenerators["ICD-9-CM Diagnosis Code List"] = func(r *rand.Rand) string {
+		codes := make([]string, 5)
+		for i := range codes {
+			pfx := pick(r, []string{"", "V", "E"})
+			base := randFromAlphabet(r, digits, 3)
+			if r.Intn(2) == 0 {
+				codes[i] = pfx + base
+			} else {
+				codes[i] = pfx + base + "." + randFromAlphabet(r, digits, 1+r.Intn(2))
+			}
+		}
+		return "ICD-9-CM legacy diagnosis codes (International Classification of Diseases 9th Revision Clinical Modification): " + codes[0] + ", " + codes[1] + ", " + codes[2] + ", " + codes[3] + ", " + codes[4]
+	}
+	valueGenerators["US NDC Drug Code (11-digit)"] = func(r *rand.Rand) string {
+		return "NDC 11-digit (FDA National Drug Code billing form): " + randFromAlphabet(r, digits, 5) + "-" + randFromAlphabet(r, digits, 4) + "-" + randFromAlphabet(r, digits, 2)
+	}
+	valueGenerators["SNOMED CT Concept ID List"] = func(r *rand.Rand) string {
+		codes := make([]string, 3)
+		for i := range codes {
+			codes[i] = randFromAlphabet(r, digits, 6+r.Intn(13))
+		}
+		return "SNOMED CT concept IDs (IHTSDO Systematized Nomenclature of Medicine clinical terms): " + codes[0] + ", " + codes[1] + ", " + codes[2]
+	}
+	valueGenerators["DSM-5 Diagnosis Code"] = func(r *rand.Rand) string {
+		return "DSM-5 diagnosis (Diagnostic and Statistical Manual mental disorder classification): F" + randFromAlphabet(r, digits, 2) + "." + randFromAlphabet(r, digits, 1+r.Intn(2))
+	}
+	valueGenerators["US Medicare HICN (legacy)"] = func(r *rand.Rand) string {
+		return "HICN legacy (Health Insurance Claim Number — Medicare pre-MBI): " + randFromAlphabet(r, digits, 9) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["CMS Certification Number (CCN)"] = func(r *rand.Rand) string {
+		return "CCN facility (CMS Certification Number — Centers for Medicare Services facility identifier): " + randFromAlphabet(r, digits, 6)
+	}
+	valueGenerators["Insurance Subscriber Member ID"] = func(r *rand.Rand) string {
+		return "Subscriber ID (insurance member id / policy member number): " + randFromAlphabet(r, upper+digits, 9+r.Intn(7))
+	}
+	valueGenerators["Patient DOB in Clinical Context"] = func(r *rand.Rand) string {
+		mo := 1 + r.Intn(12)
+		dy := 1 + r.Intn(28)
+		yr := 1950 + r.Intn(60)
+		return "Patient clinical record — DOB: " + fmt.Sprintf("%02d/%02d/%04d", mo, dy, yr) + " (diagnosis treatment chart)"
+	}
+	valueGenerators["HL7 v2 OBX Result Segment"] = func(r *rand.Rand) string {
+		return "HL7 v2 lab result OBX observation: OBX|1|NM|GLU^Glucose^L|1|" + randFromAlphabet(r, digits, 3) + ".0|mg/dL|70_110|H|||F"
+	}
+	valueGenerators["HL7 v2 ORC Order Segment"] = func(r *rand.Rand) string {
+		return "HL7 v2 order entry ORC lab order segment: ORC|NW|" + randFromAlphabet(r, digits, 7) + "|" + randFromAlphabet(r, digits, 7) + "|"
+	}
+	valueGenerators["DICOM Patient Name Tag"] = func(r *rand.Rand) string {
+		family := pick(r, []string{"Smith", "Garcia", "Nakamura", "Mueller", "Rossi", "Andersson"})
+		given := pick(r, []string{"John", "Maria", "Hiroshi", "Klaus", "Giulia", "Erik"})
+		return "DICOM imaging study patient (PACS): (0010,0010) PN [" + family + "^" + given + "]"
+	}
+
+	// W4 Batch 7: CCPA — California-specific consumer data identifiers.
+	valueGenerators["California Driver's License"] = func(r *rand.Rand) string {
+		return "California driver license (DMV California issued): " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["California State ID Card"] = func(r *rand.Rand) string {
+		return "California state id card (DMV ID card California — non-driver): " + randFromAlphabet(r, upper, 1) + randFromAlphabet(r, digits, 7)
+	}
+	valueGenerators["California Medi-Cal Beneficiary ID"] = func(r *rand.Rand) string {
+		return "Medi-Cal beneficiary (California Medicaid — DHCS Medi-Cal): " + randFromAlphabet(r, digits, 8) + randFromAlphabet(r, upper, 1)
+	}
+	valueGenerators["California Vehicle License Plate"] = func(r *rand.Rand) string {
+		first := pick(r, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9"})
+		return "California license plate (DMV plate California vehicle): " + first + randFromAlphabet(r, upper, 3) + randFromAlphabet(r, digits, 3)
+	}
+	valueGenerators["California Sales Tax Permit Number"] = func(r *rand.Rand) string {
+		return "California sales tax permit (CDTFA California seller's permit number): " + randFromAlphabet(r, digits, 3) + "-" + randFromAlphabet(r, digits, 6)
 	}
 }

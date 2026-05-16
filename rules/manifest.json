@@ -1,14 +1,41 @@
 {
   "version": "1.0.0",
   "files": [
-    {"name": "ai_allowed.txt",       "sha256": "0ee27cb4a32018924b98e0aba7aac12fcd39b8669148a3466e8facd1ec538bc6"},
-    {"name": "ai_chat_blocked.txt",  "sha256": "52464ab3db6673fd365e15713d0c216a38544ff446ac7cf628db2d45b5ab1f37"},
-    {"name": "ai_chat_dlp.txt",      "sha256": "f5efcc0d56b317c07eecbbed9f4ad11c15f602e73e3c62c42a7b7feb34d5d009"},
-    {"name": "ai_code_blocked.txt",  "sha256": "54fc788e20773ba0e69c288a3db77894fbb8df988886ec29168d50ef14983133"},
-    {"name": "news.txt",             "sha256": "68b2d09c97985c49c305824b13d7da5d7923e35f0d2ef67466c1a700d057ad2e"},
-    {"name": "phishing.txt",         "sha256": "b641c98e2b72b02e4fbc61d639b7f48c1daa253d742722d3dff0c9146d552c8f"},
-    {"name": "social.txt",           "sha256": "08a7979116a8c61a2f0075e5be3303934de958f06038ec77da5ec73fbd28fd19"},
-    {"name": "dlp_patterns.json",    "sha256": "8f479ae1ec80be4ba4367394df94bcfeefeaff47b9f7f9625cda9a207e0aac8a"},
-    {"name": "dlp_exclusions.json",  "sha256": "53428847c641f3c9dcecc2c6018098811262f12358bf87754a401b4b884bf552"}
+    {
+      "name": "ai_allowed.txt",
+      "sha256": "0ee27cb4a32018924b98e0aba7aac12fcd39b8669148a3466e8facd1ec538bc6"
+    },
+    {
+      "name": "ai_chat_blocked.txt",
+      "sha256": "52464ab3db6673fd365e15713d0c216a38544ff446ac7cf628db2d45b5ab1f37"
+    },
+    {
+      "name": "ai_chat_dlp.txt",
+      "sha256": "f5efcc0d56b317c07eecbbed9f4ad11c15f602e73e3c62c42a7b7feb34d5d009"
+    },
+    {
+      "name": "ai_code_blocked.txt",
+      "sha256": "54fc788e20773ba0e69c288a3db77894fbb8df988886ec29168d50ef14983133"
+    },
+    {
+      "name": "news.txt",
+      "sha256": "68b2d09c97985c49c305824b13d7da5d7923e35f0d2ef67466c1a700d057ad2e"
+    },
+    {
+      "name": "phishing.txt",
+      "sha256": "b641c98e2b72b02e4fbc61d639b7f48c1daa253d742722d3dff0c9146d552c8f"
+    },
+    {
+      "name": "social.txt",
+      "sha256": "08a7979116a8c61a2f0075e5be3303934de958f06038ec77da5ec73fbd28fd19"
+    },
+    {
+      "name": "dlp_patterns.json",
+      "sha256": "356037686d70c8e8bc453335ffa2efc77f826fbb94937e63f219826eb9820767"
+    },
+    {
+      "name": "dlp_exclusions.json",
+      "sha256": "53428847c641f3c9dcecc2c6018098811262f12358bf87754a401b4b884bf552"
+    }
   ]
 }

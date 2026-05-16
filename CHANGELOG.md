@@ -10,6 +10,56 @@ changes between feature releases — breaking entries are flagged explicitly.
 
 ### Added
 
+- **DLP global-PII coverage expanded from 718 to 812 rules (Workstream 4).**
+  Adds 94 jurisdiction-specific personal-data detectors across 7 themed
+  batches covering GDPR (EU), Switzerland, the UK, the GCC / Middle
+  East, Southeast / East Asia, HIPAA-adjacent PHI identifiers, and
+  CCPA / California consumer identifiers:
+  - **GDPR / EU (`pii_eu`, 30):** IBAN, EU VAT, DE Personalausweis /
+    Steueridentifikationsnummer / Sozialversicherungsnummer, FR
+    INSEE/NIR / SIREN / SIRET / CNI, IT Codice Fiscale / Partita IVA,
+    ES DNI / NIE / CIF, NL BSN, BE Rijksregister, PL PESEL / NIP, PT
+    NIF, SE Personnummer / Organisationsnummer, FI HETU, GR AFM, HU
+    TAJ.
+  - **Switzerland (`pii_switzerland`, 4):** AHV/AVS (756.xxxx.xxxx.xx),
+    Swiss UID (CHE-xxx.xxx.xxx), Swiss Passport, Swiss New Old-Age
+    Insurance Number (ZAS). Swiss IBANs (`CH..`) are covered by the
+    `EU IBAN (SEPA)` pattern in `pii_eu`, which includes `CH` in its
+    country-code alternation.
+  - **United Kingdom (`pii_uk`, 5):** NINO, NHS Number, UK Passport,
+    UK Driver's Licence, UK UTR.
+  - **GCC / Middle East (`pii_gcc`, 15):** UAE Emirates ID (784-...),
+    UAE TRN / IBAN, Saudi National ID (Iqama) / IBAN / VAT, Qatar
+    QID, Bahrain CPR, Kuwait Civil ID, Oman Civil Number.
+  - **Southeast / East Asia (`pii_sea`, 20):** Singapore NRIC/FIN,
+    Malaysia MyKad, Thai National ID, Philippines SSS / TIN / UMID,
+    Indonesia NIK / NPWP, Vietnam CCCD / MST, Japan My Number /
+    Passport, South Korea RRN / Business Registration, Taiwan
+    National ID, China Resident ID / Passport, India Aadhaar / PAN,
+    Hong Kong HKID.
+  - **HIPAA-adjacent PHI (`phi`, +15):** US CLIA Number; CPT, HCPCS
+    Level II, LOINC, ICD-9-CM, and SNOMED CT bulk code lists; NDC
+    11-digit drug code; DSM-5 diagnosis code; Medicare HICN (legacy);
+    CMS Certification Number; Insurance Subscriber/Member ID;
+    Patient DOB in clinical context; HL7 v2 OBX and ORC segments;
+    DICOM (0010,0010) Patient Name Tag.
+  - **CCPA / California (`pii_ccpa`, 5):** California Driver's
+    Licence, California State ID, California Medi-Cal Beneficiary
+    ID, California Vehicle License Plate, CDTFA Sales Tax Permit.
+  Patterns whose ambient shape (9–13 digits with separators) collides
+  with too many innocent strings are gated by `require_hotword: true`
+  with multi-syllabic, locale-specific hotword phrases so the
+  hotword AC scan stays selective. Bulk-detection medical-coding
+  patterns use the `(?:CODE\b[\s,;|]+){N}CODE\b` form so a single
+  5-digit number in isolation cannot fire. Three regex / generator
+  defects discovered while wiring this in were fixed in the same
+  branch: the Hong Kong HKID regex had a trailing `\b` that could
+  never match after `)`; the EU VAT regex used `(?i)` and matched
+  `deployment`; and the China Passport synthetic corpus phrase
+  contained the substring `admin` which trips a generic dictionary
+  exclusion. Final accuracy on the synthetic corpus
+  (15 492 samples, 43 corpus categories): all category FN budgets
+  green; full `go test -tags=large -count=1 -run 'TestDLPAccuracy(Large|Regression)' ./internal/dlp/` passes.
 - **DLP pattern coverage expanded from 376 to 718 rules (Workstream 1).**
   Adds 342 new detectors across 17 themed batches: additional cloud
   providers (DigitalOcean / Linode / Vultr / Cloudflare / Hetzner /

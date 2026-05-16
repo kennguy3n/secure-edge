@@ -482,7 +482,6 @@ var patternCategory = map[string]string{
 	"Postmark Account API Token":      "email_marketing",
 	"SparkPost API Key":               "email_marketing",
 	"SparkPost EU API Key":            "email_marketing",
-	"Amazon SES SMTP Username":        "email_marketing",
 	"Amazon SES SMTP Password":        "email_marketing",
 	"Mandrill API Key":                "email_marketing",
 	"ConvertKit API Secret":           "email_marketing",
@@ -818,7 +817,6 @@ var patternCategory = map[string]string{
 
 	// Batch 17: Financial Services
 	"Plaid Client ID":                        "financial",
-	"Plaid Production Secret":                "financial",
 	"Plaid Public Token":                     "financial",
 	"Dwolla API Key":                         "financial",
 	"Dwolla API Secret":                      "financial",
@@ -828,7 +826,6 @@ var patternCategory = map[string]string{
 	"Adyen Client Key":                       "financial",
 	"Adyen Webhook HMAC Key":                 "financial",
 	"Mollie API Key (live)":                  "financial",
-	"Mollie API Key (test)":                  "financial",
 	"GoCardless Live Access Token":           "financial",
 	"Stripe Webhook Signing Secret (whsec_)": "financial",
 	"Stripe Restricted API Key (rk_)":        "financial",
@@ -839,7 +836,6 @@ var patternCategory = map[string]string{
 	"Razorpay Key ID":                        "financial",
 	"Razorpay Key Secret":                    "financial",
 	"ACH Routing+Account Numbers Together":   "financial",
-	"SWIFT/BIC code with bank+account":       "financial",
 
 	// Batch 16: Healthcare
 	"FHIR R4 Patient Resource ID":              "healthcare",
@@ -864,6 +860,116 @@ var patternCategory = map[string]string{
 	"Discharge Summary Header":                 "healthcare",
 
 	// Batch 7: Container / Orchestration
+
+	// W4 Batch 1: GDPR / EU national identifiers.
+	"EU IBAN (SEPA)":                     "pii_eu",
+	"EU VAT Number":                      "pii_eu",
+	"German Personalausweis":             "pii_eu",
+	"German Steueridentifikationsnummer": "pii_eu",
+	"German Sozialversicherungsnummer":   "pii_eu",
+	"French INSEE/NIR":                   "pii_eu",
+	"French CNI Number":                  "pii_eu",
+	"French SIRET":                       "pii_eu",
+	"French SIREN":                       "pii_eu",
+	"Italian Codice Fiscale":             "pii_eu",
+	"Italian Partita IVA":                "pii_eu",
+	"Spanish DNI":                        "pii_eu",
+	"Spanish NIE":                        "pii_eu",
+	"Spanish CIF":                        "pii_eu",
+	"Dutch BSN":                          "pii_eu",
+	"Belgian National Number":            "pii_eu",
+	"Polish PESEL":                       "pii_eu",
+	"Polish NIP":                         "pii_eu",
+	"Portuguese NIF":                     "pii_eu",
+	"Swedish Personnummer":               "pii_eu",
+	"Swedish Organisationsnummer":        "pii_eu",
+	"Finnish HETU":                       "pii_eu",
+	"Austrian SV-Nummer":                 "pii_eu",
+	"Greek AFM":                          "pii_eu",
+	"Greek AMKA":                         "pii_eu",
+	"Czech Rodne Cislo":                  "pii_eu",
+	"Hungarian TAJ":                      "pii_eu",
+	"Romanian CNP":                       "pii_eu",
+	"Danish CPR":                         "pii_eu",
+	"Norwegian Fodselsnummer":            "pii_eu",
+
+	// W4 Batch 2: Switzerland.
+	"Swiss AHV/AVS Number":                     "pii_switzerland",
+	"Swiss UID":                                "pii_switzerland",
+	"Swiss Passport Number":                    "pii_switzerland",
+	"Swiss New Old-Age Insurance Number (ZAS)": "pii_switzerland",
+
+	// W4 Batch 3: United Kingdom.
+	"UK National Insurance Number": "pii_uk",
+	"UK NHS Number":                "pii_uk",
+	"UK Passport Number":           "pii_uk",
+	"UK Driving Licence Number":    "pii_uk",
+	"UK UTR":                       "pii_uk",
+
+	// W4 Batch 4: GCC / Middle East.
+	"UAE Emirates ID":             "pii_gcc",
+	"Saudi National ID":           "pii_gcc",
+	"Qatar QID":                   "pii_gcc",
+	"Bahrain CPR Number":          "pii_gcc",
+	"Kuwait Civil ID":             "pii_gcc",
+	"Oman Civil Number":           "pii_gcc",
+	"UAE Tax Registration Number": "pii_gcc",
+	"Saudi VAT Number":            "pii_gcc",
+	"Saudi IBAN":                  "pii_gcc",
+	"UAE IBAN":                    "pii_gcc",
+	"Kuwait IBAN":                 "pii_gcc",
+	"Bahrain IBAN":                "pii_gcc",
+	"Qatar IBAN":                  "pii_gcc",
+	"Oman IBAN":                   "pii_gcc",
+	"Qatar TIN":                   "pii_gcc",
+
+	// W4 Batch 5: Southeast & East Asia.
+	"Singapore NRIC/FIN":                       "pii_sea",
+	"Malaysia MyKad":                           "pii_sea",
+	"Thailand National ID":                     "pii_sea",
+	"Philippines SSS Number":                   "pii_sea",
+	"Philippines TIN":                          "pii_sea",
+	"Philippines UMID":                         "pii_sea",
+	"Indonesia NIK":                            "pii_sea",
+	"Indonesia NPWP":                           "pii_sea",
+	"Vietnam CCCD":                             "pii_sea",
+	"Vietnam MST":                              "pii_sea",
+	"Japan My Number":                          "pii_sea",
+	"Japan Passport Number":                    "pii_sea",
+	"South Korea RRN":                          "pii_sea",
+	"South Korea Business Registration Number": "pii_sea",
+	"Taiwan National ID":                       "pii_sea",
+	"China Resident ID":                        "pii_sea",
+	"China Passport Number":                    "pii_sea",
+	"India Aadhaar":                            "pii_sea",
+	"India PAN":                                "pii_sea",
+	"Hong Kong HKID":                           "pii_sea",
+
+	// W4 Batch 6: HIPAA — supplemental PHI patterns. All map to the
+	// existing "phi" corpus directory (alongside the MRN/NPI/DEA/MBI
+	// patterns introduced in earlier W1 work).
+	"US CLIA Number":                  "phi",
+	"US CPT Procedure Code List":      "phi",
+	"US HCPCS Level II Code List":     "phi",
+	"LOINC Code List":                 "phi",
+	"ICD-9-CM Diagnosis Code List":    "phi",
+	"US NDC Drug Code (11-digit)":     "phi",
+	"SNOMED CT Concept ID List":       "phi",
+	"DSM-5 Diagnosis Code":            "phi",
+	"US Medicare HICN (legacy)":       "phi",
+	"CMS Certification Number (CCN)":  "phi",
+	"Insurance Subscriber Member ID":  "phi",
+	"Patient DOB in Clinical Context": "phi",
+	"HL7 v2 OBX Result Segment":       "phi",
+	"HL7 v2 ORC Order Segment":        "phi",
+	"DICOM Patient Name Tag":          "phi",
+
+	// W4 Batch 7: CCPA — California consumer data identifiers.
+	"California Driver's License":        "pii_ccpa",
+	"California State ID Card":           "pii_ccpa",
+	"California Medi-Cal Beneficiary ID": "pii_ccpa",
+	"California Vehicle License Plate":   "pii_ccpa",
+	"California Sales Tax Permit Number": "pii_ccpa",
 }
 
 // patternsJSON is the structure of rules/dlp_patterns.json.

@@ -12423,6 +12423,1713 @@
       "require_hotword": true,
       "entropy_min": 0.0,
       "category": "financial"
+    },
+    {
+      "name": "EU IBAN (SEPA)",
+      "regex": "\\b(?:AT|BE|BG|CH|CY|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IE|IS|IT|LI|LT|LU|LV|MT|NL|NO|PL|PT|RO|SE|SI|SK)\\d{2}[A-Z0-9]{11,30}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "sepa",
+        "beneficiary",
+        "payee",
+        "swift code"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "EU VAT Number",
+      "regex": "\\b(?:DE|FR|IT|ES|NL|BE|AT|PL|PT|SE|FI|GR|EL|IE|DK|CZ|HU|RO|BG|HR|SK|SI|LT|LV|EE|CY|LU|MT|XI)[0-9A-Z]{8,12}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "vat-id",
+        "vat id",
+        "ust-id",
+        "ust id",
+        "mwst-id",
+        "intracom",
+        "intra-community",
+        "piva",
+        "num\u00e9ro de tva"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Personalausweis",
+      "regex": "\\b[CFGHJKLMNPRTVWXYZ0-9]{9}\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "personalausweis",
+        "ausweisnummer",
+        "identifikationsnummer",
+        "reisepass"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Steueridentifikationsnummer",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "steueridentifikationsnummer",
+        "steuer-id",
+        "steuerid",
+        "idnr",
+        "steuernummer",
+        "finanzamt"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "German Sozialversicherungsnummer",
+      "regex": "\\b\\d{2}\\s?\\d{6}\\s?[A-Z]\\s?\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sozialversicherungsnummer",
+        "sv-nummer",
+        "rentenversicherung",
+        "versicherungsnummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French INSEE/NIR",
+      "regex": "\\b[12]\\d{2}(?:0[1-9]|1[0-2])(?:[0-9]{2}|2A|2B)\\d{6}\\d{2}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "insee",
+        "s\u00e9curit\u00e9 sociale",
+        "carte vitale",
+        "ameli",
+        "num\u00e9ro de s\u00e9curit\u00e9 sociale"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French CNI Number",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "carte nationale d'identit\u00e9",
+        "carte d'identit\u00e9",
+        "carte nationale",
+        "piece d'identite"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French SIRET",
+      "regex": "\\b\\d{14}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "siret",
+        "\u00e9tablissement",
+        "etablissement",
+        "insee"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "French SIREN",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "siren",
+        "registre du commerce",
+        "num\u00e9ro de siren"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Italian Codice Fiscale",
+      "regex": "\\b[A-Z]{6}\\d{2}[A-Z]\\d{2}[A-Z]\\d{3}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "codice fiscale",
+        "tessera sanitaria",
+        "agenzia delle entrate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Italian Partita IVA",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "partita iva",
+        "piva",
+        "camera di commercio"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish DNI",
+      "regex": "\\b\\d{8}[A-HJ-NP-TV-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "documento nacional de identidad",
+        "documento de identidad",
+        "n\u00famero de identificaci\u00f3n",
+        "dni:",
+        "dni "
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish NIE",
+      "regex": "\\b[XYZ]\\d{7}[A-HJ-NP-TV-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "n\u00famero de identidad de extranjero",
+        "n\u00famero de extranjero"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Spanish CIF",
+      "regex": "\\b[ABCDEFGHJNPQRSUVW]\\d{7}[A-J0-9]\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "c\u00f3digo de identificaci\u00f3n fiscal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Dutch BSN",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bsn",
+        "burgerservicenummer",
+        "sofi-nummer",
+        "sofinummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Belgian National Number",
+      "regex": "\\b\\d{2}\\.\\d{2}\\.\\d{2}-\\d{3}\\.\\d{2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rijksregisternummer",
+        "num\u00e9ro de registre national",
+        "nationaal nummer",
+        "nationaal registratienummer",
+        "nrn"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Polish PESEL",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pesel",
+        "numer pesel",
+        "powszechny elektroniczny system ewidencji ludno\u015bci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Polish NIP",
+      "regex": "\\b\\d{3}-\\d{3}-\\d{2}-\\d{2}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "numer identyfikacji podatkowej",
+        "podatek"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Portuguese NIF",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "n\u00famero de contribuinte",
+        "contribuinte",
+        "finan\u00e7as"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Swedish Personnummer",
+      "regex": "\\b(?:19|20)?\\d{6}[-+]\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "personnummer",
+        "skatteverket"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Swedish Organisationsnummer",
+      "regex": "\\b\\d{6}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "organisationsnummer",
+        "bolagsverket"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Finnish HETU",
+      "regex": "\\b\\d{6}[-+A]\\d{3}[0-9A-Y]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "henkil\u00f6tunnus",
+        "syntym\u00e4aika",
+        "kansalainen"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Austrian SV-Nummer",
+      "regex": "\\b\\d{4}\\s?\\d{6}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sozialversicherungsnummer",
+        "sv-nummer",
+        "svnr",
+        "gesundheitskasse",
+        "\u00f6sterreich"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Greek AFM",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "\u03b1\u03c6\u03bc",
+        "\u03b1\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03c6\u03bf\u03c1\u03bf\u03bb\u03bf\u03b3\u03b9\u03ba\u03bf\u03cd \u03bc\u03b7\u03c4\u03c1\u03ce\u03bf\u03c5",
+        "\u03c6\u03bf\u03c1\u03bf\u03bb\u03bf\u03b3\u03b9\u03ba"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Greek AMKA",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "\u03b1\u03bc\u03ba\u03b1",
+        "\u03ba\u03bf\u03b9\u03bd\u03c9\u03bd\u03b9\u03ba\u03ae\u03c2 \u03b1\u03c3\u03c6\u03ac\u03bb\u03b9\u03c3\u03b7\u03c2",
+        "\u03b1\u03c1\u03b9\u03b8\u03bc\u03cc\u03c2 \u03bc\u03b7\u03c4\u03c1\u03ce\u03bf\u03c5 \u03ba\u03bf\u03b9\u03bd\u03c9\u03bd\u03b9\u03ba\u03ae\u03c2 \u03b1\u03c3\u03c6\u03ac\u03bb\u03b9\u03c3\u03b7\u03c2"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Czech Rodne Cislo",
+      "regex": "\\b\\d{6}/\\d{3,4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "rodn\u00e9 \u010d\u00edslo",
+        "rodne cislo",
+        "ob\u010dansk\u00fd pr\u016fkaz",
+        "obcansky prukaz"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Hungarian TAJ",
+      "regex": "\\b\\d{3}\\s?\\d{3}\\s?\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "tajsz\u00e1m",
+        "t\u00e1rsadalombiztos\u00edt\u00e1si azonos\u00edt\u00f3",
+        "oep",
+        "neak"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Romanian CNP",
+      "regex": "\\b[1-9]\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cod numeric personal",
+        "carte de identitate",
+        "buletin de identitate"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Danish CPR",
+      "regex": "\\b\\d{6}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cpr-nummer",
+        "det centrale personregister"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Norwegian Fodselsnummer",
+      "regex": "\\b\\d{11}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "f\u00f8dselsnummer",
+        "skatteetaten",
+        "norsk personnummer"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_eu"
+    },
+    {
+      "name": "Swiss AHV/AVS Number",
+      "regex": "\\b756\\.\\d{4}\\.\\d{4}\\.\\d{2}\\b",
+      "prefix": "756.",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "ahv",
+        "avs",
+        "ahv-nummer",
+        "avs-nummer",
+        "sozialversicherung schweiz",
+        "s\u00e9curit\u00e9 sociale suisse"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss UID",
+      "regex": "\\bCHE-\\d{3}\\.\\d{3}\\.\\d{3}\\b",
+      "prefix": "che-",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "unternehmens-identifikationsnummer",
+        "handelsregister",
+        "mwst",
+        "uid-bfs",
+        "num\u00e9ro d'identification de l'entreprise"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss Passport Number",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "schweizer pass",
+        "passnummer schweiz",
+        "swiss passport",
+        "passeport suisse",
+        "passaporto svizzero"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "Swiss New Old-Age Insurance Number (ZAS)",
+      "regex": "\\b\\d{3}\\.\\d{2}\\.\\d{3}\\.\\d{3}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "zentrale ausgleichsstelle",
+        "caisse f\u00e9d\u00e9rale de compensation",
+        "cassa di compensazione",
+        "versichertennummer schweiz"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_switzerland"
+    },
+    {
+      "name": "UK National Insurance Number",
+      "regex": "\\b[A-CEGHJ-PR-TW-Z]{2}\\d{6}[A-DFM]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "national insurance",
+        "ni number",
+        "nino",
+        "hmrc",
+        "department for work and pensions",
+        "dwp"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK NHS Number",
+      "regex": "\\b\\d{3}\\s?\\d{3}\\s?\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nhs number",
+        "national health service",
+        "nhs digital",
+        "summary care record",
+        "patient nhs"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK Passport Number",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "uk passport",
+        "british passport",
+        "gb passport",
+        "her majesty's passport office",
+        "passport number uk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK Driving Licence Number",
+      "regex": "\\b[A-Z9]{5}\\d{6}[A-Z9]{2}\\d[A-Z]{2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "driving licence",
+        "driver's licence",
+        "dvla",
+        "driving license number",
+        "driving licence number"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UK UTR",
+      "regex": "\\b\\d{10}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "unique taxpayer reference",
+        "utr number",
+        "self assessment",
+        "hmrc utr"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_uk"
+    },
+    {
+      "name": "UAE Emirates ID",
+      "regex": "\\b784-\\d{4}-\\d{7}-\\d\\b",
+      "prefix": "784-",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "emirates id",
+        "hawiya",
+        "uae emirates",
+        "hoiya",
+        "federal authority for identity"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi National ID",
+      "regex": "\\b[12]\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "saudi national id",
+        "iqama",
+        "\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064a\u0629",
+        "national identity card saudi",
+        "ahwal madaniyah"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar QID",
+      "regex": "\\b[23]\\d{10}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "qatar id",
+        "qid",
+        "qatari id",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a",
+        "ministry of interior qatar"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Bahrain CPR Number",
+      "regex": "\\b\\d{9}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "bahrain cpr",
+        "bahrain personal number",
+        "information and egovernment authority",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0634\u062e\u0635\u064a \u0627\u0644\u0628\u062d\u0631\u064a\u0646\u064a"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Kuwait Civil ID",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "kuwait civil id",
+        "public authority for civil information",
+        "\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0645\u062f\u0646\u064a\u0629",
+        "civil id kuwait",
+        "paci"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Oman Civil Number",
+      "regex": "\\b\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "oman civil number",
+        "royal oman police",
+        "sultanate of oman id",
+        "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0645\u062f\u0646\u064a \u0627\u0644\u0639\u0645\u0627\u0646\u064a"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "UAE Tax Registration Number",
+      "regex": "\\b\\d{15}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "tax registration number",
+        "trn uae",
+        "federal tax authority",
+        "uae vat",
+        "fta"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi VAT Number",
+      "regex": "\\b3\\d{13}3\\b",
+      "prefix": "3",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "saudi vat",
+        "zatca",
+        "general authority of zakat and tax",
+        "kingdom of saudi arabia vat",
+        "ksa vat"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Saudi IBAN",
+      "regex": "\\bSA\\d{2}\\d{2}[A-Z0-9]{18}\\b",
+      "prefix": "sa",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "saudi",
+        "sama",
+        "sarie",
+        "bank account saudi"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "UAE IBAN",
+      "regex": "\\bAE\\d{2}\\d{3}\\d{16}\\b",
+      "prefix": "ae",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "uae",
+        "united arab emirates",
+        "central bank of the uae",
+        "cbuae"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Kuwait IBAN",
+      "regex": "\\bKW\\d{2}[A-Z]{4}\\d{22}\\b",
+      "prefix": "kw",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "kuwait",
+        "central bank of kuwait",
+        "cbk"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Bahrain IBAN",
+      "regex": "\\bBH\\d{2}[A-Z]{4}[A-Z0-9]{14}\\b",
+      "prefix": "bh",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "bahrain",
+        "central bank of bahrain",
+        "cbb"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar IBAN",
+      "regex": "\\bQA\\d{2}[A-Z]{4}[A-Z0-9]{21}\\b",
+      "prefix": "qa",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "qatar",
+        "qatar central bank",
+        "qcb"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Oman IBAN",
+      "regex": "\\bOM\\d{2}\\d{3}[A-Z0-9]{16}\\b",
+      "prefix": "om",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "iban",
+        "oman",
+        "central bank of oman",
+        "cbo oman"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Qatar TIN",
+      "regex": "\\b\\d{10}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "qatar tax number",
+        "qatar tin",
+        "general tax authority qatar",
+        "\u0627\u0644\u0636\u0631\u0627\u0626\u0628 \u0642\u0637\u0631"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_gcc"
+    },
+    {
+      "name": "Singapore NRIC/FIN",
+      "regex": "\\b[STFGM]\\d{7}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nric",
+        "fin",
+        "national registration",
+        "singapore identity",
+        "singpass",
+        "ica singapore"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Malaysia MyKad",
+      "regex": "\\b\\d{6}-\\d{2}-\\d{4}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "mykad",
+        "malaysia ic",
+        "malaysian identity card",
+        "jpn malaysia",
+        "mykid",
+        "kad pengenalan"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Thailand National ID",
+      "regex": "\\b\\d{13}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "thai national id",
+        "thailand id card",
+        "\u0e1a\u0e31\u0e15\u0e23\u0e1b\u0e23\u0e30\u0e08\u0e33\u0e15\u0e31\u0e27\u0e1b\u0e23\u0e30\u0e0a\u0e32\u0e0a\u0e19",
+        "department of provincial administration",
+        "tabienraj"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines SSS Number",
+      "regex": "\\b\\d{2}-\\d{7}-\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "sss number",
+        "philippines social security",
+        "ss number philippines"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines TIN",
+      "regex": "\\b\\d{3}-\\d{3}-\\d{3}-\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "philippines tin",
+        "bir tin",
+        "bureau of internal revenue philippines",
+        "tin philippines"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Philippines UMID",
+      "regex": "\\b\\d{4}-\\d{7}-\\d\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "umid",
+        "unified multi-purpose id",
+        "gsis",
+        "philhealth",
+        "pagibig"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Indonesia NIK",
+      "regex": "\\b\\d{16}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "nik",
+        "nomor induk kependudukan",
+        "ktp",
+        "kartu tanda penduduk",
+        "dukcapil"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Indonesia NPWP",
+      "regex": "\\b\\d{2}\\.\\d{3}\\.\\d{3}\\.\\d-\\d{3}\\.\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "npwp",
+        "nomor pokok wajib pajak",
+        "pajak indonesia"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Vietnam CCCD",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "cccd",
+        "c\u0103n c\u01b0\u1edbc c\u00f4ng d\u00e2n",
+        "can cuoc cong dan",
+        "vietnam national id",
+        "cmnd"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Vietnam MST",
+      "regex": "\\b\\d{10}(?:-\\d{3})?\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "m\u00e3 s\u1ed1 thu\u1ebf",
+        "ma so thue",
+        "vietnam tax code",
+        "t\u1ed5ng c\u1ee5c thu\u1ebf",
+        "tong cuc thue"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Japan My Number",
+      "regex": "\\b\\d{12}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "my number",
+        "\u30de\u30a4\u30ca\u30f3\u30d0\u30fc",
+        "\u500b\u4eba\u756a\u53f7",
+        "japan social security and tax number",
+        "kojin bang\u014d"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Japan Passport Number",
+      "regex": "\\b[A-Z]{2}\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "japan passport",
+        "japanese passport",
+        "ministry of foreign affairs japan",
+        "\u30d1\u30b9\u30dd\u30fc\u30c8 \u65e5\u672c"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "South Korea RRN",
+      "regex": "\\b\\d{6}-[1-4]\\d{6}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "\uc8fc\ubbfc\ub4f1\ub85d\ubc88\ud638",
+        "resident registration number",
+        "korea rrn",
+        "jumin",
+        "korean national id"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "South Korea Business Registration Number",
+      "regex": "\\b\\d{3}-\\d{2}-\\d{5}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "\uc0ac\uc5c5\uc790\ub4f1\ub85d\ubc88\ud638",
+        "business registration number korea",
+        "hometax",
+        "nts korea"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Taiwan National ID",
+      "regex": "\\b[A-Z][12]\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "\u8eab\u5206\u8b49",
+        "national identification card taiwan",
+        "ministry of the interior taiwan",
+        "taiwan id",
+        "\u8eab\u5206\u8bc1\u5b57\u53f7"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "China Resident ID",
+      "regex": "\\b\\d{17}[\\dX]\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "\u5c45\u6c11\u8eab\u4efd\u8bc1",
+        "resident identity card china",
+        "prc national id",
+        "\u8eab\u4efd\u8bc1\u53f7",
+        "\u516c\u5b89\u90e8"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "China Passport Number",
+      "regex": "\\b[EG]\\d{8}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "china passport",
+        "prc passport",
+        "\u4e2d\u56fd\u62a4\u7167",
+        "national immigration administration china"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "India Aadhaar",
+      "regex": "\\b\\d{4}\\s\\d{4}\\s\\d{4}\\b",
+      "prefix": "",
+      "severity": "critical",
+      "score_weight": 1,
+      "hotwords": [
+        "aadhaar",
+        "aadhar",
+        "uidai",
+        "unique identification authority",
+        "\u0906\u0927\u093e\u0930"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "India PAN",
+      "regex": "\\b[A-Z]{5}\\d{4}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "pan card",
+        "permanent account number",
+        "income tax department india",
+        "incometaxindia",
+        "pan no"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "Hong Kong HKID",
+      "regex": "\\b[A-Z]{1,2}\\d{6}\\([\\dA]\\)",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hkid",
+        "hong kong identity card",
+        "\u9999\u6e2f\u8eab\u4efd\u8b49",
+        "immigration department hong kong"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "pii_sea"
+    },
+    {
+      "name": "US CLIA Number",
+      "regex": "\\b\\d{2}D\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "clia number",
+        "clinical laboratory improvement amendments",
+        "lab certification",
+        "cms clia"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US CPT Procedure Code List",
+      "regex": "(?:\\b\\d{5}\\b[\\s,;|]+){4}\\b\\d{5}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "cpt code",
+        "current procedural terminology",
+        "procedure code",
+        "ama cpt"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US HCPCS Level II Code List",
+      "regex": "(?:\\b[A-V]\\d{4}\\b[\\s,;|]+){2}\\b[A-V]\\d{4}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "hcpcs",
+        "healthcare common procedure",
+        "level ii code",
+        "durable medical equipment"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "LOINC Code List",
+      "regex": "(?:\\b\\d{1,5}-\\d\\b[\\s,;|]+){2}\\b\\d{1,5}-\\d\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "loinc code",
+        "logical observation identifiers names and codes",
+        "regenstrief loinc"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "ICD-9-CM Diagnosis Code List",
+      "regex": "(?:\\b(?:[VE]?\\d{2,3}(?:\\.\\d{1,2})?)\\b[\\s,;|]+){4}\\b[VE]?\\d{2,3}(?:\\.\\d{1,2})?\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "icd-9",
+        "icd9",
+        "icd-9-cm",
+        "international classification of diseases 9th"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US NDC Drug Code (11-digit)",
+      "regex": "\\b\\d{5}-\\d{4}-\\d{2}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "ndc 11-digit",
+        "national drug code",
+        "fda ndc"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "SNOMED CT Concept ID List",
+      "regex": "(?:\\b\\d{6,18}\\b[\\s,;|]+){2}\\b\\d{6,18}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "snomed ct",
+        "snomed-ct concept id",
+        "ihtsdo snomed",
+        "systematized nomenclature of medicine"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DSM-5 Diagnosis Code",
+      "regex": "\\bF\\d{2}\\.\\d{1,2}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dsm-5",
+        "dsm5",
+        "diagnostic and statistical manual",
+        "mental disorder diagnosis"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "US Medicare HICN (legacy)",
+      "regex": "\\b\\d{9}[A-Z]\\d?\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hicn",
+        "health insurance claim number",
+        "medicare hicn legacy"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "CMS Certification Number (CCN)",
+      "regex": "\\b\\d{6}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "cms certification number",
+        "ccn medicare",
+        "centers for medicare services facility identifier"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Insurance Subscriber Member ID",
+      "regex": "\\b[A-Z0-9]{9,15}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "subscriber id",
+        "member id",
+        "insurance member id",
+        "policy member number"
+      ],
+      "hotword_window": 80,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "Patient DOB in Clinical Context",
+      "regex": "(?i)\\bDOB\\s*[:#=]?\\s*(?:\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})\\b",
+      "prefix": "dob",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "patient",
+        "diagnosis",
+        "treatment",
+        "clinical"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 OBX Result Segment",
+      "regex": "OBX\\|\\d{1,3}\\|[A-Z]{1,3}\\|[^|]{1,40}\\|[^|]{0,40}\\|[^|]{1,80}",
+      "prefix": "obx|",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "obx",
+        "observation result",
+        "lab result"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "HL7 v2 ORC Order Segment",
+      "regex": "ORC\\|[A-Z]{2}\\|[^|]{1,40}\\|[^|]{0,40}\\|[^|]{0,40}",
+      "prefix": "orc|",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "hl7",
+        "orc",
+        "order segment",
+        "lab order"
+      ],
+      "hotword_window": 250,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "DICOM Patient Name Tag",
+      "regex": "\\(0010,0010\\)\\s*PN\\s*\\[[A-Za-z\\^\\-' ]{2,60}\\]",
+      "prefix": "(0010,0010)",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "dicom",
+        "patient name",
+        "study",
+        "imaging"
+      ],
+      "hotword_window": 300,
+      "hotword_boost": 2,
+      "require_hotword": false,
+      "entropy_min": 0.0,
+      "category": "phi"
+    },
+    {
+      "name": "California Driver's License",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "california driver",
+        "california dl",
+        "dmv california",
+        "california drivers license"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California State ID Card",
+      "regex": "\\b[A-Z]\\d{7}\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "california state id",
+        "california identification card",
+        "ca state id card",
+        "dmv id card california"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Medi-Cal Beneficiary ID",
+      "regex": "\\b\\d{8}[A-Z]\\b",
+      "prefix": "",
+      "severity": "high",
+      "score_weight": 1,
+      "hotwords": [
+        "medi-cal",
+        "medi cal",
+        "california medicaid",
+        "dhcs medi-cal"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Vehicle License Plate",
+      "regex": "\\b[1-9][A-Z]{3}\\d{3}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "california license plate",
+        "california plate number",
+        "ca plate",
+        "dmv plate california"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
+    },
+    {
+      "name": "California Sales Tax Permit Number",
+      "regex": "\\b\\d{3}-\\d{6}\\b",
+      "prefix": "",
+      "severity": "medium",
+      "score_weight": 1,
+      "hotwords": [
+        "california sales tax",
+        "cdtfa permit",
+        "california seller's permit",
+        "ca sales tax permit"
+      ],
+      "hotword_window": 200,
+      "hotword_boost": 2,
+      "require_hotword": true,
+      "entropy_min": 0.0,
+      "category": "pii_ccpa"
     }
   ]
 }

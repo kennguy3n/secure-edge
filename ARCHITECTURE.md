@@ -249,7 +249,7 @@ Optional, server-distributed policy bundles.
 
 | Capability  | Approach                                                                                                         |
 |-------------|------------------------------------------------------------------------------------------------------------------|
-| Schema      | `{name, version, managed, categories, dlp, rule_update_url, signature}` JSON                                     |
+| Schema      | `{name, version, managed, categories, dlp_thresholds, rule_update_url, signature}` JSON                          |
 | Source      | Local file (`profile_path`) or HTTPS GET (`profile_url`); `profile_path` wins when both are set                  |
 | SSRF defense| URL fetches use a custom `http.Transport` that pins the resolved IP and rejects RFC1918 / loopback / link-local  |
 | Size cap    | 1 MiB; enforced in the loader so a hostile server cannot OOM the agent                                           |
